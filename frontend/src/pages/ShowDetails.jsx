@@ -24,7 +24,7 @@ function ShowDetails() {
   }
 
   return (
-    <div style={{ maxWidth: 1100, margin: '2rem auto', color: '#e0e6ed' }}>
+    <div style={{ flex: 1, width: '100%', minWidth: 0, minHeight: 0, overflow: 'auto', color: '#e0e6ed', display: 'flex', flexDirection: 'column' }}>
       <h1 style={{ marginBottom: 24 }}>{show.title}</h1>
       <Collapse accordion>
         {show.seasons.map(season => (

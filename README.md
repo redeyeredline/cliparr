@@ -1,7 +1,7 @@
-# Cliprr Project
+# Cliparr Project
 
 ## Project Overview
-Cliprr is a media management application that integrates with the Sonarr API to fetch and store information about TV series. It provides a web interface for users to view series details and manage their media library.
+Cliparr is a media management application that integrates with the Sonarr API to fetch and store information about TV series. It provides a web interface for users to view series details and manage their media library.
 
 ## Features
 - Fetch series data from Sonarr API

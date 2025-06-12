@@ -10,7 +10,7 @@ def init_db():
     # Get the path to the schema file
     schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
     # Get the path to the database file
-    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'cliprr.db')
+    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'cliparr.db')
     
     # Ensure the data directory exists
     os.makedirs(os.path.dirname(db_path), exist_ok=True)

@@ -44,7 +44,13 @@ function Sidebar({ onImportClick, openImportModal }) {
   const location = useLocation();
   const [openBranch, setOpenBranch] = useState('');
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => {
+    if (path === '/') {
+      // Highlight Series for both / and /series/:id
+      return location.pathname === '/' || location.pathname.startsWith('/series/');
+    }
+    return location.pathname === path;
+  };
   const isBranchActive = (branch) => location.pathname.startsWith(branch);
 
   // Determine which main item/branch is currently selected
@@ -190,23 +196,18 @@ function MainApp({ importedShows, setImportedShowsLoaded, openImportModal }) {
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#181818' }}>
       <Sidebar onImportClick={handleImportClick} openImportModal={openImportModal} />
-      {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        {/* Main Page Content */}
-        <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <Routes>
-              <Route path="/" element={<Home ref={homeRef} importedShows={importedShows} setImportedShowsLoaded={setImportedShowsLoaded} />} />
-              <Route path="/system/logs" element={<LogFiles />} />
-              <Route path="/series/:id" element={<ShowDetails />} />
-              {/* Add more routes as needed */}
-            </Routes>
-          </div>
-          {/* Alphabet Sidebar only on Home */}
-          {location.pathname === '/' && (
-            <AlphabetSidebar onLetterClick={handleLetterClick} activeLetter={activeLetter} />
-          )}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, minWidth: 0, overflow: 'hidden' }}>
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Routes>
+            <Route path="/" element={<Home ref={homeRef} importedShows={importedShows} setImportedShowsLoaded={setImportedShowsLoaded} />} />
+            <Route path="/system/logs" element={<LogFiles />} />
+            <Route path="/series/:id" element={<ShowDetails />} />
+            {/* Add more routes as needed */}
+          </Routes>
         </div>
+        {location.pathname === '/' && (
+          <AlphabetSidebar onLetterClick={handleLetterClick} activeLetter={activeLetter} />
+        )}
       </div>
     </div>
   );
