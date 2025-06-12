@@ -194,20 +194,50 @@ function MainApp({ importedShows, setImportedShowsLoaded, openImportModal }) {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#181818' }}>
+    <div style={{
+      flex: 1,
+      minWidth: 0,
+      minHeight: 0,
+      display: 'flex',
+      flexDirection: 'row',
+      overflow: 'hidden',
+    }}>
       <Sidebar onImportClick={handleImportClick} openImportModal={openImportModal} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, minWidth: 0, overflow: 'hidden' }}>
-        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <Routes>
-            <Route path="/" element={<Home ref={homeRef} importedShows={importedShows} setImportedShowsLoaded={setImportedShowsLoaded} />} />
-            <Route path="/system/logs" element={<LogFiles />} />
-            <Route path="/series/:id" element={<ShowDetails />} />
-            {/* Add more routes as needed */}
-          </Routes>
+      <div style={{
+        flex: 1,
+        minWidth: 0,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'row',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          flex: 1,
+          minWidth: 0,
+          minHeight: 0,
+          height: '100%',
+          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'row',
+        }}>
+          <div style={{
+            flex: 1,
+            minWidth: 0,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            <Routes>
+              <Route path="/" element={<Home ref={homeRef} importedShows={importedShows} setImportedShowsLoaded={setImportedShowsLoaded} />} />
+              <Route path="/system/logs" element={<LogFiles />} />
+              <Route path="/series/:id" element={<ShowDetails />} />
+              {/* Add more routes as needed */}
+            </Routes>
+          </div>
+          {location.pathname === '/' && (
+            <AlphabetSidebar onLetterClick={handleLetterClick} activeLetter={activeLetter} />
+          )}
         </div>
-        {location.pathname === '/' && (
-          <AlphabetSidebar onLetterClick={handleLetterClick} activeLetter={activeLetter} />
-        )}
       </div>
     </div>
   );

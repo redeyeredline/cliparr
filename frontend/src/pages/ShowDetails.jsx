@@ -24,9 +24,33 @@ function ShowDetails() {
   }
 
   return (
-    <div style={{ flex: 1, width: '100%', minWidth: 0, minHeight: 0, overflow: 'auto', color: '#e0e6ed', display: 'flex', flexDirection: 'column' }}>
-      <h1 style={{ marginBottom: 24 }}>{show.title}</h1>
-      <Collapse accordion>
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        width: '100%',
+        height: '100%',
+        color: '#e0e6ed',
+        display: 'flex',
+        flexDirection: 'column',
+        boxSizing: 'border-box',
+        padding: '1.5rem 2.5rem 2.5rem 2.5rem',
+        margin: 0,
+      }}
+    >
+      <h1 style={{
+        marginBottom: 24,
+        fontSize: 32,
+        fontWeight: 700,
+        lineHeight: 1.1,
+        wordBreak: 'break-word',
+        marginTop: 0,
+        marginLeft: 0,
+        marginRight: 0,
+      }}>
+        {show.title}
+      </h1>
+      <Collapse accordion style={{ width: '100%', margin: 0 }}>
         {show.seasons.map(season => (
           <Collapse.Panel header={`Season ${season.seasonNumber}`} key={season.seasonNumber}>
             <Table
@@ -40,7 +64,8 @@ function ShowDetails() {
                 { title: 'Preview', render: (_, ep) => <Button size="small">Preview</Button> },
               ]}
               size="small"
-              style={{ background: '#23272b' }}
+              style={{ background: '#23272b', width: '100%' }}
+              scroll={{ x: true }}
             />
           </Collapse.Panel>
         ))}

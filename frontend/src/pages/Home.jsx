@@ -86,7 +86,7 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* Static Top Bar */}
       <div style={{ 
         position: 'sticky', 
@@ -101,7 +101,7 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
       </div>
 
       {/* Main Table Area */}
-      <div style={{ flex: 1, minHeight: 0, padding: '1rem', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{
           flex: 1,
           minHeight: 0,
@@ -109,7 +109,8 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
           padding: '1rem',
           borderRadius: '4px',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          overflowY: 'auto'
         }}>
           <Table
             rowKey="id"
