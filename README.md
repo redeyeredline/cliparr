@@ -9,6 +9,22 @@ Cliparr is a media management application that integrates with the Sonarr API to
 - Web interface to view series list and details
 - Scan media files using FFmpeg
 
+## Import Modes
+
+Cliparr supports three import modes, controlled by the `CLIPARR_IMPORT_MODE` environment variable or via the Settings page in the UI:
+
+- **none** (default):
+  - Requires manual import of shows and manual selection for audio fingerprint analysis.
+- **import**:
+  - Automatically schedules audio fingerprint analysis for shows you import.
+  - Periodically scans for new episodes for shows you have imported and schedules audio fingerprint analysis for them.
+- **auto**:
+  - Will sync all shows automatically from Sonarr and schedule fingerprinting for all media.
+  - No changes to your data will be made.
+  - Will also scan for updates to media and perform audio analysis automatically.
+
+You can change this mode at any time from the Settings page.
+
 ## Installation
 1. Clone the repository.
 2. Navigate to the project directory.
@@ -18,6 +34,7 @@ Cliparr is a media management application that integrates with the Sonarr API to
 ## Usage
 - Access the web interface at `http://localhost:5173`.
 - Use the API endpoints to interact with the application programmatically.
+- The import mode (see above) controls how shows and audio analysis are handled.
 
 ## Environment Variables
 - `SONARR_URL`: The URL of your Sonarr instance.

@@ -18,6 +18,7 @@ import ImportModal from './components/ImportModal';
 import './App.css';
 import './style.css';
 import ShowDetails from './pages/ShowDetails';
+import Settings from './pages/Settings';
 
 const navItems = [
   { label: 'Series', path: '/', icon: <AppstoreOutlined /> },
@@ -28,7 +29,9 @@ const navItems = [
     label: 'Settings',
     icon: <SettingOutlined />,
     branch: '/settings',
-    subItems: [],
+    subItems: [
+      { label: 'General', path: '/settings' },
+    ],
   },
   {
     label: 'System',
@@ -249,6 +252,7 @@ function MainApp({ importedShows, setImportedShowsLoaded, openImportModal }) {
               } />} />
               <Route path="/system/logs" element={<LogFiles />} />
               <Route path="/series/:id" element={<ShowDetails />} />
+              <Route path="/settings" element={<Settings />} />
               {/* Add more routes as needed */}
             </Routes>
           </div>

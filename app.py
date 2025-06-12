@@ -18,6 +18,9 @@ from db.manager import (
     process_show_data, store_data_in_db, get_imported_shows_from_db
 )
 from log.logging_config import configure_logging
+from config import DB_PATH, IMPORT_MODE, set_import_mode
+import threading
+import time
 
 load_dotenv()
 
@@ -579,6 +582,75 @@ def api_get_series(show_id):
         'path': show['path'],
         'seasons': season_list
     })
+
+def schedule_fingerprinting_for_show(show_id):
+    # Dummy: Replace with actual scheduling logic
+    logging.info(f"Scheduling fingerprinting for show {show_id}")
+
+# Background polling for auto mode
+def poll_sonarr_for_new_content():
+    while True:
+        try:
+            logging.info("Polling Sonarr for new shows/episodes...")
+            # Import all shows and schedule fingerprinting
+            shows = fetch_series_data()
+            for show in shows:
+                process_show_data(get_db().cursor(), show)
+                schedule_fingerprinting_for_show(show['id'])
+        except Exception as e:
+            logging.error(f"Error during Sonarr polling: {e}")
+        time.sleep(3600)  # Poll every hour
+
+# Add a global variable to track the polling thread
+polling_thread = None
+
+def start_auto_mode_polling():
+    global polling_thread
+    if polling_thread is None or not polling_thread.is_alive():
+        polling_thread = threading.Thread(target=poll_sonarr_for_new_content, daemon=True)
+        polling_thread.start()
+
+@app.before_first_request
+def handle_import_mode():
+    if IMPORT_MODE == 'auto':
+        logging.info("IMPORT_MODE=auto: Importing all shows and scheduling fingerprinting.")
+        shows = fetch_series_data()
+        for show in shows:
+            process_show_data(get_db().cursor(), show)
+            schedule_fingerprinting_for_show(show['id'])
+        # Start background polling
+        start_auto_mode_polling()
+    elif IMPORT_MODE == 'import':
+        logging.info("IMPORT_MODE=import: Only scheduling fingerprinting for manually imported shows.")
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('SELECT sonarr_id FROM shows')
+        for row in cursor.fetchall():
+            schedule_fingerprinting_for_show(row['sonarr_id'])
+    else:
+        logging.info("IMPORT_MODE=none: Manual import and fingerprinting required.")
+
+@app.route('/api/settings/import-mode', methods=['POST'])
+def update_import_mode():
+    data = request.get_json()
+    mode = data.get('mode', 'none').lower()
+    if mode not in ('auto', 'import', 'none'):
+        return jsonify({'error': 'Invalid mode'}), 400
+    set_import_mode(mode)
+    if mode == 'auto':
+        # Immediate scan/import and start polling
+        logging.info("IMPORT_MODE switched to auto: Importing all shows and scheduling fingerprinting.")
+        shows = fetch_series_data()
+        for show in shows:
+            process_show_data(get_db().cursor(), show)
+            schedule_fingerprinting_for_show(show['id'])
+        start_auto_mode_polling()
+    return jsonify({'status': 'ok', 'mode': mode})
+
+@app.route('/api/settings/import-mode', methods=['GET'])
+def get_import_mode():
+    from config import IMPORT_MODE
+    return jsonify({'mode': IMPORT_MODE})
 
 if __name__ == '__main__':
     logging.info("Starting application...")

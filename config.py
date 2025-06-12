@@ -30,6 +30,14 @@ logging.basicConfig(
     ]
 )
 
+# Import mode
+IMPORT_MODE = os.getenv('CLIPARR_IMPORT_MODE', 'none').lower()
+
+def set_import_mode(new_mode):
+    global IMPORT_MODE
+    IMPORT_MODE = new_mode.lower()
+    os.environ['CLIPARR_IMPORT_MODE'] = new_mode.lower()
+
 def configure_logging():
     """Configure logging settings for the application."""
     logging.info("Logging is configured.")

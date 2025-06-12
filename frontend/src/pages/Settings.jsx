@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ImportModal from '../components/ImportModal';
+import { useToast } from '../components/ToastProvider';
 
 function Settings({ openImportModal }) {
   const [showModal, setShowModal] = useState(false);
@@ -10,9 +11,14 @@ function Settings({ openImportModal }) {
   const [importMessage, setImportMessage] = useState('');
   const [shows, setShows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [importMode, setImportMode] = useState('none');
+  const toast = useToast();
 
   useEffect(() => {
     fetchUnimported();
+    fetch('/api/settings/import-mode')
+      .then(res => res.json())
+      .then(data => setImportMode(data.mode || 'none'));
   }, []);
 
   const fetchUnimported = () => {
@@ -49,6 +55,26 @@ function Settings({ openImportModal }) {
     setImporting(false);
   };
 
+  const handleModeChange = async (e) => {
+    const mode = e.target.value;
+    try {
+      const res = await fetch('/api/settings/import-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setImportMode(mode);
+        toast({ type: 'success', message: `Import mode set to '${mode}'.` });
+      } else {
+        toast({ type: 'error', message: data.error || 'Failed to set import mode.' });
+      }
+    } catch (e) {
+      toast({ type: 'error', message: 'Failed to set import mode.' });
+    }
+  };
+
   if (loading) return <div>Loading unimported shows...</div>;
 
   return (
@@ -60,7 +86,21 @@ function Settings({ openImportModal }) {
       padding: '2rem',
       borderRadius: '8px'
     }}>
-      <h1>Settings: Import Additional Shows</h1>
+      <h1>Settings: Changes how Cliparr handles automatically importing and scanning shows</h1>
+      <div style={{ marginBottom: '2rem', color: '#b0b8c1', fontSize: '1.1rem', lineHeight: 1.6 }}>
+        <strong>Import Modes:</strong><br/>
+        <b>none</b>: Requires manual import and manual selection for audio fingerprint analysis.<br/>
+        <b>import</b>: Will automatically schedule audio fingerprint analysis for shows you import. Will also periodically scan for new episodes for shows you have imported and schedule audio fingerprint analysis.<br/>
+        <b>auto</b>: Will sync all shows automatically and fingerprint. No changes to your data will be made. Will also scan for updates to media and perform audio analysis.
+      </div>
+      <div style={{ marginBottom: '2rem' }}>
+        <label htmlFor="import-mode-select" style={{ fontWeight: 700, marginRight: 12 }}>Import Mode:</label>
+        <select id="import-mode-select" value={importMode} onChange={handleModeChange} style={{ fontSize: '1.1rem', padding: '0.5rem 1.5rem', borderRadius: 4 }}>
+          <option value="none">Manual (default)</option>
+          <option value="import">Imported Only</option>
+          <option value="auto">Auto </option>
+        </select>
+      </div>
       {shows.length === 0 ? (
         <div>All available shows have been imported!</div>
       ) : (
