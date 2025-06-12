@@ -1,15 +1,15 @@
 body, #root, .app-main {
-  background: #20232a !important;
-  color: #e0e6ed !important;
+  background: #181b20 !important;
+  color: #f5f7fa !important;
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
 /* Table container: flatter, less radius, no shadow */
 .ant-table {
   background: #23272b !important;
-  border-radius: 4px !important;
+  border-radius: 6px !important;
   box-shadow: none !important;
-  border: 1px solid #232b36 !important;
+  border: 1px solid #2a2e36 !important;
   font-size: 15px !important;
 }
 
@@ -20,7 +20,7 @@ body, #root, .app-main {
   font-weight: 700;
   border-bottom: 1px solid #262a32 !important;
   padding: 7px 12px !important;
-  font-size: 15px !important;
+  font-size: 16px !important;
   height: 36px !important;
   line-height: 1.2 !important;
 }
@@ -28,8 +28,8 @@ body, #root, .app-main {
 /* Table rows: tighter, less vertical padding */
 .ant-table-tbody > tr > td {
   background: #23272b !important;
-  color: #e0e6ed !important;
-  border-bottom: 1px solid #232b36 !important;
+  color: #f5f7fa !important;
+  border-bottom: 1px solid #2a2e36 !important;
   padding: 6px 12px !important;
   font-size: 15px !important;
   height: 36px !important;
@@ -62,7 +62,7 @@ body, #root, .app-main {
 /* Sort icons: Sonarr blue */
 .ant-table-column-sorter-up.active,
 .ant-table-column-sorter-down.active {
-  color: #00bfff !important;
+  color: #1faaff !important;
 }
 
 /* Remove extra border on table content */
@@ -78,7 +78,7 @@ body, #root, .app-main {
 
 /* Table cell text: slightly lighter for secondary info */
 .ant-table-cell {
-  color: #e0e6ed !important;
+  color: #f5f7fa !important;
   font-size: 15px !important;
 }
 
@@ -86,4 +86,62 @@ body, #root, .app-main {
 .ant-table-wrapper {
   margin: 0 !important;
   padding: 0 !important;
+}
+
+/* Collapse panel: use a lighter dark, not white */
+.ant-collapse-content,
+.ant-collapse-content > .ant-collapse-content-box {
+  background: #23272b !important;
+  color: #f5f7fa !important;
+  border-radius: 0 0 6px 6px !important;
+  padding: 0 !important;
+}
+
+/* Collapse header: bold, readable, Sonarr-style */
+.ant-collapse-header {
+  background: #232b36 !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
+  border-radius: 6px 6px 0 0 !important;
+  padding: 0.75rem 1.5rem !important;
+  border-bottom: 1px solid #2a2e36 !important;
+}
+
+/* Remove white border around expanded panel */
+.ant-collapse-item-active {
+  border-color: #2a2e36 !important;
+}
+
+/* Remove default white background from Table inside Collapse */
+.ant-collapse-content .ant-table {
+  background: #23272b !important;
+  border: none !important;
+}
+
+/* Table inside collapse: match Sonarr's subtle border */
+.ant-collapse-content .ant-table-thead > tr > th,
+.ant-collapse-content .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #2a2e36 !important;
+}
+
+/* Remove extra margin/padding from collapse and table */
+.ant-collapse {
+  margin-bottom: 0 !important;
+  background: none !important;
+  border: none !important;
+}
+
+/* Remove border between collapse panels */
+.ant-collapse > .ant-collapse-item {
+  border-bottom: none !important;
+  margin-bottom: 28px !important;
+}
+.ant-collapse-content {
+  border-top: none !important;
+}
+
+/* Remove border from last row in table inside collapse */
+.ant-collapse-content .ant-table-tbody > tr:last-child > td {
+  border-bottom: none !important;
 } 

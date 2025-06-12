@@ -180,6 +180,19 @@ function MainApp({ importedShows, setImportedShowsLoaded, openImportModal }) {
   const homeRef = useRef();
   const location = useLocation();
 
+  // Compute available letters from importedShows
+  const availableLetters = React.useMemo(() => {
+    const alphabet = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
+    const showLetters = new Set();
+    importedShows.forEach(show => {
+      const first = (show.title || '').charAt(0).toUpperCase();
+      if (/^[A-Z]$/.test(first)) showLetters.add(first);
+      else showLetters.add('#');
+    });
+    // Only include letters that have at least one show
+    return alphabet.filter(l => showLetters.has(l));
+  }, [importedShows]);
+
   const handleLetterClick = (letter) => {
     setActiveLetter(letter);
     if (homeRef.current && homeRef.current.scrollToLetter) {
@@ -201,6 +214,7 @@ function MainApp({ importedShows, setImportedShowsLoaded, openImportModal }) {
       display: 'flex',
       flexDirection: 'row',
       overflow: 'hidden',
+      height: '100%',
     }}>
       <Sidebar onImportClick={handleImportClick} openImportModal={openImportModal} />
       <div style={{
@@ -210,6 +224,7 @@ function MainApp({ importedShows, setImportedShowsLoaded, openImportModal }) {
         display: 'flex',
         flexDirection: 'row',
         overflow: 'hidden',
+        height: '100%',
       }}>
         <div style={{
           flex: 1,
@@ -226,17 +241,18 @@ function MainApp({ importedShows, setImportedShowsLoaded, openImportModal }) {
             minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
+            height: '100%',
           }}>
             <Routes>
-              <Route path="/" element={<Home ref={homeRef} importedShows={importedShows} setImportedShowsLoaded={setImportedShowsLoaded} />} />
+              <Route path="/" element={<Home ref={homeRef} importedShows={importedShows} setImportedShowsLoaded={setImportedShowsLoaded} AlphabetSidebarComponent={
+                <AlphabetSidebar onLetterClick={handleLetterClick} activeLetter={activeLetter} letters={availableLetters} />
+              } />} />
               <Route path="/system/logs" element={<LogFiles />} />
               <Route path="/series/:id" element={<ShowDetails />} />
               {/* Add more routes as needed */}
             </Routes>
           </div>
-          {location.pathname === '/' && (
-            <AlphabetSidebar onLetterClick={handleLetterClick} activeLetter={activeLetter} />
-          )}
+          {location.pathname === '/' && false /* Remove old sidebar wrapper */}
         </div>
       </div>
     </div>

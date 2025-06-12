@@ -4,7 +4,7 @@ import { useToast } from '../components/ToastProvider';
 import 'antd/dist/reset.css';
 import { Link } from 'react-router-dom';
 
-const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
+const Home = forwardRef(({ importedShows, setImportedShowsLoaded, AlphabetSidebarComponent }, ref) => {
   const [selectionModel, setSelectionModel] = useState([]);
   const [deleting, setDeleting] = useState(false);
   const tableBodyRef = useRef();
@@ -58,25 +58,16 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
       dataIndex: 'title',
       key: 'title',
       sorter: (a, b) => a.title.localeCompare(b.title),
-      render: (text, record) => <Link to={`/series/${record.id}`}>{text}</Link>,
-    },
-    {
-      title: 'Path',
-      dataIndex: 'path',
-      key: 'path',
-      ellipsis: true,
-    },
-    {
-      title: 'Episodes (DB)',
-      dataIndex: 'db_episode_count',
-      key: 'db_episode_count',
-      sorter: (a, b) => a.db_episode_count - b.db_episode_count,
-    },
-    {
-      title: 'Episodes (Sonarr)',
-      dataIndex: 'sonarr_episode_count',
-      key: 'sonarr_episode_count',
-      sorter: (a, b) => a.sonarr_episode_count - b.sonarr_episode_count,
+      render: (text, record) => (
+        <Link to={`/series/${record.id}`} style={{
+          display: 'inline-block',
+          maxWidth: 320,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          color: '#00bfff',
+        }}>{text}</Link>
+      ),
     },
   ];
 
@@ -100,8 +91,8 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
         {/* Removed Import More Shows button from here */}
       </div>
 
-      {/* Main Table Area */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      {/* Main Table Area + Alphabet Sidebar */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', height: '100%' }}>
         <div style={{
           flex: 1,
           minHeight: 0,
@@ -110,7 +101,8 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
           borderRadius: '4px',
           display: 'flex',
           flexDirection: 'column',
-          overflowY: 'auto'
+          overflowY: 'auto',
+          height: '100%',
         }}>
           <Table
             rowKey="id"
@@ -120,6 +112,7 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
             pagination={false}
           />
         </div>
+        {AlphabetSidebarComponent}
       </div>
 
       {/* Static Bottom Bar (appears when selection) */}
