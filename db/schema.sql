@@ -39,4 +39,10 @@ CREATE TABLE IF NOT EXISTS episode_files (
     quality TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (episode_id) REFERENCES episodes(id)
+);
+
+-- Settings table for persistent app configuration
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
 ); 

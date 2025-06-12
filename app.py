@@ -591,12 +591,37 @@ def schedule_fingerprinting_for_show(show_id):
 def poll_sonarr_for_new_content():
     while True:
         try:
-            logging.info("Polling Sonarr for new shows/episodes...")
-            # Import all shows and schedule fingerprinting
-            shows = fetch_series_data()
-            for show in shows:
-                process_show_data(get_db().cursor(), show)
-                schedule_fingerprinting_for_show(show['id'])
+            from config import IMPORT_MODE
+            logging.info(f"Polling Sonarr for new shows/episodes (mode={IMPORT_MODE})...")
+            if IMPORT_MODE == 'auto':
+                # Fetch unimported shows and import them
+                sonarr_shows = fetch_series_data()
+                db = get_db()
+                cursor = db.cursor()
+                cursor.execute('SELECT sonarr_id FROM shows')
+                imported_ids = set(row['sonarr_id'] for row in cursor.fetchall())
+                unimported = [show for show in sonarr_shows if show['id'] not in imported_ids]
+                for show in unimported:
+                    # Import the show (same as import_selected_shows logic)
+                    episodes = fetch_json(f'episode?seriesId={show["id"]}')
+                    local_show_id = insert_show(cursor, show)
+                    for ep in episodes:
+                        season_number = ep['seasonNumber']
+                        season_id = insert_season(cursor, local_show_id, season_number)
+                        insert_episode(cursor, season_id, ep)
+                    schedule_fingerprinting_for_show(show['id'])
+                db.commit()
+            elif IMPORT_MODE == 'import':
+                # Only poll imported shows for new episodes
+                db = get_db()
+                cursor = db.cursor()
+                cursor.execute('SELECT sonarr_id FROM shows')
+                imported_ids = [row['sonarr_id'] for row in cursor.fetchall()]
+                for show_id in imported_ids:
+                    episodes = fetch_json(f'episode?seriesId={show_id}')
+                    for ep in episodes:
+                        # Here, schedule fingerprinting for new episodes (placeholder)
+                        schedule_fingerprinting_for_show(show_id)
         except Exception as e:
             logging.error(f"Error during Sonarr polling: {e}")
         time.sleep(3600)  # Poll every hour
@@ -612,21 +637,20 @@ def start_auto_mode_polling():
 
 @app.before_first_request
 def handle_import_mode():
-    if IMPORT_MODE == 'auto':
-        logging.info("IMPORT_MODE=auto: Importing all shows and scheduling fingerprinting.")
-        shows = fetch_series_data()
-        for show in shows:
-            process_show_data(get_db().cursor(), show)
-            schedule_fingerprinting_for_show(show['id'])
-        # Start background polling
+    if IMPORT_MODE in ('auto', 'import'):
+        logging.info(f"IMPORT_MODE={IMPORT_MODE}: Starting polling and scheduling.")
+        if IMPORT_MODE == 'auto':
+            shows = fetch_series_data()
+            for show in shows:
+                process_show_data(get_db().cursor(), show)
+                schedule_fingerprinting_for_show(show['id'])
+        elif IMPORT_MODE == 'import':
+            db = get_db()
+            cursor = db.cursor()
+            cursor.execute('SELECT sonarr_id FROM shows')
+            for row in cursor.fetchall():
+                schedule_fingerprinting_for_show(row['sonarr_id'])
         start_auto_mode_polling()
-    elif IMPORT_MODE == 'import':
-        logging.info("IMPORT_MODE=import: Only scheduling fingerprinting for manually imported shows.")
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute('SELECT sonarr_id FROM shows')
-        for row in cursor.fetchall():
-            schedule_fingerprinting_for_show(row['sonarr_id'])
     else:
         logging.info("IMPORT_MODE=none: Manual import and fingerprinting required.")
 
@@ -636,16 +660,39 @@ def update_import_mode():
     mode = data.get('mode', 'none').lower()
     if mode not in ('auto', 'import', 'none'):
         return jsonify({'error': 'Invalid mode'}), 400
-    set_import_mode(mode)
-    if mode == 'auto':
-        # Immediate scan/import and start polling
-        logging.info("IMPORT_MODE switched to auto: Importing all shows and scheduling fingerprinting.")
-        shows = fetch_series_data()
-        for show in shows:
-            process_show_data(get_db().cursor(), show)
-            schedule_fingerprinting_for_show(show['id'])
-        start_auto_mode_polling()
-    return jsonify({'status': 'ok', 'mode': mode})
+    try:
+        set_import_mode(mode)
+        if mode in ('auto', 'import'):
+            logging.info(f"IMPORT_MODE switched to {mode}: Starting polling and scheduling.")
+            if mode == 'auto':
+                # Fetch unimported shows and import them
+                sonarr_shows = fetch_series_data()
+                db = get_db()
+                cursor = db.cursor()
+                cursor.execute('SELECT sonarr_id FROM shows')
+                imported_ids = set(row['sonarr_id'] for row in cursor.fetchall())
+                unimported = [show for show in sonarr_shows if show['id'] not in imported_ids]
+                for show in unimported:
+                    # Import the show (same as import_selected_shows logic)
+                    episodes = fetch_json(f'episode?seriesId={show["id"]}')
+                    local_show_id = insert_show(cursor, show)
+                    for ep in episodes:
+                        season_number = ep['seasonNumber']
+                        season_id = insert_season(cursor, local_show_id, season_number)
+                        insert_episode(cursor, season_id, ep)
+                    schedule_fingerprinting_for_show(show['id'])
+                db.commit()
+            elif mode == 'import':
+                db = get_db()
+                cursor = db.cursor()
+                cursor.execute('SELECT sonarr_id FROM shows')
+                for row in cursor.fetchall():
+                    schedule_fingerprinting_for_show(row['sonarr_id'])
+            start_auto_mode_polling()
+        return jsonify({'status': 'ok', 'mode': mode})
+    except Exception as e:
+        logging.error(f'Failed to set import mode: {e}', exc_info=True)
+        return jsonify({'error': f'Failed to set import mode: {e}'}), 500
 
 @app.route('/api/settings/import-mode', methods=['GET'])
 def get_import_mode():

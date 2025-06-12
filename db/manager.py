@@ -175,4 +175,27 @@ def get_imported_shows_from_db():
     finally:
         conn.close()
         logging.info("Database connection closed.")
+
+
+def get_setting(key, default=None):
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT value FROM settings WHERE key = ?', (key,))
+        row = cur.fetchone()
+        if row:
+            return row[0]
+        return default
+    finally:
+        conn.close()
+
+
+def set_setting(key, value):
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
+        conn.commit()
+    finally:
+        conn.close()
         

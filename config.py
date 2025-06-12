@@ -31,12 +31,21 @@ logging.basicConfig(
 )
 
 # Import mode
-IMPORT_MODE = os.getenv('CLIPARR_IMPORT_MODE', 'none').lower()
+try:
+    from db.manager import get_setting, set_setting
+    IMPORT_MODE = get_setting('import_mode', os.getenv('CLIPARR_IMPORT_MODE', 'none')).lower()
+except Exception:
+    IMPORT_MODE = os.getenv('CLIPARR_IMPORT_MODE', 'none').lower()
 
 def set_import_mode(new_mode):
     global IMPORT_MODE
     IMPORT_MODE = new_mode.lower()
     os.environ['CLIPARR_IMPORT_MODE'] = new_mode.lower()
+    try:
+        from db.manager import set_setting
+        set_setting('import_mode', new_mode.lower())
+    except Exception:
+        pass
 
 def configure_logging():
     """Configure logging settings for the application."""

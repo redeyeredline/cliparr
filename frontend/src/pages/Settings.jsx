@@ -86,17 +86,17 @@ function Settings({ openImportModal }) {
       padding: '2rem',
       borderRadius: '8px'
     }}>
-      <h1>Settings: Changes how Cliparr handles automatically importing and scanning shows</h1>
+      <strong>This setting changes how Cliparr handles automatically importing and scanning shows</strong><br/><br/>
       <div style={{ marginBottom: '2rem', color: '#b0b8c1', fontSize: '1.1rem', lineHeight: 1.6 }}>
         <strong>Import Modes:</strong><br/>
-        <b>none</b>: Requires manual import and manual selection for audio fingerprint analysis.<br/>
-        <b>import</b>: Will automatically schedule audio fingerprint analysis for shows you import. Will also periodically scan for new episodes for shows you have imported and schedule audio fingerprint analysis.<br/>
-        <b>auto</b>: Will sync all shows automatically and fingerprint. No changes to your data will be made. Will also scan for updates to media and perform audio analysis.
+        <b>None</b>: Requires manual import and manual selection for audio fingerprint analysis.<br/>
+        <b>Import</b>: Will automatically schedule audio fingerprint analysis for shows you import. Will also periodically scan for new episodes for shows you have imported and schedule audio fingerprint analysis.<br/>
+        <b>Auto</b>: Will sync all shows automatically and run fingerprint analysis. No changes to your data will be made. Will also scan for updates to media and perform audio analysis.
       </div>
       <div style={{ marginBottom: '2rem' }}>
         <label htmlFor="import-mode-select" style={{ fontWeight: 700, marginRight: 12 }}>Import Mode:</label>
         <select id="import-mode-select" value={importMode} onChange={handleModeChange} style={{ fontSize: '1.1rem', padding: '0.5rem 1.5rem', borderRadius: 4 }}>
-          <option value="none">Manual (default)</option>
+          <option value="none">None (default)</option>
           <option value="import">Imported Only</option>
           <option value="auto">Auto </option>
         </select>
