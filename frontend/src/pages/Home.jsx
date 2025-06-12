@@ -2,6 +2,7 @@ import React, { useEffect, useState, useImperativeHandle, forwardRef, useRef } f
 import { Table, Button } from 'antd';
 import { useToast } from '../components/ToastProvider';
 import 'antd/dist/reset.css';
+import { Link } from 'react-router-dom';
 
 const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
   const [selectionModel, setSelectionModel] = useState([]);
@@ -57,7 +58,7 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
       dataIndex: 'title',
       key: 'title',
       sorter: (a, b) => a.title.localeCompare(b.title),
-      sortDirections: ['ascend', 'descend'],
+      render: (text, record) => <Link to={`/series/${record.id}`}>{text}</Link>,
     },
     {
       title: 'Path',
@@ -85,11 +86,9 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#181818' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Static Top Bar */}
       <div style={{ 
-        backgroundColor: '#222', 
-        color: '#fff', 
         position: 'sticky', 
         top: 0, 
         zIndex: 100,
@@ -107,7 +106,6 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
           flex: 1,
           minHeight: 0,
           width: '100%',
-          backgroundColor: '#222',
           padding: '1rem',
           borderRadius: '4px',
           display: 'flex',
@@ -119,7 +117,6 @@ const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
             dataSource={importedShows}
             rowSelection={rowSelection}
             pagination={false}
-            style={{ backgroundColor: '#222', color: '#fff' }}
           />
         </div>
       </div>

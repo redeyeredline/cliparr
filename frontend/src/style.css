@@ -1,0 +1,89 @@
+body, #root, .app-main {
+  background: #20232a !important;
+  color: #e0e6ed !important;
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Table container: flatter, less radius, no shadow */
+.ant-table {
+  background: #23272b !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  border: 1px solid #232b36 !important;
+  font-size: 15px !important;
+}
+
+/* Table header: tighter, bold, smaller padding */
+.ant-table-thead > tr > th {
+  background: #232b36 !important;
+  color: #fff !important;
+  font-weight: 700;
+  border-bottom: 1px solid #262a32 !important;
+  padding: 7px 12px !important;
+  font-size: 15px !important;
+  height: 36px !important;
+  line-height: 1.2 !important;
+}
+
+/* Table rows: tighter, less vertical padding */
+.ant-table-tbody > tr > td {
+  background: #23272b !important;
+  color: #e0e6ed !important;
+  border-bottom: 1px solid #232b36 !important;
+  padding: 6px 12px !important;
+  font-size: 15px !important;
+  height: 36px !important;
+  line-height: 1.2 !important;
+  transition: background 0.2s;
+}
+
+/* Row hover: subtle, not too bright */
+.ant-table-tbody > tr:hover > td {
+  background: #232b36 !important;
+}
+
+/* Row selected: subtle highlight */
+.ant-table-row-selected > td {
+  background: #1a1d23 !important;
+}
+
+/* Checkbox: smaller, aligned */
+.ant-checkbox-inner {
+  width: 16px !important;
+  height: 16px !important;
+  background: #232b36 !important;
+  border-color: #3a3f4b !important;
+}
+.ant-checkbox-checked .ant-checkbox-inner {
+  background: #00bfff !important;
+  border-color: #00bfff !important;
+}
+
+/* Sort icons: Sonarr blue */
+.ant-table-column-sorter-up.active,
+.ant-table-column-sorter-down.active {
+  color: #00bfff !important;
+}
+
+/* Remove extra border on table content */
+.ant-table-content {
+  border-radius: 4px !important;
+  border: none !important;
+}
+
+/* Remove focus outline on table rows for a cleaner look */
+.ant-table-tbody > tr:focus > td {
+  outline: none !important;
+}
+
+/* Table cell text: slightly lighter for secondary info */
+.ant-table-cell {
+  color: #e0e6ed !important;
+  font-size: 15px !important;
+}
+
+/* Remove extra spacing above/below table */
+.ant-table-wrapper {
+  margin: 0 !important;
+  padding: 0 !important;
+} 

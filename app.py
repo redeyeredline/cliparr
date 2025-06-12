@@ -550,6 +550,36 @@ def delete_imported_shows():
     except sqlite3.Error as e:
         return jsonify({'error': f"Error deleting shows: {e}"}), 500
 
+@app.route('/api/series/<int:show_id>', methods=['GET'])
+def api_get_series(show_id):
+    db = get_db()
+    cursor = db.cursor()
+    # Get show
+    cursor.execute('SELECT id, title, overview, path FROM shows WHERE id = ?', (show_id,))
+    show = cursor.fetchone()
+    if not show:
+        return jsonify({'error': 'Show not found'}), 404
+    # Get seasons
+    cursor.execute('SELECT id, season_number FROM seasons WHERE show_id = ? ORDER BY season_number', (show_id,))
+    seasons = cursor.fetchall()
+    season_list = []
+    for season in seasons:
+        season_id, season_number = season['id'], season['season_number']
+        # Get episodes for this season
+        cursor.execute('SELECT episode_number, title FROM episodes WHERE season_id = ? ORDER BY episode_number', (season_id,))
+        episodes = [{'episodeNumber': ep['episode_number'], 'title': ep['title']} for ep in cursor.fetchall()]
+        season_list.append({
+            'seasonNumber': season_number,
+            'episodes': episodes
+        })
+    return jsonify({
+        'id': show['id'],
+        'title': show['title'],
+        'overview': show['overview'],
+        'path': show['path'],
+        'seasons': season_list
+    })
+
 if __name__ == '__main__':
     logging.info("Starting application...")
     with app.app_context():

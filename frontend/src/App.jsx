@@ -16,6 +16,8 @@ import {
 } from '@ant-design/icons';
 import ImportModal from './components/ImportModal';
 import './App.css';
+import './style.css';
+import ShowDetails from './pages/ShowDetails';
 
 const navItems = [
   { label: 'Series', path: '/', icon: <AppstoreOutlined /> },
@@ -190,17 +192,13 @@ function MainApp({ importedShows, setImportedShowsLoaded, openImportModal }) {
       <Sidebar onImportClick={handleImportClick} openImportModal={openImportModal} />
       {/* Main Content Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        {/* Top Bar */}
-        <div style={{ height: 56, background: '#23272b', color: '#fff', display: 'flex', alignItems: 'center', padding: '0 32px', borderBottom: '1px solid #222', position: 'sticky', top: 0, zIndex: 100 }}>
-          <div style={{ fontWeight: 'bold', fontSize: 20 }}>Search</div>
-          {/* Add search input, actions, user menu here */}
-        </div>
         {/* Main Page Content */}
         <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
           <div style={{ flex: 1, overflow: 'hidden' }}>
             <Routes>
               <Route path="/" element={<Home ref={homeRef} importedShows={importedShows} setImportedShowsLoaded={setImportedShowsLoaded} />} />
               <Route path="/system/logs" element={<LogFiles />} />
+              <Route path="/series/:id" element={<ShowDetails />} />
               {/* Add more routes as needed */}
             </Routes>
           </div>

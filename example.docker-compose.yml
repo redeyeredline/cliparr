@@ -1,8 +1,8 @@
 version: '3.8'
 
 services:
-  cliprr:
-    container_name: cliprr
+  cliparr:
+    container_name: cliparr
     build: .
     ports:
       - "5000:5000"
