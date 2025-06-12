@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  cliprr:
+    container_name: cliprr
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - SONARR_URL=your_sonarr_url
+      - SONARR_API_KEY=your_sonarr_api_key
+    volumes:
+      # Datab files
+      - /path/to/data:/data
+      # Media files as mapped in sonarr
+      - /path/to/media:/media 
