@@ -1,35 +1,16 @@
 import React, { useEffect, useState, useImperativeHandle, forwardRef, useRef } from 'react';
-import ImportModal from '../components/ImportModal';
 import { Table, Button } from 'antd';
 import { useToast } from '../components/ToastProvider';
 import 'antd/dist/reset.css';
 
-const Home = forwardRef(({ scrollToLetter }, ref) => {
-  const [importedShows, setImportedShows] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [modalShows, setModalShows] = useState([]);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [modalError, setModalError] = useState('');
-  const [importing, setImporting] = useState(false);
-  const [importMessage, setImportMessage] = useState('');
+const Home = forwardRef(({ importedShows, setImportedShowsLoaded }, ref) => {
   const [selectionModel, setSelectionModel] = useState([]);
   const [deleting, setDeleting] = useState(false);
   const tableBodyRef = useRef();
   const toast = useToast();
 
-  useEffect(() => {
-    fetch('/api/imported-shows')
-      .then(res => res.json())
-      .then(data => {
-        setImportedShows(data);
-      })
-      .catch(() => {
-      });
-  }, []);
-
   useImperativeHandle(ref, () => ({
     scrollToLetter: (letter) => {
-      // Select all visible table rows
       const rows = document.querySelectorAll('.ant-table-row');
       let matchIndex = -1;
       for (let i = 0; i < importedShows.length; i++) {
@@ -49,52 +30,8 @@ const Home = forwardRef(({ scrollToLetter }, ref) => {
       if (matchIndex !== -1 && rows[matchIndex]) {
         rows[matchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    },
-    openImportModal: () => {
-      setShowModal(true);
-      setModalLoading(true);
-      setModalError('');
-      fetch('/api/sonarr/unimported')
-        .then(res => res.json())
-        .then(data => {
-          setModalShows(data);
-          setModalLoading(false);
-        })
-        .catch(() => {
-          setModalError('Failed to load shows from Sonarr.');
-          setModalLoading(false);
-        });
     }
   }));
-
-  const handleImport = async (selectedIds) => {
-    setImporting(true);
-    setImportMessage('Importing...');
-    try {
-      const res = await fetch('/api/sonarr/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ showIds: selectedIds })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast({ type: 'success', message: `Successfully imported ${data.importedCount} shows.` });
-        setImportMessage('');
-        // Refresh imported shows
-        fetch('/api/imported-shows')
-          .then(res => res.json())
-          .then(data => setImportedShows(data));
-        setShowModal(false);
-      } else {
-        toast({ type: 'error', message: data.error || 'Import failed.' });
-        setImportMessage('');
-      }
-    } catch (e) {
-      toast({ type: 'error', message: 'Import failed.' });
-      setImportMessage('');
-    }
-    setImporting(false);
-  };
 
   const handleDelete = async () => {
     if (selectionModel.length === 0) return;
@@ -106,14 +43,10 @@ const Home = forwardRef(({ scrollToLetter }, ref) => {
         body: JSON.stringify({ showIds: selectionModel })
       });
       toast({ type: 'success', message: `Removed ${selectionModel.length} show${selectionModel.length > 1 ? 's' : ''}.` });
-      // Refresh imported shows
-      fetch('/api/imported-shows')
-        .then(res => res.json())
-        .then(data => setImportedShows(data));
+      setImportedShowsLoaded(false); // refetch imported shows
       setSelectionModel([]);
     } catch (e) {
       toast({ type: 'error', message: 'Failed to remove show(s).' });
-      // Optionally show error
     }
     setDeleting(false);
   };
@@ -167,15 +100,6 @@ const Home = forwardRef(({ scrollToLetter }, ref) => {
       }}>
         {/* Removed Import More Shows button from here */}
       </div>
-
-      <ImportModal
-        open={showModal}
-        onClose={() => setShowModal(false)}
-        onImport={handleImport}
-        shows={modalShows}
-        loading={modalLoading || importing}
-        error={modalError || importMessage}
-      />
 
       {/* Main Table Area */}
       <div style={{ flex: 1, minHeight: 0, padding: '1rem', display: 'flex', flexDirection: 'column' }}>

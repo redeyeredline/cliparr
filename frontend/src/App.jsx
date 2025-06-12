@@ -14,6 +14,7 @@ import {
   DesktopOutlined,
   FileTextOutlined,
 } from '@ant-design/icons';
+import ImportModal from './components/ImportModal';
 import './App.css';
 
 const navItems = [
@@ -37,7 +38,7 @@ const navItems = [
   },
 ];
 
-function Sidebar({ onImportClick }) {
+function Sidebar({ onImportClick, openImportModal }) {
   const location = useLocation();
   const [openBranch, setOpenBranch] = useState('');
 
@@ -116,7 +117,7 @@ function Sidebar({ onImportClick }) {
                   alignItems: 'center',
                   height: 40,
                 }}
-                onClick={onImportClick}
+                onClick={() => openImportModal()}
               >
                 <span style={{ marginRight: 10, fontSize: 18 }}>{item.icon}</span> {item.label}
               </div>
@@ -166,7 +167,7 @@ function SidebarLink({ to, active, label, icon, isSubItem, onClick, showBar }) {
   );
 }
 
-function MainApp() {
+function MainApp({ importedShows, setImportedShowsLoaded, openImportModal }) {
   const [activeLetter, setActiveLetter] = useState(null);
   const homeRef = useRef();
   const location = useLocation();
@@ -186,7 +187,7 @@ function MainApp() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#181818' }}>
-      <Sidebar onImportClick={handleImportClick} />
+      <Sidebar onImportClick={handleImportClick} openImportModal={openImportModal} />
       {/* Main Content Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {/* Top Bar */}
@@ -198,7 +199,7 @@ function MainApp() {
         <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
           <div style={{ flex: 1, overflow: 'hidden' }}>
             <Routes>
-              <Route path="/" element={<Home ref={homeRef} />} />
+              <Route path="/" element={<Home ref={homeRef} importedShows={importedShows} setImportedShowsLoaded={setImportedShowsLoaded} />} />
               <Route path="/system/logs" element={<LogFiles />} />
               {/* Add more routes as needed */}
             </Routes>
@@ -215,13 +216,69 @@ function MainApp() {
 
 function App() {
   const [loading, setLoading] = useState(true);
+  const [importedShows, setImportedShows] = useState([]);
+  const [importedShowsLoaded, setImportedShowsLoaded] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [modalShows, setModalShows] = useState([]);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState('');
 
   useEffect(() => {
-    // Simulate main app loading (fetch main data)
-    fetch('/api/imported-shows')
-      .then(() => setLoading(false))
-      .catch(() => setLoading(false));
-  }, []);
+    if (!importedShowsLoaded) {
+      fetch('/api/imported-shows')
+        .then(res => res.json())
+        .then(data => {
+          setImportedShows(data);
+          setImportedShowsLoaded(true);
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, [importedShowsLoaded]);
+
+  // Global import modal logic
+  const openImportModal = () => {
+    setShowImportModal(true);
+    setModalLoading(true);
+    setModalError('');
+    fetch('/api/sonarr/unimported')
+      .then(res => res.json())
+      .then(data => {
+        setModalShows(data);
+        setModalLoading(false);
+      })
+      .catch(() => {
+        setModalError('Failed to load shows from Sonarr.');
+        setModalLoading(false);
+      });
+  };
+
+  const handleImport = async (selectedIds) => {
+    setImporting(true);
+    setImportMessage('Importing...');
+    try {
+      const res = await fetch('/api/sonarr/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showIds: selectedIds })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setImportMessage(`Successfully imported ${data.importedCount} shows.`);
+        setImportedShowsLoaded(false); // refetch imported shows
+        setShowImportModal(false);
+      } else {
+        setImportMessage(data.error || 'Import failed.');
+      }
+    } catch (e) {
+      setImportMessage('Import failed.');
+    }
+    setImporting(false);
+  };
 
   if (loading) {
     return (
@@ -241,7 +298,19 @@ function App() {
   return (
     <ToastProvider>
       <Router>
-        <MainApp />
+        <ImportModal
+          open={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onImport={handleImport}
+          shows={modalShows}
+          loading={modalLoading || importing}
+          error={modalError || importMessage}
+        />
+        <MainApp
+          importedShows={importedShows}
+          setImportedShowsLoaded={setImportedShowsLoaded}
+          openImportModal={openImportModal}
+        />
       </Router>
     </ToastProvider>
   );

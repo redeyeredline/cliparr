@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-function Import() {
+function Import({ openImportModal }) {
   const [shows, setShows] = useState([]);
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -122,6 +122,20 @@ function Import() {
           </a>
         </>
       )}
+      <button 
+        onClick={openImportModal} 
+        style={{ 
+          fontSize: '1.1rem', 
+          padding: '0.7rem 2rem',
+          backgroundColor: '#222',
+          color: '#fff',
+          border: '1px solid #fff',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }}
+      >
+        Import Shows
+      </button>
     </div>
   );
 }

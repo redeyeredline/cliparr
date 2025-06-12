@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ImportModal from '../components/ImportModal';
 
-function Settings() {
+function Settings({ openImportModal }) {
   const [showModal, setShowModal] = useState(false);
   const [modalShows, setModalShows] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
@@ -24,22 +24,6 @@ function Settings() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  };
-
-  const openImportModal = () => {
-    setShowModal(true);
-    setModalLoading(true);
-    setModalError('');
-    fetch('/api/sonarr/unimported')
-      .then(res => res.json())
-      .then(data => {
-        setModalShows(data);
-        setModalLoading(false);
-      })
-      .catch(() => {
-        setModalError('Failed to load shows from Sonarr.');
-        setModalLoading(false);
-      });
   };
 
   const handleImport = async (selectedIds) => {
@@ -76,14 +60,6 @@ function Settings() {
       padding: '2rem',
       borderRadius: '8px'
     }}>
-      <ImportModal
-        open={showModal}
-        onClose={() => setShowModal(false)}
-        onImport={handleImport}
-        shows={modalShows}
-        loading={modalLoading || importing}
-        error={modalError || importMessage}
-      />
       <h1>Settings: Import Additional Shows</h1>
       {shows.length === 0 ? (
         <div>All available shows have been imported!</div>
