@@ -12,11 +12,11 @@ def init_db(db_path='data/cliparr.db'):
     try:
         # Ensure the directory exists
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        
+
         # Connect to the database
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        
+
         # Create shows table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS shows (
@@ -29,7 +29,7 @@ def init_db(db_path='data/cliparr.db'):
                 added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
+
         # Create seasons table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS seasons (
@@ -41,7 +41,7 @@ def init_db(db_path='data/cliparr.db'):
                 UNIQUE(show_id, season_number)
             )
         ''')
-        
+
         # Create episodes table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS episodes (
@@ -54,7 +54,7 @@ def init_db(db_path='data/cliparr.db'):
                 FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE
             )
         ''')
-        
+
         # Create episode_files table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS episode_files (
@@ -66,7 +66,7 @@ def init_db(db_path='data/cliparr.db'):
                 FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE
             )
         ''')
-        
+
         # Create settings table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS settings (
@@ -74,28 +74,27 @@ def init_db(db_path='data/cliparr.db'):
                 value TEXT
             )
         ''')
-        
+
         # Create indexes for performance
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_shows_title ON shows(title COLLATE NOCASE)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_shows_sonarr_id ON shows(sonarr_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_seasons_show_id ON seasons(show_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_episodes_season_id ON episodes(season_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_episodes_sonarr_episode_id ON episodes(sonarr_episode_id)')
-        
+
         # Commit changes
         conn.commit()
-        
+
         # Log successful initialization
         logging.info(f"Database initialized successfully at {db_path}")
-        
+
     except sqlite3.Error as e:
         logging.error(f"Error initializing database: {e}")
         raise
     finally:
         if conn:
             conn.close()
-
 # Run initialization if this script is run directly
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    init_db() 
+    init_db()

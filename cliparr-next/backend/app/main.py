@@ -3,57 +3,66 @@ This module handles the integration with the Sonarr API to fetch and store TV se
 It includes endpoints for scanning shows, fetching show details, and importing data from Sonarr.
 """
 
-import os
-import sqlite3
-import subprocess
-import logging
-import requests
+# Standard library imports
 import asyncio
-import threading
-import time
-import json
-from typing import List, Dict, Optional
-from dotenv import load_dotenv
+import datetime
+import logging
+import os
 import platform
-from datetime import datetime
+import sqlite3
+import sys
+import time
 import traceback
+from contextlib import asynccontextmanager
+from typing import List, Dict, Optional
 
-# FastAPI and related imports
-import uvicorn
+# Third-party imports
+import fastapi
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 import hypercorn.asyncio
 import socketio
-import fastapi
-from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.middleware.gzip import GZipMiddleware
+import uvicorn
 
 # Local imports
-from backend.api.sonarr_api import (
-    fetch_series_data, fetch_episodes_with_files, process_episode_file, fetch_json
-)
-from backend.db.manager import (
-    get_db, insert_show, insert_season, insert_episode, insert_episode_file,
-    process_show_data, store_data_in_db, get_imported_shows_optimized
-)
-from backend.log.logging_config import configure_logging
-from backend.config import (
-    DB_PATH, 
-    IMPORT_MODE, 
-    set_import_mode, 
+from app.api.sonarr_api import fetch_series_data, fetch_json
+from app.db.database import get_db, insert_show, insert_season, insert_episode
+from app.log.logging_config import configure_logging
+from app.config import (
+    DB_PATH,
+    IMPORT_MODE,
+    set_import_mode,
     initialize_database,
     get_import_mode,
-    ENV
+    ENV,
+    LOG_DIR,
+    CONFIG_DIR
 )
-
-# Import audio analysis job management
-from backend.media.audio_analysis_jobs import AudioAnalysisJobManager
+from app.media.audio_analysis_jobs import AudioAnalysisJobManager
 
 load_dotenv()
 
 # Configure logging
 configure_logging()
 logger = logging.getLogger(__name__)
+
+# Debug: Print environment and paths
+logger.info("Environment: %s", ENV)
+logger.info("DB_PATH: %s", DB_PATH)
+logger.info("LOG_DIR: %s", LOG_DIR)
+logger.info("CONFIG_DIR: %s", CONFIG_DIR)
+
+# Debug: Check if directories exist
+for path in [os.path.dirname(DB_PATH), LOG_DIR, CONFIG_DIR]:
+    logger.info("Checking directory: %s", path)
+    if os.path.exists(path):
+        logger.info("Directory exists: %s", path)
+    else:
+        logger.info("Directory does not exist: %s", path)
 
 # Initialize FastAPI with performance optimizations
 app = FastAPI(
@@ -64,8 +73,16 @@ app = FastAPI(
     redoc_url=None,  # Disable ReDoc
 )
 
+# Mount static files for assets
+app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
+
+# Serve index.html for all other routes
+@app.get("/{path:path}")
+async def serve_spa(path: str):
+    return FileResponse("static/index.html")
+
 # Add performance middleware
-app.add_middleware(CORSMiddleware, 
+app.add_middleware(CORSMiddleware,
     allow_origins=["*"],  # Allows all origins
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
@@ -75,7 +92,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)  # Compress responses larg
 
 # Configure socket.io with performance settings
 sio = socketio.AsyncServer(
-    async_mode='asgi', 
+    async_mode='asgi',
     cors_allowed_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     ping_timeout=30,  # Increased timeout
     ping_interval=60,  # Increased interval
@@ -101,7 +118,13 @@ background_task_running = False
 background_task_thread = None
 
 # Initialize database
-initialize_database()
+try:
+    logger.info("Initializing database...")
+    initialize_database()
+    logger.info("Database initialized successfully")
+except Exception as e:
+    logger.error("Failed to initialize database: %s", e)
+    raise
 
 # Set the import mode from the database or environment
 current_mode = get_import_mode()
@@ -116,19 +139,16 @@ async def background_import_task():
         try:
             # Use the current import mode from the database
             current_mode = get_import_mode()
-            
             if current_mode == 'auto':
                 logging.info("Running auto import scan...")
                 sonarr_shows = fetch_series_data()
                 db = get_db()
                 cur = db.cursor()
-                
                 # Existing import logic remains the same
                 for show in sonarr_shows:
                     episodes = fetch_json(f'episode?seriesId={show["id"]}')
                     cur.execute('SELECT s.id FROM shows s WHERE s.sonarr_id = ?', (show['id'],))
                     show_row = cur.fetchone()
-                    
                     if show_row:
                         local_show_id = show_row[0]
                         cur.execute('SELECT e.sonarr_episode_id FROM episodes e JOIN seasons s ON e.season_id = s.id WHERE s.show_id = ?', (local_show_id,))
@@ -136,20 +156,20 @@ async def background_import_task():
                     else:
                         local_show_id = insert_show(cur, show)
                         imported_episode_ids = set()
-                    
+
                     missing_episodes = [ep for ep in episodes if ep['id'] not in imported_episode_ids]
-                    
+
                     if missing_episodes:
                         for ep in missing_episodes:
                             season_number = ep['seasonNumber']
                             season_id = insert_season(cur, local_show_id, season_number)
                             insert_episode(cur, season_id, ep)
-                
+
                 db.commit()
-                
+
                 # Use async emit for WebSocket
                 await sio.emit('show_imported', {'status': 'scan_complete'})
-            
+
             elif current_mode == 'import':
                 # Handle import mode - only scan imported shows
                 logging.info("Running import mode scan...")
@@ -157,31 +177,29 @@ async def background_import_task():
                 cur = db.cursor()
                 cur.execute('SELECT sonarr_id FROM shows')
                 imported_sonarr_ids = [row[0] for row in cur.fetchall()]
-                
+
                 for sonarr_id in imported_sonarr_ids:
                     episodes = fetch_json(f'episode?seriesId={sonarr_id}')
                     cur.execute('SELECT s.id FROM shows s WHERE s.sonarr_id = ?', (sonarr_id,))
                     show_row = cur.fetchone()
-                    
+
                     if show_row:
                         local_show_id = show_row[0]
                         cur.execute('SELECT e.sonarr_episode_id FROM episodes e JOIN seasons s ON e.season_id = s.id WHERE s.show_id = ?', (local_show_id,))
                         imported_episode_ids = set(row[0] for row in cur.fetchall())
                         missing_episodes = [ep for ep in episodes if ep['id'] not in imported_episode_ids]
-                        
+
                         if missing_episodes:
                             for ep in missing_episodes:
                                 season_number = ep['seasonNumber']
                                 season_id = insert_season(cur, local_show_id, season_number)
                                 insert_episode(cur, season_id, ep)
-                    
                     db.commit()
-                
-                # Use async emit for WebSocket
+                                # Use async emit for WebSocket
                 await sio.emit('show_imported', {'status': 'scan_complete'})
-            
+
             await asyncio.sleep(300)  # Sleep for 5 minutes between scans
-        
+
         except Exception as e:
             logging.error(f"Error in background import task: {e}")
             await asyncio.sleep(300)  # Sleep even on error to prevent rapid retries
@@ -197,16 +215,15 @@ def stop_background_task():
     global background_task_running
     background_task_running = False
 
-# Startup event to initialize database and background tasks
-@app.on_event("startup")
-async def startup_event():
-    from backend.config import IMPORT_MODE, initialize_database
-    
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup code
+    # (what was in startup_event)
     try:
         # Simplified database initialization with minimal logging
         logging.info(f"Initializing application with import mode: {IMPORT_MODE}")
         initialize_database()
-        
+
         # Start background task based on import mode
         if IMPORT_MODE in ("auto", "import"):
             try:
@@ -215,14 +232,11 @@ async def startup_event():
                 logging.error(f"Failed to start background task: {e}")
         else:
             logging.info("Background task not started due to import mode")
-    
     except Exception as e:
         logging.error(f"Critical startup error: {e}", exc_info=True)
         # Consider raising an exception to prevent app startup if critical
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    stop_background_task()
+    yield
+    # Shutdown code
     stop_background_task()
 
 def log_performance(func):
@@ -250,12 +264,12 @@ async def get_imported_shows(page: Optional[int] = 1, page_size: Optional[int] =
     # Ensure page and page_size are positive integers
     page = max(1, page or 1)
     page_size = max(1, page_size or 100)
-    
+
     conn = None
     try:
         # Detailed logging for database connection
         logging.info(f"Attempting to connect to database at {DB_PATH}")
-        
+
         # Validate database path
         if not os.path.exists(DB_PATH):
             logging.error(f"Database file does not exist: {DB_PATH}")
@@ -268,20 +282,20 @@ async def get_imported_shows(page: Optional[int] = 1, page_size: Optional[int] =
                 "page_size": page_size,
                 "total_pages": 0
             }
-        
+
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row  # Enable dictionary-like access
         cursor = conn.cursor()
-        
+
         # Comprehensive database diagnostics
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = cursor.fetchall()
         logging.info(f"Existing tables: {[table[0] for table in tables]}")
-        
-        # Validate shows table exists
+
+# Validate shows table exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='shows'")
         shows_table_exists = cursor.fetchone() is not None
-        
+
         if not shows_table_exists:
             logging.warning("Shows table does not exist. Attempting to create.")
             cursor.execute('''
@@ -293,23 +307,23 @@ async def get_imported_shows(page: Optional[int] = 1, page_size: Optional[int] =
                 )
             ''')
             conn.commit()
-        
+
         # Performance tracking for count query
         count_start = time.time()
         cursor.execute('SELECT COUNT(*) FROM shows')
         total_shows = cursor.fetchone()[0]
         count_duration = time.time() - count_start
         logging.info(f"Count query took {count_duration * 1000:.2f} ms")
-        
+
         # Calculate total pages
         total_pages = max(1, (total_shows + page_size - 1) // page_size)
-        
+
         # Ensure page is within valid range
         page = min(page, total_pages)
-        
+
         # Calculate offset
         offset = (page - 1) * page_size
-        
+
         # Performance tracking for fetch query
         fetch_start = time.time()
         cursor.execute('''
@@ -318,11 +332,11 @@ async def get_imported_shows(page: Optional[int] = 1, page_size: Optional[int] =
             ORDER BY title 
             LIMIT ? OFFSET ?
         ''', (page_size, offset))
-        
+
         shows_rows = cursor.fetchall()
         fetch_duration = time.time() - fetch_start
         logging.info(f"Fetch query took {fetch_duration * 1000:.2f} ms")
-        
+
         shows = []
         for row in shows_rows:
             try:
@@ -332,7 +346,7 @@ async def get_imported_shows(page: Optional[int] = 1, page_size: Optional[int] =
                     'sonarr_id': row['sonarr_id'],
                     'path': row['path']
                 }
-                
+
                 # Fetch season and episode count
                 season_stats_start = time.time()
                 cursor.execute('''
@@ -343,18 +357,18 @@ async def get_imported_shows(page: Optional[int] = 1, page_size: Optional[int] =
                     LEFT JOIN episodes e ON e.season_id = s.id
                     WHERE s.show_id = ?
                 ''', (row['id'],))
-                
+
                 season_stats = cursor.fetchone()
                 season_stats_duration = time.time() - season_stats_start
                 logging.info(f"Season stats query took {season_stats_duration * 1000:.2f} ms")
-                
+
                 show['seasons_count'] = season_stats[0] if season_stats else 0
                 show['episodes_count'] = season_stats[1] if season_stats else 0
-                
+
                 shows.append(show)
             except Exception as row_error:
                 logging.error(f"Error processing show row: {row_error}", exc_info=True)
-        
+
         # Comprehensive response logging
         response = {
             "shows": shows,
@@ -368,11 +382,11 @@ async def get_imported_shows(page: Optional[int] = 1, page_size: Optional[int] =
                 "season_stats_query_ms": season_stats_duration * 1000
             }
         }
-        
+
         logging.info(f"Returning {len(shows)} shows out of {total_shows}")
-        
+
         return response
-    
+
     except sqlite3.Error as e:
         logging.error(f"SQLite error fetching imported shows: {e}", exc_info=True)
         return {
@@ -474,11 +488,11 @@ async def delete_imported_shows(request: Request):
         if not show_ids:
             logging.error("No show IDs provided for deletion")
             return {"error": "No show IDs provided"}
-        
+
         logging.info(f"Attempting to delete shows with IDs: {show_ids}")
         db = get_db()
         cursor = db.cursor()
-        
+
         # First get episode IDs
         cursor.execute(
             f'SELECT e.id FROM episodes e JOIN seasons s ON e.season_id = s.id WHERE s.show_id IN ({",".join("?" * len(show_ids))})',
@@ -486,34 +500,34 @@ async def delete_imported_shows(request: Request):
         )
         episode_ids = [row[0] for row in cursor.fetchall()]
         logging.info(f"Found {len(episode_ids)} episodes to delete")
-        
+
         # Delete episode files
         if episode_ids:
             placeholders = ','.join(['?' for _ in episode_ids])
             cursor.execute(f'DELETE FROM episode_files WHERE episode_id IN ({placeholders})', episode_ids)
             logging.info(f"Deleted episode files for {len(episode_ids)} episodes")
-        
+
         # Delete episodes
         cursor.execute(
             f'DELETE FROM episodes WHERE season_id IN (SELECT id FROM seasons WHERE show_id IN ({",".join("?" * len(show_ids))}))',
             show_ids
         )
         logging.info(f"Deleted episodes for shows {show_ids}")
-        
+
         # Delete seasons
         cursor.execute(
             f'DELETE FROM seasons WHERE show_id IN ({",".join("?" * len(show_ids))})',
             show_ids
         )
         logging.info(f"Deleted seasons for shows {show_ids}")
-        
+
         # Finally delete shows
         cursor.execute(
             f'DELETE FROM shows WHERE id IN ({",".join("?" * len(show_ids))})',
             show_ids
         )
         logging.info(f"Deleted shows {show_ids}")
-        
+
         db.commit()
         logging.info("Successfully committed all deletions")
         return {"status": "success"}
@@ -553,7 +567,7 @@ async def api_get_series(show_id: int):
 
 @app.get('/api/settings/import-mode')
 async def get_import_mode():
-    from backend.config import IMPORT_MODE
+    from app.config import IMPORT_MODE
     return {"mode": IMPORT_MODE}
 
 @app.post('/api/settings/import-mode')
@@ -565,7 +579,6 @@ async def update_import_mode(request: Request):
     try:
         set_import_mode(mode)
         logging.info(f"Import mode set to: {mode}")
-        
         # Handle background task based on mode
         if mode in ('auto', 'import'):
             start_background_task()
@@ -597,7 +610,7 @@ async def update_import_mode(request: Request):
                 logging.error(f"Error during immediate scan: {e}")
         else:
             stop_background_task()
-            
+
         return {"status": "ok", "mode": mode}
     except Exception as e:
         logging.error(f'Failed to set import mode: {e}', exc_info=True)
@@ -631,8 +644,8 @@ async def websocket_test():
 
 @app.get('/api/audio-analysis/jobs')
 async def get_audio_analysis_jobs(
-    status: Optional[str] = None, 
-    limit: int = 100, 
+    status: Optional[str] = None,
+    limit: int = 100,
     offset: int = 0
 ) -> List[Dict]:
     """
@@ -647,8 +660,8 @@ async def get_audio_analysis_jobs(
 
 @app.post('/api/audio-analysis/schedule')
 async def schedule_audio_analysis(
-    show_id: int, 
-    show_title: str, 
+    show_id: int,
+    show_title: str,
     episodes: List[Dict]
 ) -> Dict:
     """
@@ -670,21 +683,21 @@ async def schedule_audio_analysis(
                 'season_number': episode.get('season_number'),
                 'episode_number': episode.get('episode_number')
             })
-        
+
         # Schedule audio analysis
         await audio_job_manager.schedule_show_analysis(
-            show_id, 
-            show_title, 
+            show_id,
+            show_title,
             validated_episodes
         )
-        
+
         # Emit WebSocket event for real-time updates
         await sio.emit('audio_analysis_scheduled', {
             'show_id': show_id,
             'show_title': show_title,
             'episode_count': len(validated_episodes)
         })
-        
+
         return {
             "status": "success", 
             "message": f"Scheduled audio analysis for {show_title}",

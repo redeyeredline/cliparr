@@ -7,36 +7,36 @@ process show data fetched from the Sonarr API.
 
 import sqlite3
 import logging
-from backend.config import DB_PATH
+from backend.app.config import DB_PATH
 from typing import List, Dict, Any
 import math
 import time
 from fastapi import HTTPException
-from backend.api.sonarr_api import fetch_json
-from backend.db.init_db import init_db
+from .api.sonarr_api import fetch_json
+from .db.init_db import init_db
 
 def get_db(db_path: str = 'data/cliparr.db') -> sqlite3.Connection:
     """
     Create a connection to the database with optimized settings.
     """
     try:
-        conn = sqlite3.connect(db_path, 
+        conn = sqlite3.connect(db_path,
             isolation_level=None,  # Enable autocommit
             cached_statements=100,  # Increase cached prepared statements
             timeout=10  # Increase timeout for concurrent access
         )
-        
+
         # Enable Write-Ahead Logging (WAL) for better concurrency
         conn.execute('PRAGMA journal_mode=WAL')
-        
+
         # Optimize performance settings
         conn.execute('PRAGMA synchronous=NORMAL')
         conn.execute('PRAGMA cache_size=-16000')  # 16MB cache
         conn.execute('PRAGMA mmap_size=30000000')  # Memory-mapped I/O
-        
+
         # Use row_factory to return dict-like rows
         conn.row_factory = sqlite3.Row
-        
+
         return conn
     except sqlite3.Error as e:
         logging.error(f"Database connection error: {e}")
@@ -182,21 +182,21 @@ def log_query_performance(func):
             # Log query details
             logging.info(f"Executing query: {func.__name__}")
             logging.info(f"Query arguments: {args}, {kwargs}")
-            
+
             result = func(*args, **kwargs)
-            
+
             end_time = time.time()
             query_time = (end_time - start_time) * 1000
-            
+
             # Log query performance
             logging.info(f"Query {func.__name__} took {query_time:.2f} ms")
-            
+
             # Log result size
             if isinstance(result, dict) and 'shows' in result:
                 logging.info(f"Query returned {len(result['shows'])} shows")
             elif isinstance(result, list):
                 logging.info(f"Query returned {len(result)} items")
-            
+
             return result
         except Exception as e:
             logging.error(f"Error in {func.__name__}: {e}")
@@ -214,7 +214,7 @@ def get_imported_shows_optimized(cursor, page=1, page_size=100) -> Dict[str, Any
         # Validate and sanitize input
         page = max(1, int(page)) if page is not None else 1
         page_size = max(1, int(page_size)) if page_size is not None else 100
-        
+
         query = '''
         WITH show_episodes AS (
             SELECT 
@@ -239,25 +239,25 @@ def get_imported_shows_optimized(cursor, page=1, page_size=100) -> Dict[str, Any
         WHERE row_num BETWEEN ? AND ?
         ORDER BY row_num
         '''
-        
+
         # Calculate offset and limit
         start_row = (page - 1) * page_size + 1
         end_row = start_row + page_size - 1
-        
+
         # Log query parameters
         logging.info(f"Fetching shows: page={page}, page_size={page_size}, start_row={start_row}, end_row={end_row}")
-        
+
         cursor.execute(query, (start_row, end_row))
         shows = [dict(row) for row in cursor.fetchall()]
-        
+
         # Get total count for pagination metadata
         total_query = 'SELECT COUNT(*) as total FROM shows'
         cursor.execute(total_query)
         total_count = cursor.fetchone()[0]
-        
+
         # Log results
         logging.info(f"Fetched {len(shows)} shows out of {total_count} total")
-        
+
         return {
             'shows': shows,
             'total': total_count,
@@ -317,9 +317,9 @@ def batch_insert_shows(cursor, shows: List[Dict[str, Any]]):
                 (title, path, sonarr_id, overview) 
                 VALUES (?, ?, ?, ?)
             ''', (
-                show.get('title'), 
-                show.get('path'), 
-                show.get('id'), 
+                show.get('title'),
+                show.get('path'),
+                show.get('id'),
                 show.get('overview')
             ))
         cursor.execute('COMMIT')

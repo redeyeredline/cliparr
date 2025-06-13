@@ -2,17 +2,9 @@
 This module handles interactions with the Sonarr API, including fetching series and episode data.
 """
 
-import os
 import logging
 import requests
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# Load environment variables
-SONARR_URL = os.getenv('SONARR_URL')
-SONARR_API_KEY = os.getenv('SONARR_API_KEY')
-TIMEOUT = 10
+from ..config import SONARR_URL, SONARR_API_KEY, TIMEOUT
 
 
 def fetch_series_data(sonarr_url=None, api_key=None):

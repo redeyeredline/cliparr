@@ -1,11 +1,17 @@
+"""
+This module handles the scheduling and management of audio analysis jobs.
+"""
+
 import asyncio
 import logging
 import sqlite3
 import uuid
+import threading
+import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Union
 
-from backend.media.audio_fingerprint import AudioFingerprinter
+from .media.audio_fingerprint import AudioFingerprinter
 
 class AudioAnalysisJobManager:
     def __init__(self, db_path: str = "data/audio_analysis_jobs.db"):
