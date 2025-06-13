@@ -12,46 +12,52 @@ import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Union
 
-from ..config import DB_PATH
+from ..config import AUDIO_ANALYSIS_JOBS_DB
 from .audio_fingerprint import AudioFingerprinter
 
 class AudioAnalysisJobManager:
     def __init__(self, db_path: str = None):
-        self.db_path = db_path or os.path.join(os.path.dirname(DB_PATH), 'audio_analysis_jobs.db')
+        # Use configured path for storing the jobs database
+        self.db_path = db_path or AUDIO_ANALYSIS_JOBS_DB
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.fingerprinter = AudioFingerprinter()
         self._init_db()
 
     def _init_db(self):
         """Initialize the SQLite database for tracking audio analysis jobs."""
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        
-        # Create jobs table
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS audio_analysis_jobs (
-                id TEXT PRIMARY KEY,
-                show_id INTEGER,
-                show_title TEXT,
-                season_number INTEGER,
-                episode_number INTEGER,
-                file_path TEXT,
-                status TEXT DEFAULT 'pending',
-                progress REAL DEFAULT 0.0,
-                error_message TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                completed_at TIMESTAMP
-            )
-        ''')
-        
-        # Create index for faster queries
-        c.execute('''
-            CREATE INDEX IF NOT EXISTS idx_audio_analysis_jobs_status 
-            ON audio_analysis_jobs(status)
-        ''')
-        
-        conn.commit()
-        conn.close()
+        try:
+            conn = sqlite3.connect(self.db_path)
+            c = conn.cursor()
+            
+            # Create jobs table
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS audio_analysis_jobs (
+                    id TEXT PRIMARY KEY,
+                    show_id INTEGER,
+                    show_title TEXT,
+                    season_number INTEGER,
+                    episode_number INTEGER,
+                    file_path TEXT,
+                    status TEXT DEFAULT 'pending',
+                    progress REAL DEFAULT 0.0,
+                    error_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed_at TIMESTAMP
+                )
+            ''')
+            
+            # Create index for faster queries
+            c.execute('''
+                CREATE INDEX IF NOT EXISTS idx_audio_analysis_jobs_status 
+                ON audio_analysis_jobs(status)
+            ''')
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logging.error(f"Error initializing database: {str(e)}")
 
     def create_job(self, show_id: int, show_title: str, file_path: str, 
                    season_number: Optional[int] = None, 

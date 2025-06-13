@@ -46,7 +46,7 @@ from .config import (
     PORT,
     CLIPARR_IMPORT_MODE
 )
-from .db.settings import set_import_mode, get_import_mode
+from .db.settings import set_import_mode, get_import_mode, ensure_settings_table
 from .db.manager import (
     get_db,
     insert_show,
@@ -90,34 +90,27 @@ app = FastAPI(
     redoc_url=None,  # Disable ReDoc
 )
 
-# Mount static files for assets
-app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
-
-# Serve index.html for all other routes
-@app.get("/{path:path}")
-async def serve_spa(path: str):
-    return FileResponse("static/index.html")
-
 # Add performance middleware
-app.add_middleware(CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-app.add_middleware(GZipMiddleware, minimum_size=1000)  # Compress responses larger than 1000 bytes
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Configure socket.io with performance settings
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    ping_timeout=30,  # Increased timeout
-    ping_interval=60,  # Increased interval
-    logger=True,  # Enable logging for debugging
-    engineio_logger=True,  # Enable engine.io logging
-    max_http_buffer_size=1024 * 1024,  # 1MB max buffer size
-    async_handlers=True,  # Use async handlers
-    cors_credentials=True  # Allow credentials
+    ping_timeout=30,
+    ping_interval=60,
+    logger=True,
+    engineio_logger=True,
+    max_http_buffer_size=1024 * 1024,
+    async_handlers=True,
+    cors_credentials=True
 )
 socket_app = socketio.ASGIApp(sio, app, socketio_path='/socket.io')
 
@@ -128,18 +121,65 @@ audio_job_manager = AudioAnalysisJobManager()
 background_task_running = False
 background_task_thread = None
 
-# Initialize database
-try:
-    logger.info("Initializing database...")
-    init_db()
-    logger.info("Database initialized successfully")
-except Exception as e:
-    logger.error("Failed to initialize database: %s", e)
-    raise
+# Define static directory based on environment
+STATIC_DIR = "/data/static" if ENV == "production" else os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "dist")
 
-# Set the import mode from the database or environment
-current_mode = get_import_mode()
-set_import_mode(current_mode)
+# Ensure static directory exists
+os.makedirs(STATIC_DIR, exist_ok=True)
+
+# Mount static files
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="frontend")
+
+# Serve index.html for client-side routing
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc: HTTPException):
+    if not request.url.path.startswith("/api"):
+        index_path = os.path.join(STATIC_DIR, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+    return JSONResponse(status_code=404, content={"detail": "Not found"})
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        # Initialize database
+        logger.info("Initializing database...")
+        init_db(DB_PATH)
+        logger.info("Database initialized successfully")
+
+        # Ensure settings table exists and set initial import mode
+        from .db.settings import ensure_settings_table, set_import_mode
+        ensure_settings_table()
+        set_import_mode(IMPORT_MODE)
+
+        # Start background task based on import mode
+        if IMPORT_MODE in ("auto", "import"):
+            try:
+                start_background_task()
+            except Exception as e:
+                logging.error(f"Failed to start background task: {e}")
+        else:
+            logging.info("Background task not started due to import mode")
+    except Exception as e:
+        logging.error(f"Critical startup error: {e}", exc_info=True)
+        raise  # Re-raise the exception to prevent app startup if critical
+    yield
+    # Shutdown code
+    stop_background_task()
+
+# Set the lifespan context manager
+app.router.lifespan_context = lifespan
+
+def start_background_task():
+    global background_task_running, background_task_thread
+    if not background_task_running:
+        background_task_running = True
+        # Use asyncio to run the background task
+        asyncio.create_task(background_import_task())
+
+def stop_background_task():
+    global background_task_running
+    background_task_running = False
 
 async def background_import_task():
     """
@@ -214,40 +254,6 @@ async def background_import_task():
         except Exception as e:
             logging.error(f"Error in background import task: {e}")
             await asyncio.sleep(300)  # Sleep even on error to prevent rapid retries
-
-def start_background_task():
-    global background_task_running, background_task_thread
-    if not background_task_running:
-        background_task_running = True
-        # Use asyncio to run the background task
-        asyncio.create_task(background_import_task())
-
-def stop_background_task():
-    global background_task_running
-    background_task_running = False
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    try:
-        # Simplified database initialization with minimal logging
-        logging.info(f"Initializing application with import mode: {IMPORT_MODE}")
-        logging.info(f"Environment: {ENV}")
-        init_db()
-
-        # Start background task based on import mode
-        if IMPORT_MODE in ("auto", "import"):
-            try:
-                start_background_task()
-            except Exception as e:
-                logging.error(f"Failed to start background task: {e}")
-        else:
-            logging.info("Background task not started due to import mode")
-    except Exception as e:
-        logging.error(f"Critical startup error: {e}", exc_info=True)
-        # Consider raising an exception to prevent app startup if critical
-    yield
-    # Shutdown code
-    stop_background_task()
 
 def log_performance(func):
     async def wrapper(*args, **kwargs):

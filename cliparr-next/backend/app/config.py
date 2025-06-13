@@ -5,58 +5,52 @@ Configuration settings for the application.
 import os
 import logging
 from pathlib import Path
-from .db.constants import DB_PATH
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = os.getenv('CLIPARR_DATA_DIR', '/data')
+DB_DIR = os.path.join(DATA_DIR, 'db')
 
-# Environment
-ENV = os.getenv('ENV', 'production')
-DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
+# Database paths
+DB_PATH = os.path.join(DB_DIR, 'cliparr.db')
+AUDIO_FINGERPRINTS_DB = os.path.join(DB_DIR, 'audio_fingerprints.db')
+AUDIO_ANALYSIS_JOBS_DB = os.path.join(DB_DIR, 'audio_analysis_jobs.db')
 
-# Server configuration
+# Logging and config directories
+LOG_DIR = os.path.join(DATA_DIR, 'logs')
+CONFIG_DIR = os.path.join(DATA_DIR, 'config')
+MEDIA_DIR = os.path.join(DATA_DIR, 'media')
+
+# Ensure directories exist
+os.makedirs(DB_DIR, exist_ok=True)
+os.makedirs(LOG_DIR, exist_ok=True)
+os.makedirs(CONFIG_DIR, exist_ok=True)
+os.makedirs(MEDIA_DIR, exist_ok=True)
+
+# Environment variables with defaults
+ENV = os.getenv('ENV', 'development')
+DEBUG = os.getenv('DEBUG', 'true').lower() == 'true'
 HOST = os.getenv('HOST', '0.0.0.0')
 PORT = int(os.getenv('PORT', '5000'))
-
-# Import mode configuration
 CLIPARR_IMPORT_MODE = os.getenv('CLIPARR_IMPORT_MODE', 'none')
 IMPORT_MODE = CLIPARR_IMPORT_MODE  # Alias for backward compatibility
 
-# Logging configuration
-LOG_DIR = os.getenv('LOG_DIR', os.path.join('/config', 'log'))
-if not os.getenv('LOG_DIR'):
-    LOG_DIR = os.path.join(BASE_DIR, 'log')
-
-# Config directory
-CONFIG_DIR = os.getenv('CONFIG_DIR', os.path.join('/config'))
-if not os.getenv('CONFIG_DIR'):
-    CONFIG_DIR = os.path.join(BASE_DIR, 'config')
-
-# Ensure directories exist
-for directory in [os.path.dirname(DB_PATH), LOG_DIR, CONFIG_DIR]:
-    os.makedirs(directory, exist_ok=True)
-
-# Sonarr configuration
-SONARR_URL = os.getenv('SONARR_URL', 'localhost:8989')
+# Sonarr API settings
+SONARR_URL = os.getenv('SONARR_URL', 'http://localhost:8989')
 SONARR_API_KEY = os.getenv('SONARR_API_KEY', '')
-TIMEOUT = int(os.getenv('TIMEOUT', '10'))
+
+# Timeout settings
+TIMEOUT = 30  # seconds
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(os.path.join(LOG_DIR, 'app.log'))
-    ]
+    level=logging.DEBUG if DEBUG else logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-# Initialize database
-from .db.init_db import init_db
-init_db(DB_PATH)
-
 __all__ = [
-    'DB_PATH', 'LOG_DIR', 'CONFIG_DIR', 'SONARR_URL', 
-    'SONARR_API_KEY', 'TIMEOUT', 'IMPORT_MODE', 'ENV', 'DEBUG',
-    'HOST', 'PORT', 'CLIPARR_IMPORT_MODE'
+    'DB_PATH', 'AUDIO_FINGERPRINTS_DB', 'AUDIO_ANALYSIS_JOBS_DB',
+    'DATA_DIR', 'DB_DIR', 'LOG_DIR', 'CONFIG_DIR', 'MEDIA_DIR', 
+    'SONARR_URL', 'SONARR_API_KEY', 'TIMEOUT', 'CLIPARR_IMPORT_MODE', 
+    'IMPORT_MODE', 'ENV', 'DEBUG', 'HOST', 'PORT'
 ]

@@ -6,9 +6,29 @@ import sqlite3
 import logging
 from .constants import DB_PATH
 
+def ensure_settings_table():
+    """Ensure the settings table exists."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        logging.error("Error ensuring settings table: %s", e)
+        raise
+
 def set_import_mode(mode: str) -> None:
     """Set the import mode in the database."""
     try:
+        ensure_settings_table()
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
         cur.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
@@ -23,6 +43,7 @@ def set_import_mode(mode: str) -> None:
 def get_import_mode() -> str:
     """Get the current import mode from the database."""
     try:
+        ensure_settings_table()
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
         cur.execute("SELECT value FROM settings WHERE key = ?", ('import_mode',))
@@ -36,6 +57,7 @@ def get_import_mode() -> str:
 def get_setting(key: str, default=None):
     """Get a setting value from the database."""
     try:
+        ensure_settings_table()
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
         cur.execute("SELECT value FROM settings WHERE key = ?", (key,))
@@ -49,6 +71,7 @@ def get_setting(key: str, default=None):
 def set_setting(key: str, value: str) -> None:
     """Set a setting value in the database."""
     try:
+        ensure_settings_table()
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
         cur.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",

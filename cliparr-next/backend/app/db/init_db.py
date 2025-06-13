@@ -1,77 +1,32 @@
-import sqlite3
+"""
+Database initialization module.
+"""
+
 import os
+import sqlite3
 import logging
 from pathlib import Path
-from .constants import DB_PATH
 
-def init_db(db_path=None):
+logger = logging.getLogger(__name__)
+
+def init_db(db_path: str) -> None:
     """
-    Initialize the database with all necessary tables.
+    Initialize the SQLite database with required tables.
     
-    :param db_path: Path to the SQLite database file
+    Args:
+        db_path: Path to the SQLite database file
     """
-    db_path = db_path or DB_PATH
+    conn = None
     try:
         # Ensure the directory exists
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
-        # Connect to the database
+        
+        # Connect to database
         conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
-        # Create shows table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS shows (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sonarr_id INTEGER UNIQUE,
-                title TEXT,
-                overview TEXT,
-                path TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        # Create seasons table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS seasons (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                show_id INTEGER,
-                season_number INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (show_id) REFERENCES shows (id),
-                UNIQUE(show_id, season_number)
-            )
-        ''')
-
-        # Create episodes table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS episodes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                season_id INTEGER,
-                episode_number INTEGER,
-                title TEXT,
-                sonarr_episode_id INTEGER UNIQUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (season_id) REFERENCES seasons (id)
-            )
-        ''')
-
-        # Create episode_files table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS episode_files (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                episode_id INTEGER,
-                file_path TEXT,
-                size INTEGER,
-                quality TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (episode_id) REFERENCES episodes (id)
-            )
-        ''')
-
+        c = conn.cursor()
+        
         # Create settings table
-        cursor.execute('''
+        c.execute('''
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT,
@@ -79,25 +34,100 @@ def init_db(db_path=None):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-
-        # Create indexes for better performance
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_shows_sonarr_id ON shows(sonarr_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_seasons_show_id ON seasons(show_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_episodes_season_id ON episodes(season_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_episode_files_episode_id ON episode_files(episode_id)')
-
-        # Commit changes
+        
+        # Create shows table
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS shows (
+                id INTEGER PRIMARY KEY,
+                title TEXT NOT NULL,
+                sort_title TEXT,
+                status TEXT,
+                overview TEXT,
+                network TEXT,
+                air_time TEXT,
+                images TEXT,
+                original_language TEXT,
+                year INTEGER,
+                path TEXT,
+                quality_profile_id INTEGER,
+                monitored BOOLEAN,
+                runtime INTEGER,
+                tvdb_id INTEGER,
+                tvrage_id INTEGER,
+                genres TEXT,
+                ratings TEXT,
+                statistics TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create seasons table
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS seasons (
+                id INTEGER PRIMARY KEY,
+                show_id INTEGER,
+                season_number INTEGER,
+                monitored BOOLEAN,
+                statistics TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (show_id) REFERENCES shows (id)
+            )
+        ''')
+        
+        # Create episodes table
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS episodes (
+                id INTEGER PRIMARY KEY,
+                show_id INTEGER,
+                season_id INTEGER,
+                episode_number INTEGER,
+                title TEXT,
+                overview TEXT,
+                air_date TEXT,
+                file_path TEXT,
+                file_size INTEGER,
+                quality TEXT,
+                monitored BOOLEAN,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (show_id) REFERENCES shows (id),
+                FOREIGN KEY (season_id) REFERENCES seasons (id)
+            )
+        ''')
+        
+        # Create audio_analysis table
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS audio_analysis (
+                id INTEGER PRIMARY KEY,
+                episode_id INTEGER,
+                analysis_data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (episode_id) REFERENCES episodes (id)
+            )
+        ''')
+        
+        # Insert default settings if they don't exist
+        c.execute('''
+            INSERT OR IGNORE INTO settings (key, value) 
+            VALUES ('import_mode', 'none')
+        ''')
+        
         conn.commit()
-
-        # Log successful initialization
-        logging.info(f"Database initialized successfully at {db_path}")
-
+        logger.info("Database initialized successfully")
+        
     except sqlite3.Error as e:
-        logging.error(f"Error initializing database: {e}")
+        logger.error(f"Error initializing database: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error initializing database: {str(e)}")
         raise
     finally:
         if conn:
             conn.close()
+
 # Run initialization if this script is run directly
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)

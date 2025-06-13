@@ -7,7 +7,7 @@ export default defineConfig({
   root: path.resolve(__dirname, '.'),
   base: '/',
   build: {
-    outDir: '../backend/static',
+    outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
       input: {

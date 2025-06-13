@@ -15,7 +15,7 @@ __all__ = ['BASE_DIR', 'ENV', 'DB_PATH', 'LOG_DIR', 'IMPORT_MODE', 'initialize_d
 if ENV == 'production':
     DB_PATH = os.getenv('DB_PATH', '/opt/dockerdata/cliparr/db/cliparr.db')
 else:
-    DB_PATH = os.path.join(BASE_DIR, 'data', 'cliparr.db')
+    DB_PATH = os.path.join(BASE_DIR, 'data/db/', 'cliparr.db')
 
 # Ensure data directory exists in development
 if ENV == 'development':

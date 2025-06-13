@@ -1,82 +1,56 @@
-FROM ubuntu:22.04
-
-# Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONUNBUFFERED=1 \
-    NODE_ENV=production \
-    PYTHONPATH=/app/backend:/app/backend/app
-
-# Install system dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    build-essential \
-    python3 \
-    python3-pip \
-    python3-dev \
-    curl \
-    gnupg \
-    ca-certificates \
-    apt-transport-https && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set up application directories
-WORKDIR /app
-
-# Create necessary directories with proper permissions
-RUN mkdir -p /app/backend/app/data /app/backend/app/log /app/backend/app/config /config/log /data && \
-    chown -R 1000:1000 /app/backend/app/data /app/backend/app/log /app/backend/app/config /config /data && \
-    chmod -R 755 /app/backend/app/data /app/backend/app/log /app/backend/app/config /config /data
-
-# Install Python dependencies
-COPY backend/requirements.txt /app/backend/
-RUN pip3 install --no-cache-dir -r /app/backend/requirements.txt
-
-# Copy backend files
-COPY backend/app /app/backend/app/
-COPY backend/static /app/backend/static/
-
-# Ensure proper permissions after copying files
-RUN chown -R 1000:1000 /app/backend/app /app/backend/static && \
-    chmod -R 755 /app/backend/app /app/backend/static
-
-# Set up frontend
-WORKDIR /app/frontend
-COPY frontend/package*.json /app/frontend/
-RUN npm install
-COPY frontend/ /app/frontend/
-
-# Create backend/static directory for Vite build
-RUN mkdir -p /app/backend/static
-
-# Build frontend
+# Build stage for frontend
+FROM node:18-slim as frontend-builder
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
 RUN npm run build
 
-# Verify frontend build
-RUN echo "Backend static directory contents:" && \
-    ls -la /app/backend/static
+# Main stage
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create abc user and group
+RUN groupadd -g 911 abc && \
+    useradd -u 911 -g abc -s /bin/bash -m abc
+
+# Create necessary directories with correct permissions
+RUN mkdir -p /data/{app,logs,config,db,static} && \
+    chown -R abc:abc /data && \
+    chmod -R 755 /data
+
+# Set workdir to data/app
+WORKDIR /data/app
+
+# Copy requirements first for better caching
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend code
+COPY --chown=abc:abc backend/app ./app
+
+# Copy built frontend files from builder stage
+COPY --from=frontend-builder --chown=abc:abc /frontend/dist/* /data/static/
+COPY --from=frontend-builder --chown=abc:abc /frontend/dist/assets /data/static/assets
+
+# Switch to abc user
+USER abc
+
+# Set environment variables
+ENV PYTHONPATH=/data/app
+ENV CLIPARR_DATA_DIR=/data
+ENV ENV=production
+ENV DEBUG=false
+ENV HOST=0.0.0.0
+ENV PORT=5000
+ENV CLIPARR_IMPORT_MODE=none
 
 # Expose port
 EXPOSE 5000
 
-# Define volumes
-VOLUME /config
-VOLUME /data
-
-# Show final directory structure
-RUN echo "Final directory structure:" && \
-    echo "Backend directory:" && \
-    ls -la /app/backend && \
-    echo "App directory:" && \
-    ls -la /app/backend/app && \
-    echo "Static directory:" && \
-    ls -la /app/backend/static
-
-# Set the working directory and user
-WORKDIR /app/backend
-USER 1000:1000
-
-# Start the application
-CMD ["python3", "-m", "app.main"] 
+# Run the application
+CMD ["python", "-m", "app.main"] 

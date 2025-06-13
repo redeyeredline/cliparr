@@ -1,0 +1,701 @@
+/* Global styles */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #181818;
+  color: #fff;
+}
+
+/* Custom table styles */
+.custom-table .ant-table {
+  background: #181818;
+  color: #fff;
+}
+
+.custom-table .ant-table-thead > tr > th {
+  background: #23272b;
+  color: #00bfff;
+  border-bottom: 1px solid #23272b;
+}
+
+.custom-table .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #23272b;
+  color: #fff;
+}
+
+.custom-table .ant-table-tbody > tr:hover > td {
+  background: #23272b;
+}
+
+.custom-table .ant-table-row-selected td {
+  background: #23272b !important;
+}
+
+/* Custom button styles */
+.ant-btn {
+  background: #23272b;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.ant-btn:hover {
+  background: #2c3136;
+  color: #00bfff;
+  border-color: #00bfff;
+}
+
+.ant-btn-primary {
+  background: #00bfff;
+  color: #fff;
+  border: none;
+}
+
+.ant-btn-primary:hover {
+  background: #0099cc;
+  color: #fff;
+}
+
+/* Custom input styles */
+.ant-input {
+  background: #23272b;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+.ant-input:hover,
+.ant-input:focus {
+  border-color: #00bfff;
+}
+
+/* Custom select styles */
+.ant-select {
+  color: #fff;
+}
+
+.ant-select-selector {
+  background: #23272b !important;
+  border: 1px solid #444 !important;
+  border-radius: 4px !important;
+}
+
+.ant-select-selection-item {
+  color: #fff !important;
+}
+
+.ant-select-arrow {
+  color: #fff !important;
+}
+
+/* Custom modal styles */
+.ant-modal-content {
+  background: #181818;
+  border-radius: 8px;
+}
+
+.ant-modal-header {
+  background: #181818;
+  border-bottom: 1px solid #23272b;
+}
+
+.ant-modal-title {
+  color: #00bfff;
+}
+
+.ant-modal-close {
+  color: #fff;
+}
+
+.ant-modal-body {
+  color: #fff;
+}
+
+/* Custom dropdown styles */
+.ant-dropdown-menu {
+  background: #181818;
+  border: 1px solid #23272b;
+  border-radius: 4px;
+}
+
+.ant-dropdown-menu-item {
+  color: #fff;
+}
+
+.ant-dropdown-menu-item:hover {
+  background: #23272b;
+}
+
+/* Custom checkbox styles */
+.ant-checkbox-wrapper {
+  color: #fff;
+}
+
+.ant-checkbox-inner {
+  background: #23272b;
+  border: 1px solid #444;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner {
+  background: #00bfff;
+  border-color: #00bfff;
+}
+
+/* Custom radio styles */
+.ant-radio-wrapper {
+  color: #fff;
+}
+
+.ant-radio-inner {
+  background: #23272b;
+  border: 1px solid #444;
+}
+
+.ant-radio-checked .ant-radio-inner {
+  border-color: #00bfff;
+}
+
+.ant-radio-inner::after {
+  background: #00bfff;
+}
+
+/* Custom spin styles */
+.ant-spin-dot-item {
+  background: #00bfff;
+}
+
+.ant-spin-text {
+  color: #00bfff;
+}
+
+/* Custom tooltip styles */
+.ant-tooltip-inner {
+  background: #23272b;
+  color: #fff;
+}
+
+.ant-tooltip-arrow-content {
+  background: #23272b;
+}
+
+/* Custom message styles */
+.ant-message {
+  color: #fff;
+}
+
+.ant-message-notice-content {
+  background: #23272b;
+  border-radius: 4px;
+}
+
+/* Custom notification styles */
+.ant-notification {
+  color: #fff;
+}
+
+.ant-notification-notice {
+  background: #23272b;
+  border-radius: 4px;
+}
+
+/* Custom popover styles */
+.ant-popover-inner {
+  background: #181818;
+  border-radius: 4px;
+}
+
+.ant-popover-title {
+  color: #00bfff;
+  border-bottom: 1px solid #23272b;
+}
+
+.ant-popover-inner-content {
+  color: #fff;
+}
+
+/* Custom drawer styles */
+.ant-drawer-content {
+  background: #181818;
+}
+
+.ant-drawer-header {
+  background: #181818;
+  border-bottom: 1px solid #23272b;
+}
+
+.ant-drawer-title {
+  color: #00bfff;
+}
+
+.ant-drawer-body {
+  color: #fff;
+}
+
+/* Custom tabs styles */
+.ant-tabs-tab {
+  color: #fff;
+}
+
+.ant-tabs-tab-active {
+  color: #00bfff;
+}
+
+.ant-tabs-ink-bar {
+  background: #00bfff;
+}
+
+/* Custom pagination styles */
+.ant-pagination-item {
+  background: #23272b;
+  border: 1px solid #444;
+}
+
+.ant-pagination-item a {
+  color: #fff;
+}
+
+.ant-pagination-item-active {
+  border-color: #00bfff;
+}
+
+.ant-pagination-item-active a {
+  color: #00bfff;
+}
+
+.ant-pagination-prev .ant-pagination-item-link,
+.ant-pagination-next .ant-pagination-item-link {
+  background: #23272b;
+  border: 1px solid #444;
+  color: #fff;
+}
+
+/* Custom date picker styles */
+.ant-picker {
+  background: #23272b;
+  border: 1px solid #444;
+}
+
+.ant-picker-input > input {
+  color: #fff;
+}
+
+.ant-picker-suffix {
+  color: #fff;
+}
+
+.ant-picker-clear {
+  background: #23272b;
+  color: #fff;
+}
+
+/* Custom time picker styles */
+.ant-picker-time-panel {
+  background: #181818;
+}
+
+.ant-picker-time-panel-column {
+  border-right: 1px solid #23272b;
+}
+
+.ant-picker-time-panel-cell {
+  color: #fff;
+}
+
+.ant-picker-time-panel-cell-selected {
+  background: #23272b;
+}
+
+/* Custom calendar styles */
+.ant-picker-calendar {
+  background: #181818;
+}
+
+.ant-picker-calendar-header {
+  border-bottom: 1px solid #23272b;
+}
+
+.ant-picker-calendar-date {
+  color: #fff;
+}
+
+.ant-picker-calendar-date-today {
+  border-color: #00bfff;
+}
+
+.ant-picker-calendar-date-selected {
+  background: #00bfff;
+}
+
+/* Custom tree styles */
+.ant-tree {
+  background: #181818;
+  color: #fff;
+}
+
+.ant-tree-treenode {
+  color: #fff;
+}
+
+.ant-tree-node-content-wrapper {
+  color: #fff;
+}
+
+.ant-tree-node-content-wrapper:hover {
+  background: #23272b;
+}
+
+.ant-tree-node-selected {
+  background: #23272b;
+}
+
+/* Custom transfer styles */
+.ant-transfer {
+  color: #fff;
+}
+
+.ant-transfer-list {
+  background: #181818;
+  border: 1px solid #23272b;
+}
+
+.ant-transfer-list-header {
+  background: #23272b;
+  border-bottom: 1px solid #23272b;
+}
+
+.ant-transfer-list-content-item {
+  color: #fff;
+}
+
+.ant-transfer-list-content-item:hover {
+  background: #23272b;
+}
+
+/* Custom upload styles */
+.ant-upload {
+  color: #fff;
+}
+
+.ant-upload-list {
+  color: #fff;
+}
+
+.ant-upload-list-item {
+  color: #fff;
+}
+
+.ant-upload-list-item:hover {
+  background: #23272b;
+}
+
+/* Custom progress styles */
+.ant-progress-text {
+  color: #fff;
+}
+
+.ant-progress-bg {
+  background: #00bfff;
+}
+
+/* Custom slider styles */
+.ant-slider-rail {
+  background: #23272b;
+}
+
+.ant-slider-track {
+  background: #00bfff;
+}
+
+.ant-slider-handle {
+  border: 2px solid #00bfff;
+}
+
+/* Custom rate styles */
+.ant-rate {
+  color: #00bfff;
+}
+
+/* Custom switch styles */
+.ant-switch {
+  background: #23272b;
+}
+
+.ant-switch-checked {
+  background: #00bfff;
+}
+
+/* Custom collapse styles */
+.ant-collapse {
+  background: #181818;
+  border: 1px solid #23272b;
+}
+
+.ant-collapse-item {
+  border-bottom: 1px solid #23272b;
+}
+
+.ant-collapse-header {
+  color: #fff;
+}
+
+.ant-collapse-content {
+  background: #181818;
+  color: #fff;
+}
+
+/* Custom carousel styles */
+.ant-carousel .slick-dots li button {
+  background: #23272b;
+}
+
+.ant-carousel .slick-dots li.slick-active button {
+  background: #00bfff;
+}
+
+/* Custom badge styles */
+.ant-badge-count {
+  background: #00bfff;
+}
+
+/* Custom tag styles */
+.ant-tag {
+  background: #23272b;
+  color: #fff;
+  border: 1px solid #444;
+}
+
+/* Custom alert styles */
+.ant-alert {
+  background: #23272b;
+  border: 1px solid #444;
+}
+
+.ant-alert-message {
+  color: #fff;
+}
+
+.ant-alert-description {
+  color: #b0b8c1;
+}
+
+/* Custom skeleton styles */
+.ant-skeleton {
+  background: #23272b;
+}
+
+.ant-skeleton-title {
+  background: #181818;
+}
+
+.ant-skeleton-paragraph li {
+  background: #181818;
+}
+
+/* Custom empty styles */
+.ant-empty {
+  color: #b0b8c1;
+}
+
+.ant-empty-image {
+  opacity: 0.5;
+}
+
+/* Custom result styles */
+.ant-result {
+  color: #fff;
+}
+
+.ant-result-title {
+  color: #00bfff;
+}
+
+.ant-result-subtitle {
+  color: #b0b8c1;
+}
+
+/* Custom statistic styles */
+.ant-statistic-title {
+  color: #b0b8c1;
+}
+
+.ant-statistic-content {
+  color: #fff;
+}
+
+/* Custom timeline styles */
+.ant-timeline-item-tail {
+  border-left: 2px solid #23272b;
+}
+
+.ant-timeline-item-head {
+  background: #00bfff;
+}
+
+.ant-timeline-item-content {
+  color: #fff;
+}
+
+/* Custom steps styles */
+.ant-steps-item-title {
+  color: #fff;
+}
+
+.ant-steps-item-description {
+  color: #b0b8c1;
+}
+
+.ant-steps-item-icon {
+  background: #23272b;
+  border-color: #444;
+}
+
+.ant-steps-item-process .ant-steps-item-icon {
+  background: #00bfff;
+  border-color: #00bfff;
+}
+
+.ant-steps-item-finish .ant-steps-item-icon {
+  border-color: #00bfff;
+}
+
+/* Custom breadcrumb styles */
+.ant-breadcrumb {
+  color: #b0b8c1;
+}
+
+.ant-breadcrumb-link {
+  color: #fff;
+}
+
+.ant-breadcrumb-separator {
+  color: #b0b8c1;
+}
+
+/* Custom menu styles */
+.ant-menu {
+  background: #181818;
+  color: #fff;
+}
+
+.ant-menu-item {
+  color: #fff;
+}
+
+.ant-menu-item:hover {
+  color: #00bfff;
+}
+
+.ant-menu-item-selected {
+  color: #00bfff;
+  background: #23272b;
+}
+
+.ant-menu-submenu-title {
+  color: #fff;
+}
+
+.ant-menu-submenu-title:hover {
+  color: #00bfff;
+}
+
+.ant-menu-submenu-selected .ant-menu-submenu-title {
+  color: #00bfff;
+}
+
+/* Custom anchor styles */
+.ant-anchor {
+  color: #b0b8c1;
+}
+
+.ant-anchor-link-title {
+  color: #fff;
+}
+
+.ant-anchor-link-title:hover {
+  color: #00bfff;
+}
+
+.ant-anchor-link-active > .ant-anchor-link-title {
+  color: #00bfff;
+}
+
+/* Custom back-top styles */
+.ant-back-top {
+  background: #23272b;
+  color: #fff;
+}
+
+.ant-back-top:hover {
+  background: #2c3136;
+}
+
+/* Custom affix styles */
+.ant-affix {
+  background: #181818;
+}
+
+/* Custom anchor styles */
+.ant-anchor {
+  color: #b0b8c1;
+}
+
+.ant-anchor-link-title {
+  color: #fff;
+}
+
+.ant-anchor-link-title:hover {
+  color: #00bfff;
+}
+
+.ant-anchor-link-active > .ant-anchor-link-title {
+  color: #00bfff;
+}
+
+/* Custom back-top styles */
+.ant-back-top {
+  background: #23272b;
+  color: #fff;
+}
+
+.ant-back-top:hover {
+  background: #2c3136;
+}
+
+/* Custom affix styles */
+.ant-affix {
+  background: #181818;
+}
+
+/* Custom anchor styles */
+.ant-anchor {
+  color: #b0b8c1;
+}
+
+.ant-anchor-link-title {
+  color: #fff;
+}
+
+.ant-anchor-link-title:hover {
+  color: #00bfff;
+}
+
+.ant-anchor-link-active > .ant-anchor-link-title {
+  color: #00bfff;
+}
+
+/* Custom back-top styles */
+.ant-back-top {
+  background: #23272b;
+  color: #fff;
+}
+
+.ant-back-top:hover {
+  background: #2c3136;
+}
+
+/* Custom affix styles */
+.ant-affix {
+  background: #181818;
+} 

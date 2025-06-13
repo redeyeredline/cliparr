@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Define LOG_DIR here, do NOT import from app.py
-LOG_DIR = os.getenv('LOG_DIR', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'log'))
+# Define LOG_DIR to use the mounted /data directory
+LOG_DIR = os.getenv('LOG_DIR', '/data/logs')
 
 def configure_logging():
     """Configure logging to output to console and file."""
