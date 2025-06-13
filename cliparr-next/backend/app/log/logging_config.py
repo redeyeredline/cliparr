@@ -5,12 +5,16 @@ This module configures logging for the application, directing log output to the 
 import os
 import logging
 from dotenv import load_dotenv
+from pathlib import Path
 
 # Load environment variables
 load_dotenv()
 
-# Define LOG_DIR to use the mounted /data directory
-LOG_DIR = os.getenv('LOG_DIR', '/data/logs')
+# Base paths
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Define LOG_DIR to use a local directory
+LOG_DIR = os.getenv('LOG_DIR', os.path.join(os.path.dirname(BASE_DIR), 'data', 'logs'))
 
 def configure_logging():
     """Configure logging to output to console and file."""

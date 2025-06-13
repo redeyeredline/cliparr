@@ -9,7 +9,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Database paths
-DATA_DIR = os.getenv('CLIPARR_DATA_DIR', '/data')
+DATA_DIR = os.getenv('CLIPARR_DATA_DIR', os.path.join(os.path.dirname(BASE_DIR), 'data'))
 DB_DIR = os.path.join(DATA_DIR, 'db')
 DB_PATH = os.getenv('DB_PATH', os.path.join(DB_DIR, 'cliparr.db'))
 

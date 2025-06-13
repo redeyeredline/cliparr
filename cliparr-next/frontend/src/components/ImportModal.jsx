@@ -18,7 +18,7 @@ const ImportModal = ({ visible, onClose, onSuccess }) => {
   const fetchShows = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/shows/unimported');
+      const response = await fetch('/api/sonarr/unimported');
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to fetch unimported shows');
@@ -38,7 +38,7 @@ const ImportModal = ({ visible, onClose, onSuccess }) => {
     
     setImporting(true);
     try {
-      const response = await fetch('/api/shows/import', {
+      const response = await fetch('/api/sonarr/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ showIds: selected })

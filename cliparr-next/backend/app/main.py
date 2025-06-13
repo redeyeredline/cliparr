@@ -86,33 +86,19 @@ app = FastAPI(
     title="Cliparr",
     description="Media Management Application",
     version="0.1.0",
-    docs_url=None,  # Disable Swagger UI in production
-    redoc_url=None,  # Disable ReDoc
+    docs_url=None if not DEBUG else "/docs",
+    redoc_url=None if not DEBUG else "/redoc"
 )
 
 # Add performance middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-# Configure socket.io with performance settings
-sio = socketio.AsyncServer(
-    async_mode='asgi',
-    cors_allowed_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    ping_timeout=30,
-    ping_interval=60,
-    logger=True,
-    engineio_logger=True,
-    max_http_buffer_size=1024 * 1024,
-    async_handlers=True,
-    cors_credentials=True
-)
-socket_app = socketio.ASGIApp(sio, app, socketio_path='/socket.io')
 
 # Initialize audio analysis job manager
 audio_job_manager = AudioAnalysisJobManager()
@@ -141,14 +127,24 @@ async def not_found_handler(request: Request, exc: HTTPException):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Application lifespan manager for startup and shutdown events.
+    """
     try:
         # Initialize database
         logger.info("Initializing database...")
-        init_db(DB_PATH)
-        logger.info("Database initialized successfully")
-
+        init_db()
+        
+        # Verify Sonarr connection
+        logger.info("Verifying Sonarr connection...")
+        try:
+            fetch_series_data()
+            logger.info("Successfully connected to Sonarr")
+        except Exception as e:
+            logger.error("Failed to connect to Sonarr: %s", str(e))
+            raise
+        
         # Ensure settings table exists and set initial import mode
-        from .db.settings import ensure_settings_table, set_import_mode
         ensure_settings_table()
         set_import_mode(IMPORT_MODE)
 
@@ -160,12 +156,14 @@ async def lifespan(app: FastAPI):
                 logging.error(f"Failed to start background task: {e}")
         else:
             logging.info("Background task not started due to import mode")
-    except Exception as e:
-        logging.error(f"Critical startup error: {e}", exc_info=True)
-        raise  # Re-raise the exception to prevent app startup if critical
-    yield
-    # Shutdown code
-    stop_background_task()
+        
+        yield
+    finally:
+        # Cleanup on shutdown
+        logger.info("Shutting down application...")
+        global background_task_running
+        background_task_running = False
+        stop_background_task()
 
 # Set the lifespan context manager
 app.router.lifespan_context = lifespan
@@ -429,72 +427,123 @@ async def get_imported_shows(page: Optional[int] = 1, page_size: Optional[int] =
         if conn:
             conn.close()
 
+@app.get('/api/health')
+async def health_check():
+    """
+    Health check endpoint to verify application status.
+    """
+    try:
+        # Check database connection
+        db = get_db()
+        db.execute('SELECT 1')
+        
+        # Check Sonarr connection
+        fetch_series_data()
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "sonarr": "connected"
+        }
+    except Exception as e:
+        logger.error("Health check failed: %s", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get('/api/sonarr/unimported')
-@log_performance
 async def get_unimported_shows():
+    """
+    Get list of shows that haven't been imported yet.
+    """
     try:
         sonarr_shows = fetch_series_data()
         db = get_db()
         cursor = db.cursor()
-        cursor.execute('SELECT sonarr_id, id FROM shows')
-        show_id_map = {row['sonarr_id']: row['id'] for row in cursor.fetchall()}
-        db_episode_counts = {}
-        for sonarr_id, local_id in show_id_map.items():
-            cursor.execute('SELECT COUNT(*) FROM episodes e JOIN seasons s ON e.season_id = s.id WHERE s.show_id = ?', (local_id,))
-            db_episode_counts[sonarr_id] = cursor.fetchone()[0]
-        unimported = []
-        for show in sonarr_shows:
-            sonarr_episode_count = show.get('statistics', {}).get('episodeFileCount', 0)
-            db_count = db_episode_counts.get(show['id'], 0)
-            if db_count < sonarr_episode_count:
-                unimported.append(show)
+        
+        # Get imported show IDs
+        cursor.execute('SELECT sonarr_id FROM shows')
+        imported_ids = {row[0] for row in cursor.fetchall()}
+        
+        # Filter out imported shows
+        unimported = [show for show in sonarr_shows if show['id'] not in imported_ids]
+        
         return unimported
     except Exception as e:
-        logging.error(f"Error fetching unimported shows: {e}")
-        return {"error": str(e)}
+        logger.error("Error fetching unimported shows: %s", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post('/api/sonarr/import')
 async def import_selected_shows(request: Request):
+    """
+    Import selected shows from Sonarr.
+    """
     try:
         data = await request.json()
         show_ids = data.get('showIds', [])
+        
         if not show_ids:
-            return {"error": "No show IDs provided"}
+            raise HTTPException(status_code=400, detail="No show IDs provided")
+        
         sonarr_shows = fetch_series_data()
         shows_to_import = [show for show in sonarr_shows if show['id'] in show_ids]
+        
+        if not shows_to_import:
+            raise HTTPException(status_code=404, detail="No matching shows found")
+        
         db = get_db()
         cur = db.cursor()
         imported_shows = []
+        
         for show in shows_to_import:
-            episodes = fetch_json(f'episode?seriesId={show["id"]}')
-            cur.execute('SELECT s.id FROM shows s WHERE s.sonarr_id = ?', (show['id'],))
-            show_row = cur.fetchone()
-            if show_row:
-                local_show_id = show_row[0]
-                cur.execute('SELECT e.sonarr_episode_id FROM episodes e JOIN seasons s ON e.season_id = s.id WHERE s.show_id = ?', (local_show_id,))
-                imported_episode_ids = set(row[0] for row in cur.fetchall())
-            else:
-                local_show_id = insert_show(cur, show)
-                imported_episode_ids = set()
-            missing_episodes = [ep for ep in episodes if ep['id'] not in imported_episode_ids]
-            if missing_episodes:
-                for ep in missing_episodes:
+            try:
+                episodes = fetch_json(f'episode?seriesId={show["id"]}')
+                
+                # Insert show
+                cur.execute(
+                    'INSERT OR REPLACE INTO shows (sonarr_id, title, overview, path) VALUES (?, ?, ?, ?)',
+                    (show['id'], show.get('title', ''), show.get('overview', ''), show.get('path', ''))
+                )
+                show_id = cur.lastrowid or cur.execute('SELECT id FROM shows WHERE sonarr_id = ?', (show['id'],)).fetchone()[0]
+                
+                # Process episodes
+                for ep in episodes:
                     season_number = ep['seasonNumber']
-                    season_id = insert_season(cur, local_show_id, season_number)
-                    insert_episode(cur, season_id, ep)
+                    
+                    # Insert season
+                    cur.execute(
+                        'INSERT OR REPLACE INTO seasons (show_id, season_number) VALUES (?, ?)',
+                        (show_id, season_number)
+                    )
+                    season_id = cur.lastrowid or cur.execute(
+                        'SELECT id FROM seasons WHERE show_id = ? AND season_number = ?',
+                        (show_id, season_number)
+                    ).fetchone()[0]
+                    
+                    # Insert episode
+                    cur.execute(
+                        'INSERT OR REPLACE INTO episodes (season_id, episode_number, title, sonarr_episode_id) VALUES (?, ?, ?, ?)',
+                        (season_id, ep['episodeNumber'], ep.get('title', ''), ep['id'])
+                    )
+                
                 imported_shows.append({
                     'id': show['id'],
                     'title': show['title'],
-                    'episodesImported': len(missing_episodes)
+                    'episodesImported': len(episodes)
                 })
+                
+            except Exception as e:
+                logger.error("Error importing show %s: %s", show['title'], str(e))
+                continue
+        
         db.commit()
+        
         return {
             "importedCount": len(imported_shows),
             "importedShows": imported_shows
         }
+        
     except Exception as e:
-        logging.error(f"Error importing shows: {e}")
-        return {"error": str(e)}
+        logger.error("Error importing shows: %s", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post('/api/imported-shows')
 async def delete_imported_shows(request: Request):
@@ -632,7 +681,27 @@ async def update_import_mode(request: Request):
         logging.error(f'Failed to set import mode: {e}', exc_info=True)
         return {"error": f'Failed to set import mode: {e}'}
 
-# Improved WebSocket event handlers with logging
+# Configure socket.io with performance settings
+sio = socketio.AsyncServer(
+    async_mode='asgi',
+    cors_allowed_origins=["*"],
+    ping_timeout=30,
+    ping_interval=60,
+    logger=DEBUG,
+    engineio_logger=DEBUG,
+    max_http_buffer_size=1024 * 1024,
+    async_handlers=True,
+    cors_credentials=True
+)
+
+# Create the ASGI app after all routes are defined
+socket_app = socketio.ASGIApp(sio, app, socketio_path='/socket.io')
+
+# Create a new FastAPI app for API routes
+api_app = FastAPI()
+api_app.mount("/", app)
+
+# WebSocket event handlers
 @sio.on('connect')
 async def connect(sid, environ):
     logger.info(f"WebSocket client connected: {sid}")
@@ -796,8 +865,8 @@ if __name__ == '__main__':
         import asyncio
         config = hypercorn.config.Config()
         config.bind = ["0.0.0.0:5000"]
-        asyncio.run(hypercorn.asyncio.serve(socket_app, config))
+        asyncio.run(hypercorn.asyncio.serve(api_app, config))
     except ImportError:
         import uvicorn
-        uvicorn.run(socket_app, host="0.0.0.0", port=5000)
+        uvicorn.run(api_app, host="0.0.0.0", port=5000)
     

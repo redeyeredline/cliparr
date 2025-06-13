@@ -5,10 +5,14 @@ Configuration settings for the application.
 import os
 import logging
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = os.getenv('CLIPARR_DATA_DIR', '/data')
+DATA_DIR = os.getenv('CLIPARR_DATA_DIR', os.path.join(os.path.dirname(BASE_DIR), 'data'))
 DB_DIR = os.path.join(DATA_DIR, 'db')
 
 # Database paths
@@ -36,16 +40,25 @@ CLIPARR_IMPORT_MODE = os.getenv('CLIPARR_IMPORT_MODE', 'none')
 IMPORT_MODE = CLIPARR_IMPORT_MODE  # Alias for backward compatibility
 
 # Sonarr API settings
-SONARR_URL = os.getenv('SONARR_URL', 'http://localhost:8989')
-SONARR_API_KEY = os.getenv('SONARR_API_KEY', '')
+SONARR_URL = os.getenv('SONARR_URL')
+if not SONARR_URL:
+    raise ValueError("SONARR_URL environment variable is required")
+
+SONARR_API_KEY = os.getenv('SONARR_API_KEY')
+if not SONARR_API_KEY:
+    raise ValueError("SONARR_API_KEY environment variable is required")
 
 # Timeout settings
-TIMEOUT = 30  # seconds
+TIMEOUT = int(os.getenv('TIMEOUT', '30'))  # seconds
 
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG if DEBUG else logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(LOG_DIR, 'app.log')),
+        logging.StreamHandler()
+    ]
 )
 
 __all__ = [
