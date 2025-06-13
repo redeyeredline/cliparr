@@ -19,19 +19,20 @@ RUN groupadd -g 911 abc && \
     useradd -u 911 -g abc -s /bin/bash -m abc
 
 # Create necessary directories with correct permissions
-RUN mkdir -p /data/{app,logs,config,db,static} && \
+RUN mkdir -p /data/app /data/storage/{config,logs,db,media} && \
     chown -R abc:abc /data && \
     chmod -R 755 /data
 
-# Set workdir to data/app
-WORKDIR /data/app
+# Set workdir to data
+WORKDIR /data
 
 # Copy requirements first for better caching
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
-COPY --chown=abc:abc backend/app ./app
+COPY backend/app /data/app
+COPY backend/__init__.py /data/app/__init__.py
 
 # Copy built frontend files from builder stage
 COPY --from=frontend-builder --chown=abc:abc /frontend/dist/* /data/static/
@@ -41,8 +42,8 @@ COPY --from=frontend-builder --chown=abc:abc /frontend/dist/assets /data/static/
 USER abc
 
 # Set environment variables
-ENV PYTHONPATH=/data/app
-ENV CLIPARR_DATA_DIR=/data
+ENV PYTHONPATH=/data
+ENV CLIPARR_DATA_DIR=/data/storage
 ENV ENV=production
 ENV DEBUG=false
 ENV HOST=0.0.0.0
@@ -52,5 +53,5 @@ ENV CLIPARR_IMPORT_MODE=none
 # Expose port
 EXPOSE 5000
 
-# Run the application
+# Run the application as a module
 CMD ["python", "-m", "app.main"] 
