@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import hashlib
 from datetime import datetime
+from ..config import DB_PATH
 
 class AudioFingerprinter:
-    def __init__(self, db_path: str = "data/audio_fingerprints.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or os.path.join(os.path.dirname(DB_PATH), 'audio_fingerprints.db')
         self._init_db()
         
     def _init_db(self):

@@ -8,14 +8,16 @@ import sqlite3
 import uuid
 import threading
 import time
+import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Union
 
-from .media.audio_fingerprint import AudioFingerprinter
+from ..config import DB_PATH
+from .audio_fingerprint import AudioFingerprinter
 
 class AudioAnalysisJobManager:
-    def __init__(self, db_path: str = "data/audio_analysis_jobs.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or os.path.join(os.path.dirname(DB_PATH), 'audio_analysis_jobs.db')
         self.fingerprinter = AudioFingerprinter()
         self._init_db()
 

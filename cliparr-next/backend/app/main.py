@@ -19,30 +19,47 @@ from typing import List, Dict, Optional
 # Third-party imports
 import fastapi
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import hypercorn.asyncio
 import socketio
 import uvicorn
+from fastapi.templating import Jinja2Templates
+from fastapi.websockets import WebSocketState
+import json
 
 # Local imports
-from app.api.sonarr_api import fetch_series_data, fetch_json
-from app.db.database import get_db, insert_show, insert_season, insert_episode
-from app.log.logging_config import configure_logging
-from app.config import (
+from .config import (
     DB_PATH,
-    IMPORT_MODE,
-    set_import_mode,
-    initialize_database,
-    get_import_mode,
-    ENV,
     LOG_DIR,
-    CONFIG_DIR
+    CONFIG_DIR,
+    SONARR_URL,
+    SONARR_API_KEY,
+    TIMEOUT,
+    IMPORT_MODE,
+    ENV,
+    DEBUG,
+    HOST,
+    PORT,
+    CLIPARR_IMPORT_MODE
 )
-from app.media.audio_analysis_jobs import AudioAnalysisJobManager
+from .db.settings import set_import_mode, get_import_mode
+from .db.manager import (
+    get_db,
+    insert_show,
+    insert_season,
+    insert_episode,
+    process_show_data,
+    store_data_in_db,
+    get_imported_shows_optimized
+)
+from .api.sonarr_api import fetch_series_data, fetch_json
+from .log.logging_config import configure_logging
+from .media.audio_analysis_jobs import AudioAnalysisJobManager
+from .db.init_db import init_db
 
 load_dotenv()
 
@@ -107,12 +124,6 @@ socket_app = socketio.ASGIApp(sio, app, socketio_path='/socket.io')
 # Initialize audio analysis job manager
 audio_job_manager = AudioAnalysisJobManager()
 
-# Add timeout to requests.get calls
-TIMEOUT = 10
-
-SONARR_URL = os.getenv('SONARR_URL')
-SONARR_API_KEY = os.getenv('SONARR_API_KEY')
-
 # Global flag to control background task
 background_task_running = False
 background_task_thread = None
@@ -120,7 +131,7 @@ background_task_thread = None
 # Initialize database
 try:
     logger.info("Initializing database...")
-    initialize_database()
+    init_db()
     logger.info("Database initialized successfully")
 except Exception as e:
     logger.error("Failed to initialize database: %s", e)
@@ -217,12 +228,11 @@ def stop_background_task():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup code
-    # (what was in startup_event)
     try:
         # Simplified database initialization with minimal logging
         logging.info(f"Initializing application with import mode: {IMPORT_MODE}")
-        initialize_database()
+        logging.info(f"Environment: {ENV}")
+        init_db()
 
         # Start background task based on import mode
         if IMPORT_MODE in ("auto", "import"):

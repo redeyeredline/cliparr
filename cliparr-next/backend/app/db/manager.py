@@ -7,19 +7,20 @@ process show data fetched from the Sonarr API.
 
 import sqlite3
 import logging
-from backend.app.config import DB_PATH
+from .constants import DB_PATH
 from typing import List, Dict, Any
 import math
 import time
 from fastapi import HTTPException
-from .api.sonarr_api import fetch_json
-from .db.init_db import init_db
+from ..api.sonarr_api import fetch_json
+from .init_db import init_db
 
-def get_db(db_path: str = 'data/cliparr.db') -> sqlite3.Connection:
+def get_db(db_path: str = None) -> sqlite3.Connection:
     """
     Create a connection to the database with optimized settings.
     """
     try:
+        db_path = db_path or DB_PATH
         conn = sqlite3.connect(db_path,
             isolation_level=None,  # Enable autocommit
             cached_statements=100,  # Increase cached prepared statements

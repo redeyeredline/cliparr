@@ -25,6 +25,11 @@ RUN apt-get update && \
 # Set up application directories
 WORKDIR /app
 
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/backend/app/data /app/backend/app/log /app/backend/app/config /config/log /data && \
+    chown -R 1000:1000 /app/backend/app/data /app/backend/app/log /app/backend/app/config /config /data && \
+    chmod -R 755 /app/backend/app/data /app/backend/app/log /app/backend/app/config /config /data
+
 # Install Python dependencies
 COPY backend/requirements.txt /app/backend/
 RUN pip3 install --no-cache-dir -r /app/backend/requirements.txt
@@ -32,6 +37,10 @@ RUN pip3 install --no-cache-dir -r /app/backend/requirements.txt
 # Copy backend files
 COPY backend/app /app/backend/app/
 COPY backend/static /app/backend/static/
+
+# Ensure proper permissions after copying files
+RUN chown -R 1000:1000 /app/backend/app /app/backend/static && \
+    chmod -R 755 /app/backend/app /app/backend/static
 
 # Set up frontend
 WORKDIR /app/frontend
@@ -48,10 +57,6 @@ RUN npm run build
 # Verify frontend build
 RUN echo "Backend static directory contents:" && \
     ls -la /app/backend/static
-
-# Create necessary directories
-RUN mkdir -p /config/log /data && \
-    chown -R 1000:1000 /config /data
 
 # Expose port
 EXPOSE 5000

@@ -2,13 +2,15 @@ import sqlite3
 import os
 import logging
 from pathlib import Path
+from .constants import DB_PATH
 
-def init_db(db_path='data/cliparr.db'):
+def init_db(db_path=None):
     """
     Initialize the database with all necessary tables.
     
     :param db_path: Path to the SQLite database file
     """
+    db_path = db_path or DB_PATH
     try:
         # Ensure the directory exists
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -21,12 +23,12 @@ def init_db(db_path='data/cliparr.db'):
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS shows (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
                 sonarr_id INTEGER UNIQUE,
-                path TEXT,
+                title TEXT,
                 overview TEXT,
-                status TEXT,
-                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                path TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
@@ -36,8 +38,8 @@ def init_db(db_path='data/cliparr.db'):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 show_id INTEGER,
                 season_number INTEGER,
-                monitored BOOLEAN DEFAULT 1,
-                FOREIGN KEY (show_id) REFERENCES shows(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (show_id) REFERENCES shows (id),
                 UNIQUE(show_id, season_number)
             )
         ''')
@@ -47,11 +49,11 @@ def init_db(db_path='data/cliparr.db'):
             CREATE TABLE IF NOT EXISTS episodes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 season_id INTEGER,
-                sonarr_episode_id INTEGER UNIQUE,
                 episode_number INTEGER,
                 title TEXT,
-                monitored BOOLEAN DEFAULT 1,
-                FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE
+                sonarr_episode_id INTEGER UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (season_id) REFERENCES seasons (id)
             )
         ''')
 
@@ -63,7 +65,8 @@ def init_db(db_path='data/cliparr.db'):
                 file_path TEXT,
                 size INTEGER,
                 quality TEXT,
-                FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (episode_id) REFERENCES episodes (id)
             )
         ''')
 
@@ -71,16 +74,17 @@ def init_db(db_path='data/cliparr.db'):
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
-                value TEXT
+                value TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
-        # Create indexes for performance
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_shows_title ON shows(title COLLATE NOCASE)')
+        # Create indexes for better performance
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_shows_sonarr_id ON shows(sonarr_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_seasons_show_id ON seasons(show_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_episodes_season_id ON episodes(season_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_episodes_sonarr_episode_id ON episodes(sonarr_episode_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_episode_files_episode_id ON episode_files(episode_id)')
 
         # Commit changes
         conn.commit()
