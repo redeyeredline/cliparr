@@ -1,57 +1,48 @@
 # Build stage for frontend
-FROM node:18-slim as frontend-builder
+FROM node:20-slim AS frontend-builder
 WORKDIR /frontend
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
 # Main stage
-FROM python:3.11-slim
+FROM node:20-slim
+
+# Set working directory
+WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    ffmpeg \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create abc user and group
-RUN groupadd -g 911 abc && \
-    useradd -u 911 -g abc -s /bin/bash -m abc
+# Copy package files
+COPY backend/package*.json ./
 
-# Create necessary directories with correct permissions
-RUN mkdir -p /data/app /data/storage/{config,logs,db,media} && \
-    chown -R abc:abc /data && \
-    chmod -R 755 /data
+# Install dependencies
+RUN npm install
 
-# Set workdir to data
-WORKDIR /data
+# Copy source code
+COPY backend/ ./
 
-# Copy requirements first for better caching
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Build TypeScript
+RUN npm run build
 
-# Copy backend code
-COPY backend/app /data/app
-COPY backend/__init__.py /data/app/__init__.py
+# Create necessary directories
+RUN mkdir -p /data/static /data/logs /data/config /data/db
 
 # Copy built frontend files from builder stage
-COPY --from=frontend-builder --chown=abc:abc /frontend/dist/* /data/static/
-COPY --from=frontend-builder --chown=abc:abc /frontend/dist/assets /data/static/assets
-
-# Switch to abc user
-USER abc
+COPY --from=frontend-builder /frontend/dist/* /data/static/
+COPY --from=frontend-builder /frontend/dist/assets /data/static/assets
 
 # Set environment variables
-ENV PYTHONPATH=/data
-ENV CLIPARR_DATA_DIR=/data/storage
-ENV ENV=production
-ENV DEBUG=false
-ENV HOST=0.0.0.0
+ENV NODE_ENV=production
 ENV PORT=5000
-ENV CLIPARR_IMPORT_MODE=none
+ENV HOST=0.0.0.0
 
 # Expose port
 EXPOSE 5000
 
-# Run the application as a module
-CMD ["python", "-m", "app.main"] 
+# Start the application
+CMD ["npm", "start"] 
