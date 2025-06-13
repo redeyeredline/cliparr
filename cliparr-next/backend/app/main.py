@@ -30,6 +30,7 @@ import uvicorn
 from fastapi.templating import Jinja2Templates
 from fastapi.websockets import WebSocketState
 import json
+import requests
 
 # Local imports
 from .config import (
@@ -113,17 +114,53 @@ STATIC_DIR = "/data/static" if ENV == "production" else os.path.join(os.path.dir
 # Ensure static directory exists
 os.makedirs(STATIC_DIR, exist_ok=True)
 
-# Mount static files
-app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="frontend")
+# Mount static files at /static instead of root
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Serve index.html for client-side routing
-@app.exception_handler(404)
-async def not_found_handler(request: Request, exc: HTTPException):
-    if not request.url.path.startswith("/api"):
-        index_path = os.path.join(STATIC_DIR, "index.html")
-        if os.path.exists(index_path):
-            return FileResponse(index_path)
-    return JSONResponse(status_code=404, content={"detail": "Not found"})
+# Ensure logging outputs to console
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Log all registered routes at startup
+def log_routes(app):
+    logger.info('Registered routes:')
+    for route in app.routes:
+        if hasattr(route, 'methods'):
+            logger.info(f"{route.path} [{','.join(route.methods)}]")
+        elif hasattr(route, 'name'):
+            logger.info(f"{route.path} [{route.name}]")
+        else:
+            logger.info(f"{route.path}")
+
+log_routes(app)
+
+# Define all API routes using @app
+@app.get('/api/health')
+async def health_check():
+    logger.info('GET /api/health called')
+    return {"status": "ok"}
+
+@app.get('/api/sonarr/unimported')
+async def get_unimported_shows():
+    logger.info('GET /api/sonarr/unimported called')
+    try:
+        sonarr_shows = fetch_series_data()
+        if not sonarr_shows:
+            logger.warning("No shows returned from Sonarr API")
+            return []
+            
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('SELECT sonarr_id FROM shows')
+        imported_ids = {row[0] for row in cursor.fetchall()}
+        unimported = [show for show in sonarr_shows if show['id'] not in imported_ids]
+        logger.info(f"Returning {len(unimported)} unimported shows")
+        return unimported
+    except requests.exceptions.RequestException as e:
+        logger.error("Error connecting to Sonarr API: %s", str(e))
+        raise HTTPException(status_code=503, detail="Unable to connect to Sonarr API")
+    except Exception as e:
+        logger.error("Error fetching unimported shows: %s", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -427,88 +464,32 @@ async def get_imported_shows(page: Optional[int] = 1, page_size: Optional[int] =
         if conn:
             conn.close()
 
-@app.get('/api/health')
-async def health_check():
-    """
-    Health check endpoint to verify application status.
-    """
-    try:
-        # Check database connection
-        db = get_db()
-        db.execute('SELECT 1')
-        
-        # Check Sonarr connection
-        fetch_series_data()
-        
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "sonarr": "connected"
-        }
-    except Exception as e:
-        logger.error("Health check failed: %s", str(e))
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get('/api/sonarr/unimported')
-async def get_unimported_shows():
-    """
-    Get list of shows that haven't been imported yet.
-    """
-    try:
-        sonarr_shows = fetch_series_data()
-        db = get_db()
-        cursor = db.cursor()
-        
-        # Get imported show IDs
-        cursor.execute('SELECT sonarr_id FROM shows')
-        imported_ids = {row[0] for row in cursor.fetchall()}
-        
-        # Filter out imported shows
-        unimported = [show for show in sonarr_shows if show['id'] not in imported_ids]
-        
-        return unimported
-    except Exception as e:
-        logger.error("Error fetching unimported shows: %s", str(e))
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.post('/api/sonarr/import')
 async def import_selected_shows(request: Request):
-    """
-    Import selected shows from Sonarr.
-    """
+    logger.info('POST /api/sonarr/import called')
     try:
         data = await request.json()
         show_ids = data.get('showIds', [])
-        
+        logger.info(f"Importing shows: {show_ids}")
         if not show_ids:
             raise HTTPException(status_code=400, detail="No show IDs provided")
-        
         sonarr_shows = fetch_series_data()
         shows_to_import = [show for show in sonarr_shows if show['id'] in show_ids]
-        
         if not shows_to_import:
             raise HTTPException(status_code=404, detail="No matching shows found")
-        
         db = get_db()
         cur = db.cursor()
         imported_shows = []
-        
         for show in shows_to_import:
             try:
                 episodes = fetch_json(f'episode?seriesId={show["id"]}')
-                
-                # Insert show
                 cur.execute(
                     'INSERT OR REPLACE INTO shows (sonarr_id, title, overview, path) VALUES (?, ?, ?, ?)',
                     (show['id'], show.get('title', ''), show.get('overview', ''), show.get('path', ''))
                 )
                 show_id = cur.lastrowid or cur.execute('SELECT id FROM shows WHERE sonarr_id = ?', (show['id'],)).fetchone()[0]
-                
-                # Process episodes
                 for ep in episodes:
                     season_number = ep['seasonNumber']
-                    
-                    # Insert season
                     cur.execute(
                         'INSERT OR REPLACE INTO seasons (show_id, season_number) VALUES (?, ?)',
                         (show_id, season_number)
@@ -517,99 +498,84 @@ async def import_selected_shows(request: Request):
                         'SELECT id FROM seasons WHERE show_id = ? AND season_number = ?',
                         (show_id, season_number)
                     ).fetchone()[0]
-                    
-                    # Insert episode
                     cur.execute(
                         'INSERT OR REPLACE INTO episodes (season_id, episode_number, title, sonarr_episode_id) VALUES (?, ?, ?, ?)',
                         (season_id, ep['episodeNumber'], ep.get('title', ''), ep['id'])
                     )
-                
                 imported_shows.append({
                     'id': show['id'],
                     'title': show['title'],
                     'episodesImported': len(episodes)
                 })
-                
             except Exception as e:
                 logger.error("Error importing show %s: %s", show['title'], str(e))
                 continue
-        
         db.commit()
-        
+        logger.info(f"Successfully imported {len(imported_shows)} shows")
         return {
             "importedCount": len(imported_shows),
             "importedShows": imported_shows
         }
-        
     except Exception as e:
         logger.error("Error importing shows: %s", str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post('/api/imported-shows')
 async def delete_imported_shows(request: Request):
+    logger.info('POST /api/imported-shows called')
     try:
         data = await request.json()
         show_ids = data.get('showIds', [])
+        logger.info(f"Deleting shows: {show_ids}")
         if not show_ids:
             logging.error("No show IDs provided for deletion")
             return {"error": "No show IDs provided"}
-
-        logging.info(f"Attempting to delete shows with IDs: {show_ids}")
         db = get_db()
         cursor = db.cursor()
-
-        # First get episode IDs
         cursor.execute(
             f'SELECT e.id FROM episodes e JOIN seasons s ON e.season_id = s.id WHERE s.show_id IN ({",".join("?" * len(show_ids))})',
             show_ids
         )
         episode_ids = [row[0] for row in cursor.fetchall()]
-        logging.info(f"Found {len(episode_ids)} episodes to delete")
-
-        # Delete episode files
+        logger.info(f"Found {len(episode_ids)} episodes to delete")
         if episode_ids:
             placeholders = ','.join(['?' for _ in episode_ids])
             cursor.execute(f'DELETE FROM episode_files WHERE episode_id IN ({placeholders})', episode_ids)
-            logging.info(f"Deleted episode files for {len(episode_ids)} episodes")
-
-        # Delete episodes
+            logger.info(f"Deleted episode files for {len(episode_ids)} episodes")
         cursor.execute(
             f'DELETE FROM episodes WHERE season_id IN (SELECT id FROM seasons WHERE show_id IN ({",".join("?" * len(show_ids))}))',
             show_ids
         )
-        logging.info(f"Deleted episodes for shows {show_ids}")
-
-        # Delete seasons
+        logger.info(f"Deleted episodes for shows {show_ids}")
         cursor.execute(
             f'DELETE FROM seasons WHERE show_id IN ({",".join("?" * len(show_ids))})',
             show_ids
         )
-        logging.info(f"Deleted seasons for shows {show_ids}")
-
-        # Finally delete shows
+        logger.info(f"Deleted seasons for shows {show_ids}")
         cursor.execute(
             f'DELETE FROM shows WHERE id IN ({",".join("?" * len(show_ids))})',
             show_ids
         )
-        logging.info(f"Deleted shows {show_ids}")
-
+        logger.info(f"Deleted shows {show_ids}")
         db.commit()
-        logging.info("Successfully committed all deletions")
+        logger.info("Successfully committed all deletions")
         return {"status": "success"}
     except sqlite3.Error as e:
-        logging.error(f"Database error while deleting shows: {e}")
+        logger.error(f"Database error while deleting shows: {e}")
         return {"error": f"Error deleting shows: {e}"}
     except Exception as e:
-        logging.error(f"Unexpected error while deleting shows: {e}")
+        logger.error(f"Unexpected error while deleting shows: {e}")
         return {"error": f"Unexpected error: {e}"}
 
 @app.get('/api/series/{show_id}')
 async def api_get_series(show_id: int):
+    logger.info(f'GET /api/series/{show_id} called')
     db = get_db()
     cursor = db.cursor()
     cursor.execute('SELECT id, title, overview, path FROM shows WHERE id = ?', (show_id,))
     show = cursor.fetchone()
     if not show:
+        logger.info(f'Show {show_id} not found')
         return {"error": "Show not found"}
     cursor.execute('SELECT id, season_number FROM seasons WHERE show_id = ? ORDER BY season_number', (show_id,))
     seasons = cursor.fetchall()
@@ -622,6 +588,7 @@ async def api_get_series(show_id: int):
             'seasonNumber': season_number,
             'episodes': episodes
         })
+    logger.info(f'Returning series info for show {show_id}')
     return {
         'id': show['id'],
         'title': show['title'],
@@ -632,54 +599,74 @@ async def api_get_series(show_id: int):
 
 @app.get('/api/settings/import-mode')
 async def get_import_mode():
+    logger.info('GET /api/settings/import-mode called')
     from app.config import IMPORT_MODE
     return {"mode": IMPORT_MODE}
 
 @app.post('/api/settings/import-mode')
 async def update_import_mode(request: Request):
+    logger.info('POST /api/settings/import-mode called')
     data = await request.json()
     mode = data.get('mode', 'none').lower()
+    logger.info(f"Setting import mode to: {mode}")
     if mode not in ('auto', 'import', 'none'):
         return {"error": "Invalid mode"}
     try:
         set_import_mode(mode)
         logging.info(f"Import mode set to: {mode}")
-        # Handle background task based on mode
         if mode in ('auto', 'import'):
             start_background_task()
-            # Trigger immediate scan
-            try:
-                sonarr_shows = fetch_series_data()
-                db = get_db()
-                cur = db.cursor()
-                for show in sonarr_shows:
-                    episodes = fetch_json(f'episode?seriesId={show["id"]}')
-                    cur.execute('SELECT s.id FROM shows s WHERE s.sonarr_id = ?', (show['id'],))
-                    show_row = cur.fetchone()
-                    if show_row:
-                        local_show_id = show_row[0]
-                        cur.execute('SELECT e.sonarr_episode_id FROM episodes e JOIN seasons s ON e.season_id = s.id WHERE s.show_id = ?', (local_show_id,))
-                        imported_episode_ids = set(row[0] for row in cur.fetchall())
-                    else:
-                        local_show_id = insert_show(cur, show)
-                        imported_episode_ids = set()
-                    missing_episodes = [ep for ep in episodes if ep['id'] not in imported_episode_ids]
-                    if missing_episodes:
-                        for ep in missing_episodes:
-                            season_number = ep['seasonNumber']
-                            season_id = insert_season(cur, local_show_id, season_number)
-                            insert_episode(cur, season_id, ep)
-                db.commit()
-                sio.emit('show_imported', {'status': 'scan_complete'})
-            except Exception as e:
-                logging.error(f"Error during immediate scan: {e}")
-        else:
-            stop_background_task()
-
-        return {"status": "ok", "mode": mode}
+        return {"status": "success", "mode": mode}
     except Exception as e:
-        logging.error(f'Failed to set import mode: {e}', exc_info=True)
-        return {"error": f'Failed to set import mode: {e}'}
+        logger.error(f"Error updating import mode: {e}")
+        return {"error": str(e)}
+
+@app.get('/api/audio-analysis/jobs')
+async def get_audio_analysis_jobs(
+    status: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0
+) -> List[Dict]:
+    logger.info('GET /api/audio-analysis/jobs called')
+    return audio_job_manager.get_jobs(status, limit, offset)
+
+@app.post('/api/audio-analysis/schedule')
+async def schedule_audio_analysis(
+    show_id: int,
+    show_title: str,
+    episodes: List[Dict]
+) -> Dict:
+    logger.info('POST /api/audio-analysis/schedule called')
+    try:
+        job_id = audio_job_manager.schedule_job(show_id, show_title, episodes)
+        logger.info(f"Scheduled audio analysis job {job_id}")
+        return {"status": "success", "job_id": job_id}
+    except Exception as e:
+        logger.error(f"Error scheduling audio analysis: {e}")
+        return {"error": str(e)}
+
+@app.post('/api/audio-analysis/cleanup')
+async def cleanup_audio_analysis_jobs(days: int = 30) -> Dict:
+    logger.info('POST /api/audio-analysis/cleanup called')
+    try:
+        cleaned = audio_job_manager.cleanup_old_jobs(days)
+        logger.info(f"Cleaned up {cleaned} audio analysis jobs older than {days} days")
+        return {"status": "success", "cleaned": cleaned}
+    except Exception as e:
+        logger.error(f"Error cleaning up jobs: {e}")
+        return {"error": str(e)}
+
+@app.get('/api/websocket-test')
+async def websocket_test():
+    logger.info('GET /api/websocket-test called')
+    return {"status": "WebSocket server is running"}
+
+# Add a catch-all route for the frontend
+@app.get("/{path:path}")
+async def serve_frontend(path: str):
+    if path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 # Configure socket.io with performance settings
 sio = socketio.AsyncServer(
@@ -696,10 +683,6 @@ sio = socketio.AsyncServer(
 
 # Create the ASGI app after all routes are defined
 socket_app = socketio.ASGIApp(sio, app, socketio_path='/socket.io')
-
-# Create a new FastAPI app for API routes
-api_app = FastAPI()
-api_app.mount("/", app)
 
 # WebSocket event handlers
 @sio.on('connect')
@@ -721,94 +704,6 @@ async def disconnect(sid):
 @sio.on('connect_error')
 async def connect_error(error):
     logger.error(f"WebSocket connection error: {error}", exc_info=True)
-
-# Add a specific route to test WebSocket connection
-@app.get('/api/websocket-test')
-async def websocket_test():
-    return {"status": "WebSocket server is running"}
-
-@app.get('/api/audio-analysis/jobs')
-async def get_audio_analysis_jobs(
-    status: Optional[str] = None,
-    limit: int = 100,
-    offset: int = 0
-) -> List[Dict]:
-    """
-    Retrieve audio analysis jobs.
-    
-    :param status: Filter by job status
-    :param limit: Maximum number of jobs to return
-    :param offset: Offset for pagination
-    :return: List of job details
-    """
-    return audio_job_manager.get_jobs(status, limit, offset)
-
-@app.post('/api/audio-analysis/schedule')
-async def schedule_audio_analysis(
-    show_id: int,
-    show_title: str,
-    episodes: List[Dict]
-) -> Dict:
-    """
-    Schedule audio analysis for a show or specific episodes.
-    
-    :param show_id: ID of the show
-    :param show_title: Title of the show
-    :param episodes: List of episodes to analyze
-    :return: Job scheduling status
-    """
-    try:
-        # Validate episodes input
-        validated_episodes = []
-        for episode in episodes:
-            if 'file_path' not in episode:
-                raise HTTPException(status_code=400, detail="Each episode must have a file_path")
-            validated_episodes.append({
-                'file_path': episode['file_path'],
-                'season_number': episode.get('season_number'),
-                'episode_number': episode.get('episode_number')
-            })
-
-        # Schedule audio analysis
-        await audio_job_manager.schedule_show_analysis(
-            show_id,
-            show_title,
-            validated_episodes
-        )
-
-        # Emit WebSocket event for real-time updates
-        await sio.emit('audio_analysis_scheduled', {
-            'show_id': show_id,
-            'show_title': show_title,
-            'episode_count': len(validated_episodes)
-        })
-
-        return {
-            "status": "success", 
-            "message": f"Scheduled audio analysis for {show_title}",
-            "episode_count": len(validated_episodes)
-        }
-    except Exception as e:
-        logging.error(f"Error scheduling audio analysis: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post('/api/audio-analysis/cleanup')
-async def cleanup_audio_analysis_jobs(days: int = 30) -> Dict:
-    """
-    Cleanup old audio analysis jobs.
-    
-    :param days: Number of days to keep jobs
-    :return: Cleanup status
-    """
-    try:
-        audio_job_manager.cleanup_old_fingerprints(days)
-        return {
-            "status": "success", 
-            "message": f"Cleaned up audio analysis jobs older than {days} days"
-        }
-    except Exception as e:
-        logging.error(f"Error cleaning up audio analysis jobs: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 @sio.on('test_event')
 async def handle_test_event(sid, data):
@@ -865,8 +760,8 @@ if __name__ == '__main__':
         import asyncio
         config = hypercorn.config.Config()
         config.bind = ["0.0.0.0:5000"]
-        asyncio.run(hypercorn.asyncio.serve(api_app, config))
+        asyncio.run(hypercorn.asyncio.serve(socket_app, config))
     except ImportError:
         import uvicorn
-        uvicorn.run(api_app, host="0.0.0.0", port=5000)
+        uvicorn.run(socket_app, host="0.0.0.0", port=5000)
     

@@ -12,6 +12,12 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html')
+      },
+      output: {
+        manualChunks: undefined,
+        entryFileNames: 'assets/[name].[hash].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]'
       }
     }
   },
@@ -25,10 +31,16 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/api': 'http://localhost:5000',
+      '/api': {
+        target: process.env.NODE_ENV === 'production' ? 'http://localhost:5000' : 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false
+      },
       '/socket.io': {
-        target: 'http://localhost:5000',
-        ws: true
+        target: process.env.NODE_ENV === 'production' ? 'http://localhost:5000' : 'http://localhost:5000',
+        ws: true,
+        changeOrigin: true,
+        secure: false
       }
     }
   }
