@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import pino from 'pino';
+import { config } from '../config';
 
 const logger = pino({
   transport:
@@ -12,11 +13,14 @@ const logger = pino({
 });
 
 const pool = new Pool({
-  user: 'postgres',
-  password: 'postgres',
-  database: 'cliparr',
-  host: 'localhost',
-  port: 5432,
+  host: config.database.host, // Unix socket
+  port: config.database.port,
+  user: config.database.user, // 'cliparr'
+  database: config.database.database, // 'cliparr'
+  password: config.database.password, // ''
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
 pool.on('connect', () => {

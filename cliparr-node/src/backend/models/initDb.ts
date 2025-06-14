@@ -1,5 +1,6 @@
-import pool from './db';
+import { Pool } from 'pg';
 import pino from 'pino';
+import pool from './db';
 
 const logger = pino({
   transport:
@@ -11,12 +12,12 @@ const logger = pino({
       : undefined,
 });
 
-export async function initializeDb() {
-  logger.info('Initializing PostgreSQL database schema...');
+export async function initializeDatabase(): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Shows table
+
+    // Create shows table
     await client.query(`
       CREATE TABLE IF NOT EXISTS shows (
         id SERIAL PRIMARY KEY,
@@ -24,67 +25,103 @@ export async function initializeDb() {
         title TEXT NOT NULL,
         overview TEXT,
         path TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    // Seasons table
+
+    // Create seasons table
     await client.query(`
       CREATE TABLE IF NOT EXISTS seasons (
         id SERIAL PRIMARY KEY,
-        show_id INTEGER NOT NULL REFERENCES shows(id) ON DELETE CASCADE,
+        show_id INTEGER REFERENCES shows(id) ON DELETE CASCADE,
         season_number INTEGER NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(show_id, season_number)
       )
     `);
-    // Episodes table
+
+    // Create episodes table
     await client.query(`
       CREATE TABLE IF NOT EXISTS episodes (
         id SERIAL PRIMARY KEY,
-        season_id INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+        season_id INTEGER REFERENCES seasons(id) ON DELETE CASCADE,
         episode_number INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        sonarr_episode_id INTEGER UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(season_id, episode_number)
+        title TEXT,
+        sonarr_episode_id INTEGER UNIQUE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    // Episode files table
+
+    // Create episode_files table
     await client.query(`
       CREATE TABLE IF NOT EXISTS episode_files (
         id SERIAL PRIMARY KEY,
-        episode_id INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+        episode_id INTEGER REFERENCES episodes(id) ON DELETE CASCADE,
         file_path TEXT NOT NULL,
-        size INTEGER,
+        size BIGINT,
         quality TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(episode_id)
       )
     `);
-    // Settings table
+
+    // Create settings table
     await client.query(`
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
-        value TEXT
+        value TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    // Indexes
-    await client.query('CREATE INDEX IF NOT EXISTS idx_shows_title ON shows(title)');
+
+    // Create indexes for better query performance
     await client.query('CREATE INDEX IF NOT EXISTS idx_shows_sonarr_id ON shows(sonarr_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_seasons_show_id ON seasons(show_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_episodes_season_id ON episodes(season_id)');
     await client.query(
-      'CREATE INDEX IF NOT EXISTS idx_episodes_sonarr_episode_id ON episodes(sonarr_episode_id)'
+      'CREATE INDEX IF NOT EXISTS idx_episodes_sonarr_id ON episodes(sonarr_episode_id)'
     );
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS idx_episode_files_episode_id ON episode_files(episode_id)'
+    );
+
+    // Insert default settings if they don't exist
+    await client.query(`
+      INSERT INTO settings (key, value)
+      VALUES ('import_mode', 'none')
+      ON CONFLICT (key) DO NOTHING
+    `);
+
     await client.query('COMMIT');
-    logger.info('Database schema initialized successfully.');
-  } catch (err) {
+    logger.info('Database initialized successfully');
+  } catch (error) {
     await client.query('ROLLBACK');
-    if (err instanceof Error) {
-      logger.error({ msg: 'Error initializing database schema', error: err.message });
-    } else {
-      logger.error({ msg: 'Error initializing database schema', error: err });
-    }
-    throw err;
+    logger.error('Error initializing database:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// Function to check if database is initialized
+export async function isDatabaseInitialized(): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'shows'
+      )
+    `);
+    return result.rows[0].exists;
+  } catch (error) {
+    logger.error('Error checking database initialization:', error);
+    throw error;
   } finally {
     client.release();
   }

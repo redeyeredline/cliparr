@@ -7,6 +7,7 @@ import pino from 'pino';
 import databaseRouter from './routes/database';
 import { testConnection, initializeDatabase } from './config/database';
 import sonarrRoutes from './routes/sonarr';
+import dbTestRouter from './routes/dbTest';
 
 const app = express();
 const port = process.env.PORT || 8484;
@@ -42,6 +43,9 @@ app.use('/api/sonarr', sonarrRoutes);
 // Register database routes
 logger.info('Registering database routes');
 app.use('/api/database', databaseRouter);
+
+// Add routes
+app.use('/api/db', dbTestRouter);
 
 // Test DB connection at startup
 testConnection()

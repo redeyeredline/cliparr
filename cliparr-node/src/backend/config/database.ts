@@ -1,23 +1,38 @@
 import { Pool } from 'pg';
-import config from './environment';
+import { logger } from '../utils/logger';
 
-// Database configuration using environment manager
-const pool = new Pool(config.database);
+// Generate a random password for the database
+const generateDbPassword = () => {
+  return Math.random().toString(36).slice(-12);
+};
 
-// Test database connection
-export const testConnection = async () => {
+// Database configuration
+const dbConfig = {
+  user: 'postgres',
+  host: 'localhost',
+  database: 'cliparr',
+  password: process.env.POSTGRES_PASSWORD || generateDbPassword(),
+  port: 5432,
+};
+
+// Create the connection pool
+const pool = new Pool(dbConfig);
+
+// Test the database connection
+const testConnection = async () => {
   try {
     const client = await pool.connect();
+    logger.info('Successfully connected to PostgreSQL database');
     client.release();
     return true;
   } catch (error) {
-    console.error('Database connection error:', error);
+    logger.error('Failed to connect to PostgreSQL database:', error);
     return false;
   }
 };
 
-// Silently initialize database schema
-export const initializeDatabase = async () => {
+// Initialize database tables
+const initializeDatabase = async () => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -28,23 +43,10 @@ export const initializeDatabase = async () => {
         id SERIAL PRIMARY KEY,
         sonarr_id INTEGER UNIQUE NOT NULL,
         title VARCHAR(255) NOT NULL,
-        overview TEXT,
-        status VARCHAR(50),
-        network VARCHAR(255),
-        air_time VARCHAR(50),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // Create seasons table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS seasons (
-        id SERIAL PRIMARY KEY,
-        show_id INTEGER REFERENCES shows(id) ON DELETE CASCADE,
-        season_number INTEGER NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(show_id, season_number)
+        path VARCHAR(255) NOT NULL,
+        status VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -52,26 +54,15 @@ export const initializeDatabase = async () => {
     await client.query(`
       CREATE TABLE IF NOT EXISTS episodes (
         id SERIAL PRIMARY KEY,
-        season_id INTEGER REFERENCES seasons(id) ON DELETE CASCADE,
-        sonarr_episode_id INTEGER UNIQUE NOT NULL,
-        title VARCHAR(255) NOT NULL,
-        overview TEXT,
+        show_id INTEGER REFERENCES shows(id) ON DELETE CASCADE,
+        sonarr_id INTEGER UNIQUE NOT NULL,
+        season_number INTEGER NOT NULL,
         episode_number INTEGER NOT NULL,
-        air_date DATE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(season_id, episode_number)
-      );
-    `);
-
-    // Create episode_files table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS episode_files (
-        id SERIAL PRIMARY KEY,
-        episode_id INTEGER REFERENCES episodes(id) ON DELETE CASCADE,
-        path VARCHAR(1024) NOT NULL,
-        size BIGINT,
-        quality VARCHAR(50),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        title VARCHAR(255) NOT NULL,
+        path VARCHAR(255) NOT NULL,
+        status VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -81,54 +72,20 @@ export const initializeDatabase = async () => {
         id SERIAL PRIMARY KEY,
         key VARCHAR(50) UNIQUE NOT NULL,
         value TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     await client.query('COMMIT');
-    return true;
-  } catch (error: unknown) {
+    logger.info('Database tables initialized successfully');
+  } catch (error) {
     await client.query('ROLLBACK');
-    console.error(
-      'Database initialization error:',
-      error instanceof Error ? error.message : String(error)
-    );
-    return false;
+    logger.error('Failed to initialize database tables:', error);
+    throw error;
   } finally {
     client.release();
   }
 };
 
-// Verify database operations by performing a test write and read
-export const verifyDatabaseOperations = async () => {
-  const client = await pool.connect();
-  try {
-    // Test write
-    await client.query(
-      'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
-      ['test_key', new Date().toISOString()]
-    );
-
-    // Test read
-    const result = await client.query('SELECT value FROM settings WHERE key = $1', ['test_key']);
-
-    return {
-      success: true,
-      timestamp: result.rows[0]?.value,
-    };
-  } catch (error: unknown) {
-    console.error(
-      'Database verification error:',
-      error instanceof Error ? error.message : String(error)
-    );
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  } finally {
-    client.release();
-  }
-};
-
-export default pool;
+export { pool, testConnection, initializeDatabase };

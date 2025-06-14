@@ -34,36 +34,23 @@ RUN npm run build:backend
 
 # Create startup script
 RUN echo '#!/bin/bash\n\
-# Verify npm version\n\
-echo "Using npm version: $(npm --version)"\n\
-\n\
-# Start PostgreSQL service\n\
-service postgresql start\n\
-\n\
-# Initialize PostgreSQL if not already initialized\n\
-if [ ! -f /opt/dockerdata/cliparr/postgres/PG_VERSION ]; then\n\
-  echo "Initializing PostgreSQL database..."\n\
-  su - postgres -c "/usr/lib/postgresql/15/bin/initdb -D /opt/dockerdata/cliparr/postgres"\n\
-  \n\
-  # Configure PostgreSQL\n\
-  echo "listen_addresses = '\''localhost'\''" >> /opt/dockerdata/cliparr/postgres/postgresql.conf\n\
-  echo "port = 5432" >> /opt/dockerdata/cliparr/postgres/postgresql.conf\n\
-  \n\
-  # Restart PostgreSQL to apply new configuration\n\
-  service postgresql restart\n\
-  \n\
-  # Create database and set password\n\
-  su - postgres -c "createdb cliparr"\n\
-  su - postgres -c "psql -c \"ALTER USER postgres WITH PASSWORD '\''postgres'\'';\""\n\
-fi\n\
-\n\
+set -e\n\
+# Start PostgreSQL in the background\n\
+su - postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /opt/dockerdata/cliparr/postgres -l /opt/dockerdata/cliparr/postgres/server.log start"\n\
+# Wait for Postgres to be ready\n\
+until su - postgres -c "/usr/lib/postgresql/15/bin/pg_isready -h /var/run/postgresql -d postgres"; do\n\
+  echo "Waiting for Postgres..."\n\
+  sleep 1\n\
+done\n\
+# Create database and user if not exist\n\
+su - postgres -c "psql -c \"DO \\\\$\\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_database WHERE datname = 'cliparr') THEN CREATE DATABASE cliparr; END IF; IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'cliparr') THEN CREATE ROLE cliparr LOGIN; END IF; END \\\\$\\\$;\""\n\
 # Start the application\n\
-npm start\n\
-' > /app/start.sh && chmod +x /app/start.sh
+exec npm start\n' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose the port the app runs on
 EXPOSE 8484
 
-# Start the application
+# Start the application as postgres user (UID 999)
+USER 999:999
 ENV NODE_ENV=production
 CMD ["/app/start.sh"] 

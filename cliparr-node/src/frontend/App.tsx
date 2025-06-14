@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import SonarrTest from './components/SonarrTest';
+import DatabaseTest from './components/DatabaseTest';
 
 interface DbStatus {
   status: 'success' | 'error' | 'loading';
@@ -69,6 +70,8 @@ const App: React.FC = () => {
             </div>
             {/* Sonarr API Test Section */}
             <SonarrTest />
+            {/* Database Operations Test Section */}
+            <DatabaseTest />
           </div>
         </div>
       </main>
