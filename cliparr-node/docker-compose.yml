@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   cliparr:
@@ -6,11 +6,13 @@ services:
     container_name: cliparr
     ports:
       - "8484:8484"
+    environment:
+      - CLIPARR_IMPORT_MODE=import
     volumes:
-      - /opt/dockerdata/cliparr:/app/data
+      - /opt/slowerdata/media:/media
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5 
+      retries: 5

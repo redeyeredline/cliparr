@@ -1,9 +1,0 @@
-#!/usr/bin/with-contenv bash
-
-# Create necessary directories
-mkdir -p /config
-mkdir -p /data
-
-# Set permissions
-chown -R abc:abc /app /config /data
-chmod -R 755 /app /config /data 
