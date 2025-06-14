@@ -1,25 +1,30 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
+import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  root: 'src/frontend',
-  build: {
-    outDir: '../../dist/frontend',
-    emptyOutDir: true,
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src')
+    }
   },
   server: {
+    port: 8484,
     proxy: {
       '/api': {
         target: 'http://localhost:8484',
-        changeOrigin: true,
+        changeOrigin: true
       },
-    },
+      '/socket.io': {
+        target: 'http://localhost:8484',
+        changeOrigin: true,
+        ws: true
+      }
+    }
   },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src/frontend'),
-    },
-  },
-});
+  build: {
+    outDir: 'dist/client',
+    sourcemap: true
+  }
+}); 

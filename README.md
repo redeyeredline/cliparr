@@ -32,7 +32,7 @@ You can change this mode at any time from the Settings page.
 4. Build and run the Docker container using the provided Dockerfile and docker-compose.yml.
 
 ## Usage
-- Access the web interface at `http://localhost:5173`.
+- Access the web interface at `http://localhost:8484`.
 - Use the API endpoints to interact with the application programmatically.
 - The import mode (see above) controls how shows and audio analysis are handled.
 
