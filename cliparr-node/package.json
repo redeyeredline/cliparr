@@ -1,16 +1,14 @@
 {
   "name": "cliparr-node",
   "version": "1.0.0",
-  "description": "Media Management Application",
+  "description": "Cliparr Node.js/TypeScript Implementation",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.server.json && tsc -p tsconfig.json && vite build",
-    "serve": "vite preview",
-    "start": "node dist/server/index.js",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "build": "tsc && vite build",
+    "start": "node src/server/index.js",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "",
@@ -22,8 +20,7 @@
     "pino-pretty": "^13.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1"
+    "ws": "^8.18.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
@@ -31,16 +28,19 @@
     "@types/node": "^24.0.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.34.0",
     "@typescript-eslint/parser": "^8.34.0",
     "@vitejs/plugin-react": "^4.5.2",
     "autoprefixer": "^10.4.21",
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.29.0",
     "eslint": "^9.29.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
     "postcss": "^8.5.5",
-    "prettier": "^3.5.3",
-    "tailwindcss": "^4.1.10",
+    "@tailwindcss/postcss": "^4.1.10",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
   }
