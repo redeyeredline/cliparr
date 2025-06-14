@@ -3,9 +3,16 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  root: 'src/frontend',
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8484',
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
-    outDir: '../../dist',
-    emptyOutDir: true
-  }
-}); 
+    outDir: 'dist',
+    assetsDir: 'assets',
+  },
+});

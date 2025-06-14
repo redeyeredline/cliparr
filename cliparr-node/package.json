@@ -1,32 +1,62 @@
 {
   "name": "cliparr-node",
   "version": "1.0.0",
-  "description": "",
-  "main": "src/backend/server.js",
+  "description": "Cliparr Node.js Version",
+  "main": "src/server/index.js",
+  "type": "module",
   "scripts": {
-    "dev": "vite",
+    "start": "node src/server/index.js",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "nodemon src/server/index.js",
+    "dev:client": "vite",
     "build": "vite build",
-    "start": "node src/backend/server.js"
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:score": "eslint . --format json | node scripts/calculate-score.js",
+    "prepare": "husky install",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.6.7",
+    "@eslint/css": "^0.9.0",
+    "@eslint/markdown": "^6.5.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "express": "^5.1.0",
-    "pg": "^8.16.0",
-    "socket.io": "^4.7.4"
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "pino": "^8.17.2",
+    "pino-pretty": "^10.3.1"
   },
   "devDependencies": {
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.5.2",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.5",
-    "tailwindcss": "^4.1.10",
-    "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "@eslint/js": "^8.56.0",
+    "@eslint/json": "^0.12.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.56.0",
+    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-sonarjs": "^0.23.0",
+    "globals": "^13.24.0",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.2",
+    "nodemon": "^3.0.2",
+    "postcss": "^8.4.32",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "eslint --format json | node scripts/calculate-score.js"
+    ]
   }
 }
