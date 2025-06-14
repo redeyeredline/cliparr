@@ -15,7 +15,7 @@ const App: React.FC = () => {
         const data = await response.json();
         setDbStatus({
           status: data.status === 'success' ? 'success' : 'error',
-          timestamp: data.timestamp
+          timestamp: data.timestamp,
         });
       } catch (error) {
         setDbStatus({ status: 'error' });
@@ -37,15 +37,21 @@ const App: React.FC = () => {
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center space-x-2 mb-4">
-                <div className={`w-3 h-3 rounded-full ${
-                  dbStatus.status === 'success' ? 'bg-green-500' :
-                  dbStatus.status === 'error' ? 'bg-red-500' :
-                  'bg-yellow-500'
-                }`} />
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    dbStatus.status === 'success'
+                      ? 'bg-green-500'
+                      : dbStatus.status === 'error'
+                        ? 'bg-red-500'
+                        : 'bg-yellow-500'
+                  }`}
+                />
                 <span className="text-lg font-medium">
-                  {dbStatus.status === 'success' ? 'Database Ready' :
-                   dbStatus.status === 'error' ? 'Database Error' :
-                   'Checking Database...'}
+                  {dbStatus.status === 'success'
+                    ? 'Database Ready'
+                    : dbStatus.status === 'error'
+                      ? 'Database Error'
+                      : 'Checking Database...'}
                 </span>
               </div>
               {dbStatus.timestamp && (

@@ -3,10 +3,13 @@ import pool from '../models/db';
 import pino from 'pino';
 
 const logger = pino({
-  transport: process.env.NODE_ENV !== 'production' ? {
-    target: 'pino-pretty',
-    options: { colorize: true }
-  } : undefined
+  transport:
+    process.env.NODE_ENV !== 'production'
+      ? {
+          target: 'pino-pretty',
+          options: { colorize: true },
+        }
+      : undefined,
 });
 
 const router = Router();
@@ -23,4 +26,4 @@ router.get('/db-test', async (req, res) => {
   }
 });
 
-export default router; 
+export default router;

@@ -11,10 +11,13 @@ const app = express();
 const port = process.env.PORT || 8484;
 
 const logger = pino({
-  transport: process.env.NODE_ENV !== 'production' ? {
-    target: 'pino-pretty',
-    options: { colorize: true }
-  } : undefined
+  transport:
+    process.env.NODE_ENV !== 'production'
+      ? {
+          target: 'pino-pretty',
+          options: { colorize: true },
+        }
+      : undefined,
 });
 
 // Middleware
@@ -37,14 +40,14 @@ app.use('/api/database', databaseRouter);
 
 // Test DB connection at startup
 testConnection()
-  .then(isConnected => {
+  .then((isConnected) => {
     if (isConnected) {
       logger.info('Database connection established');
     } else {
       logger.error('Database connection failed');
     }
   })
-  .catch(err => {
+  .catch((err) => {
     logger.error({ msg: 'Database connection failed', error: err.message });
   });
 

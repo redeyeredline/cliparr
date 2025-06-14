@@ -10,23 +10,23 @@ const DatabaseStatus: React.FC = () => {
   const [status, setStatus] = useState<DatabaseStatus>({
     isConnected: false,
     isInitialized: false,
-    message: 'Checking database status...'
+    message: 'Checking database status...',
   });
 
   const checkDatabaseStatus = async () => {
     try {
       const response = await fetch('/api/database/test');
       const data = await response.json();
-      setStatus(prev => ({
+      setStatus((prev) => ({
         ...prev,
         isConnected: data.status === 'success',
-        message: data.message
+        message: data.message,
       }));
     } catch (error) {
-      setStatus(prev => ({
+      setStatus((prev) => ({
         ...prev,
         isConnected: false,
-        message: 'Failed to check database status'
+        message: 'Failed to check database status',
       }));
     }
   };
@@ -34,19 +34,19 @@ const DatabaseStatus: React.FC = () => {
   const initializeDatabase = async () => {
     try {
       const response = await fetch('/api/database/initialize', {
-        method: 'POST'
+        method: 'POST',
       });
       const data = await response.json();
-      setStatus(prev => ({
+      setStatus((prev) => ({
         ...prev,
         isInitialized: data.status === 'success',
-        message: data.message
+        message: data.message,
       }));
     } catch (error) {
-      setStatus(prev => ({
+      setStatus((prev) => ({
         ...prev,
         isInitialized: false,
-        message: 'Failed to initialize database'
+        message: 'Failed to initialize database',
       }));
     }
   };
@@ -60,11 +60,15 @@ const DatabaseStatus: React.FC = () => {
       <h2 className="text-xl font-bold mb-4">Database Status</h2>
       <div className="space-y-4">
         <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${status.isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+          <div
+            className={`w-3 h-3 rounded-full ${status.isConnected ? 'bg-green-500' : 'bg-red-500'}`}
+          />
           <span>Connection Status: {status.isConnected ? 'Connected' : 'Disconnected'}</span>
         </div>
         <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${status.isInitialized ? 'bg-green-500' : 'bg-yellow-500'}`} />
+          <div
+            className={`w-3 h-3 rounded-full ${status.isInitialized ? 'bg-green-500' : 'bg-yellow-500'}`}
+          />
           <span>Schema Status: {status.isInitialized ? 'Initialized' : 'Not Initialized'}</span>
         </div>
         <p className="text-sm text-gray-600">{status.message}</p>
@@ -88,4 +92,4 @@ const DatabaseStatus: React.FC = () => {
   );
 };
 
-export default DatabaseStatus; 
+export default DatabaseStatus;

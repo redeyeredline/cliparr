@@ -1,16 +1,8 @@
 import { Pool } from 'pg';
-import dotenv from 'dotenv';
+import config from './environment';
 
-dotenv.config();
-
-// Database configuration
-const pool = new Pool({
-  user: process.env.POSTGRES_USER || 'postgres',
-  host: process.env.POSTGRES_HOST || 'localhost',
-  database: process.env.POSTGRES_DB || 'cliparr',
-  password: process.env.POSTGRES_PASSWORD || 'postgres',
-  port: parseInt(process.env.POSTGRES_PORT || '5432'),
-});
+// Database configuration using environment manager
+const pool = new Pool(config.database);
 
 // Test database connection
 export const testConnection = async () => {
@@ -98,7 +90,10 @@ export const initializeDatabase = async () => {
     return true;
   } catch (error: unknown) {
     await client.query('ROLLBACK');
-    console.error('Database initialization error:', error instanceof Error ? error.message : String(error));
+    console.error(
+      'Database initialization error:',
+      error instanceof Error ? error.message : String(error)
+    );
     return false;
   } finally {
     client.release();
@@ -110,25 +105,30 @@ export const verifyDatabaseOperations = async () => {
   const client = await pool.connect();
   try {
     // Test write
-    await client.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', 
-      ['test_key', new Date().toISOString()]);
-    
+    await client.query(
+      'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
+      ['test_key', new Date().toISOString()]
+    );
+
     // Test read
     const result = await client.query('SELECT value FROM settings WHERE key = $1', ['test_key']);
-    
+
     return {
       success: true,
-      timestamp: result.rows[0]?.value
+      timestamp: result.rows[0]?.value,
     };
   } catch (error: unknown) {
-    console.error('Database verification error:', error instanceof Error ? error.message : String(error));
+    console.error(
+      'Database verification error:',
+      error instanceof Error ? error.message : String(error)
+    );
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     };
   } finally {
     client.release();
   }
 };
 
-export default pool; 
+export default pool;
