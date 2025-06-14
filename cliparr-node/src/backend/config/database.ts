@@ -88,4 +88,32 @@ const initializeDatabase = async () => {
   }
 };
 
-export { pool, testConnection, initializeDatabase };
+// Verify database operations by performing a test write and read
+const verifyDatabaseOperations = async () => {
+  const client = await pool.connect();
+  try {
+    // Test write
+    await client.query(
+      'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
+      ['test_key', new Date().toISOString()]
+    );
+
+    // Test read
+    const result = await client.query('SELECT value FROM settings WHERE key = $1', ['test_key']);
+
+    return {
+      success: true,
+      timestamp: result.rows[0]?.value,
+    };
+  } catch (error) {
+    logger.error('Database verification error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    client.release();
+  }
+};
+
+export { pool, testConnection, initializeDatabase, verifyDatabaseOperations };
