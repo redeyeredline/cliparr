@@ -12,7 +12,9 @@
     "allowJs": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": false
+    "noEmit": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": ["src/server/**/*"],
   "exclude": ["node_modules"]
