@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 function App() {
   const [health, setHealth] = useState<string>('checking...');
   const [wsStatus, setWsStatus] = useState<string>('disconnected');
+  const [dbStatus, setDbStatus] = useState<{ success: boolean; message: string; testValue?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,10 +17,25 @@ function App() {
         // Only connect WebSocket if health check passes
         if (data.status === 'healthy') {
           connectWebSocket();
+          testDatabase();
         }
       } catch (err) {
         setHealth('error');
         setError('Failed to connect to server');
+      }
+    };
+
+    const testDatabase = async () => {
+      try {
+        const res = await fetch('/api/db-test');
+        const data = await res.json();
+        setDbStatus(data);
+        if (!data.success) {
+          setError('Database test failed');
+        }
+      } catch (err) {
+        setDbStatus({ success: false, message: 'Database test failed' });
+        setError('Failed to test database');
       }
     };
 
@@ -66,7 +82,7 @@ function App() {
               <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
                 <h1 className="text-3xl font-bold text-center mb-8">Cliparr</h1>
                 <p className="text-center text-gray-600 mb-8">
-                  Welcome to Cliparr! This is a placeholder page to verify the server is running correctly.
+                  Welcome to asfsadfsafdis is a placeholder page to verify the server is running correctly.
                 </p>
                 <div className="space-y-4">
                   <div className="flex items-center space-x-2">
@@ -85,6 +101,19 @@ function App() {
                       {wsStatus}
                     </span>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold">Database Status:</span>
+                    <span className={`px-2 py-1 rounded ${
+                      dbStatus?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {dbStatus ? (dbStatus.success ? 'Connected' : 'Error') : 'Checking...'}
+                    </span>
+                  </div>
+                  {dbStatus?.testValue && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      Test Value: {dbStatus.testValue}
+                    </div>
+                  )}
                   {error && (
                     <div className="mt-4 p-2 bg-red-100 text-red-800 rounded">
                       {error}
