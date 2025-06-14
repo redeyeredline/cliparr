@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import SonarrTest from './components/SonarrTest';
 
 interface DbStatus {
   status: 'success' | 'error' | 'loading';
@@ -66,6 +67,8 @@ const App: React.FC = () => {
                 This is the placeholder page. Features will be added here as we implement them.
               </p>
             </div>
+            {/* Sonarr API Test Section */}
+            <SonarrTest />
           </div>
         </div>
       </main>

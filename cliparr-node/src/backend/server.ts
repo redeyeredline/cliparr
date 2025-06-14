@@ -6,6 +6,7 @@ import path from 'path';
 import pino from 'pino';
 import databaseRouter from './routes/database';
 import { testConnection, initializeDatabase } from './config/database';
+import sonarrRoutes from './routes/sonarr';
 
 const app = express();
 const port = process.env.PORT || 8484;
@@ -33,6 +34,10 @@ app.get('/api/health', (req, res) => {
   logger.info('Health check endpoint hit');
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Register Sonarr routes
+logger.info('Registering Sonarr routes');
+app.use('/api/sonarr', sonarrRoutes);
 
 // Register database routes
 logger.info('Registering database routes');
