@@ -1,11 +1,5 @@
 import { getDatabaseSingleton } from './Auto_DB_Setup.js';
-import pino from 'pino';
-
-const logger = pino({
-  level: 'info',
-  timestamp: pino.stdTimeFunctions.isoTime,
-  formatters: { level: label => ({ level: label }) }
-});
+import { logger } from '../services/logger.js';
 
 function getDb(dbPath = 'data/cliparr.db') {
   return getDatabaseSingleton(dbPath);

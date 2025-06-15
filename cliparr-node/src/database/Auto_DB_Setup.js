@@ -1,22 +1,8 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import pino from 'pino';
+import { logger } from '../services/logger.js';
 import { STATEMENTS } from './Schema.mjs';
-
-// Initialize logger
-const logger = pino({
-  level: 'info',
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      levelFirst: true,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname'
-    }
-  }
-});
 
 let dbInstance = null;
 

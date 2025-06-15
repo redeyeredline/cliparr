@@ -2,7 +2,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import pino from 'pino';
+import { logger } from '../services/logger.js';
 import { WebSocketServer } from 'ws';
 import dotenv from 'dotenv';
 import http from 'http';
@@ -20,20 +20,6 @@ import sonarrRoutes from '../routes/sonarr.js';
 import settingsRoutes from '../routes/settings.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Initialize logger with less verbose settings
-const logger = pino({
-  level: 'info',
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      levelFirst: true,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname'
-    }
-  }
-});
 
 // Validate required environment variables
 const requiredEnvVars = ['SONARR_API_KEY'];

@@ -1,26 +1,13 @@
 // src/routes/sonarr.js
 import express from 'express';
 import axios from 'axios';
-import pino from 'pino';
+import { logger } from '../services/logger.js';
 import dotenv from 'dotenv';
-import { getDb, processShowData, getImportedShows } from '../database/Db_Operations.js';
-import { getWebSocketServer } from '../integration/server.js';
+import process from 'process';
 
 // Load environment variables
 dotenv.config();
 const router = express.Router();
-const logger = pino({
-  level: 'info',
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      levelFirst: true,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname'
-    }
-  }
-});
 
 // Validate environment variables
 const SONARR_URL = process.env.SONARR_URL;
@@ -77,7 +64,7 @@ const testSonarrConnection = async () => {
     logger.info(`Testing connection to Sonarr at ${SONARR_URL}`);
     const response = await sonarrClient.get('/api/v3/system/status');
     logger.info('Successfully connected to Sonarr API');
-    logger.debug('Sonarr version:', response.data.version);
+    logger.debug({ version: response.data.version }, 'Sonarr version');
   } catch (error) {
     logger.error('Failed to connect to Sonarr API:', error.message);
     throw error;
@@ -88,16 +75,6 @@ const testSonarrConnection = async () => {
 testSonarrConnection().catch(error => {
   logger.error('Sonarr API connection test failed:', error.message);
 });
-
-// Helper function to broadcast progress
-const broadcastProgress = (ws, progress) => {
-  if (ws && ws.readyState === 1) { // 1 = OPEN
-    ws.send(JSON.stringify({
-      type: 'import_progress',
-      ...progress
-    }));
-  }
-};
 
 // Get unimported shows from Sonarr
 router.get('/unimported', async (req, res) => {
@@ -126,19 +103,18 @@ router.get('/unimported', async (req, res) => {
 
 // Import a show from Sonarr
 router.post('/import/:id', async (req, res) => { 
-  console.log('Importing show from Sonarr');
+  logger.info('Importing show from Sonarr');
 
-  
   if (!req.app.get('db')) {
-    console.error('Database instance is not set on app');
+    logger.error('Database instance is not set on app');
     return res.status(500).json({ success: false, message: 'Database not initialized' });
   }
   if (!logger) {
-    console.error('Logger is not set on app');
+    logger.error('Logger is not set on app');
     return res.status(500).json({ success: false, message: 'Logger not initialized' });
   }
   if (!sonarrClient) {
-    console.error('Sonarr client is not set on app');
+    logger.error('Sonarr client is not set on app');
     return res.status(500).json({ success: false, message: 'Sonarr client not initialized' });
   }
   
@@ -171,10 +147,9 @@ router.post('/import/:id', async (req, res) => {
     logger.info({ seasonCount: Object.keys(seasons).length }, 'Prepared seasons grouping');
 
     // Use a transaction for data consistency
-    let result;
     try {
       logger.info('Beginning database transaction for import');
-      result = req.app.get('db').transaction(() => {
+      req.app.get('db').transaction(() => {
         // Insert the show
         logger.info({ showInsert: { sonarr_id: show.id, title: show.title, overview: show.overview, path: show.path } }, 'Inserting show');
         const showResult = req.app.get('db').prepare(`
@@ -214,8 +189,6 @@ router.post('/import/:id', async (req, res) => {
             );
           });
         });
-
-        return showResult;
       })();
       logger.info('Database transaction for import completed successfully');
     } catch (txError) {
@@ -223,69 +196,13 @@ router.post('/import/:id', async (req, res) => {
       throw txError;
     }
 
-    logger.info(`Successfully imported show: ${show.title}`);
-    const wss = req.app.get('wss');
-    if (wss) {
-      wss.clients.forEach(client => {
-        if (client.readyState === 1) {
-          client.send(JSON.stringify({
-            type: 'import_progress',
-            showId: show.id,
-            status: 'imported',
-            message: `Imported ${show.title}`
-          }));
-        }
-      });
-    }
-    res.json({
-      success: true,
-      message: `Successfully imported ${show.title}`,
-      showId: result.lastInsertRowid
+    res.json({ success: true, message: 'Show imported successfully' });
+  } catch (error) {
+    logger.error({ error: error.message }, 'Failed to import show');
+    res.status(500).json({ 
+      error: 'Failed to import show',
+      details: error.message 
     });
-  } catch (error) {
-    logger.error({ error: error.stack || error }, 'Failed to import show (outer catch)');
-    res.status(500).json({
-      success: false,
-      message: 'Failed to import show',
-      error: error.message
-    });
-  }
-});
-
-// Get imported shows
-router.get('/imported', async (req, res) => {
-  try {
-    const db = req.app.get('db');
-    const { page = 1, pageSize = 100 } = req.query;
-    const result = getImportedShows(db, parseInt(page), parseInt(pageSize));
-    res.json(result);
-  } catch (error) {
-    console.error('Error fetching imported shows:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get series details
-router.get('/series/:sonarrId', async (req, res) => {
-  try {
-    const { sonarrId } = req.params;
-    const show = await sonarrClient.get(`/api/v3/series/${sonarrId}`);
-    res.json(show.data);
-  } catch (error) {
-    console.error('Error fetching series details:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get series episodes
-router.get('/series/:sonarrId/episodes', async (req, res) => {
-  try {
-    const { sonarrId } = req.params;
-    const episodes = await sonarrClient.get(`/api/v3/series/${sonarrId}/episodes`);
-    res.json(episodes.data);
-  } catch (error) {
-    console.error('Error fetching series episodes:', error);
-    res.status(500).json({ error: error.message });
   }
 });
 
