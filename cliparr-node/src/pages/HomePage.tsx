@@ -14,71 +14,70 @@ function HomePage() {
   const [wsStatus, setWsStatus] = useState('disconnected');
   const [dbStatus, setDbStatus] = useState<DbStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  let ws: WebSocket | null = null;
+
+  const connectWebSocket = () => {
+    try {
+      ws = new WebSocket('ws://localhost:8485/ws');
+      ws.onopen = () => {
+        setWsStatus('connected');
+        setError(null);
+      };
+      ws.onclose = () => {
+        setWsStatus('disconnected');
+        setTimeout(connectWebSocket, 5000);
+      };
+      ws.onerror = () => {
+        setWsStatus('error');
+        setError('WebSocket connection failed');
+      };
+    } catch {
+      setWsStatus('error');
+      setError('Failed to create WebSocket connection');
+    }
+  };
+
+  const testDatabase = async () => {
+    try {
+      const data = await apiClient.testDatabase();
+      setDbStatus(data);
+      if (!data.success) {
+        setError('Database test failed');
+      }
+    } catch {
+      setDbStatus({ success: false, message: 'Database test failed' });
+      setError('Failed to check database status');
+    }
+  };
+
+  const checkHealth = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await apiClient.checkHealth();
+      setHealth(data.status);
+      if (data.status === 'healthy') {
+        connectWebSocket();
+        testDatabase();
+      }
+    } catch {
+      setHealth('error');
+      setError('Failed to connect to server');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
-
-    const connectWebSocket = () => {
-      try {
-        ws = new WebSocket('ws://localhost:8485/ws');
-
-        ws.onopen = () => {
-          setWsStatus('connected');
-          setError(null);
-        };
-
-        ws.onclose = () => {
-          setWsStatus('disconnected');
-          // Attempt to reconnect after 5 seconds
-          setTimeout(connectWebSocket, 5000);
-        };
-
-        ws.onerror = () => {
-          setWsStatus('error');
-          setError('WebSocket connection failed');
-        };
-      } catch {
-        setWsStatus('error');
-        setError('Failed to create WebSocket connection');
-      }
-    };
-
-    const testDatabase = async () => {
-      try {
-        const data = await apiClient.testDatabase();
-        setDbStatus(data);
-        if (!data.success) {
-          setError('Database test failed');
-        }
-      } catch {
-        setDbStatus({ success: false, message: 'Database test failed' });
-        setError('Failed to check database status');
-      }
-    };
-
-    const checkHealth = async () => {
-      try {
-        const data = await apiClient.checkHealth();
-        setHealth(data.status);
-        // Only connect WebSocket if health check passes
-        if (data.status === 'healthy') {
-          connectWebSocket();
-          testDatabase();
-        }
-      } catch {
-        setHealth('error');
-        setError('Failed to connect to server');
-      }
-    };
-
     checkHealth();
-
     return () => {
       if (ws) {
         ws.close();
       }
     };
-  }, []);
+  }, [checkHealth]);
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
@@ -91,6 +90,21 @@ function HomePage() {
                 <p className="text-center text-gray-600 mb-8">
                   Welcome to Cliparr - a placeholder page to verify the server is running correctly.
                 </p>
+                {/* Health Check Button */}
+                <div className="flex justify-center mb-4">
+                  <button
+                    onClick={checkHealth}
+                    disabled={isLoading}
+                    className={`px-4 py-2 rounded-md text-white font-medium ${
+                      isLoading
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : 'bg-blue-500 hover:bg-blue-600'
+                    }`}
+                  >
+                    {isLoading ? 'Checking...' : 'Check Server Health'}
+                  </button>
+                </div>
+                {/* Status blocks */}
                 <div className="space-y-4">
                   <div className="flex items-center space-x-2">
                     <span className="font-semibold">Health Status:</span>
@@ -146,10 +160,8 @@ function HomePage() {
                     WebSocket connection will be established automatically.
                   </p>
                 </div>
-
                 {/* Add Sonarr Test Component */}
-                <SonarrTest />
-
+                <SonarrTest backendReady={health === 'healthy'} />
                 {/* Add Import Mode Test Component */}
                 <ImportModeTest />
               </div>

@@ -2,16 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../integration/api-client.js';
 import { logger } from '../services/logger.frontend.js';
 
-const SonarrTest = () => {
+const SonarrTest = ({ backendReady }) => {
   const [shows, setShows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [importStatus, setImportStatus] = useState({});
   const [wsConnected, setWsConnected] = useState(false);
+  const wsRef = React.useRef(null);
 
   useEffect(() => {
-    // Connect to WebSocket
-    const ws = new WebSocket('ws://localhost:8485/ws');
+    if (!backendReady) {
+      return;
+    }
+    // Connect to WebSocket only when backend is ready
+    const ws = new window.WebSocket('ws://localhost:8485/ws');
+    wsRef.current = ws;
 
     ws.onopen = () => {
       logger.info('WebSocket connected');
@@ -44,7 +49,7 @@ const SonarrTest = () => {
     return () => {
       ws.close();
     };
-  }, []);
+  }, [backendReady]);
 
   const fetchShows = async () => {
     try {
