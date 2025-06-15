@@ -20,7 +20,7 @@
 ## 3. Import Modes & Background Tasks
 - ❌ Not yet implemented
   - Need to implement:
-    - Auto/import/none modes
+    ✅ Auto/import/none modes
     - Background import task
     - Manual import functionality (basic manual import via UI is working)
 
@@ -34,7 +34,7 @@
 
 ## 5. WebSocket Events
 - ✅ WebSocket server runs and connects
-- ⚠️ Import progress events (being added/fixed)
+- ✅ Import progress events
 - ❌ Audio analysis jobs/events
 - ❌ Diagnostics events
 
