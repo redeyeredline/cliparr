@@ -9,7 +9,9 @@
     "start": "node src/server/index.js",
     "backend": "node src/integration/index.js",
     "fullstack": "vite",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "lint:check": "eslint . --ext .ts,.tsx --max-warnings 0",
     "preview": "vite preview"
   },
   "keywords": [],
@@ -45,6 +47,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^15.3.0",
     "postcss": "^8.5.5",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
