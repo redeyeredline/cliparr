@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Validate required environment variables
 const requiredEnvVars = ['SONARR_API_KEY'];
-const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+const missingEnvVars = requiredEnvVars.filter((varName) => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
   logger.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
@@ -52,19 +52,19 @@ async function isPortInUse(port) {
 // Setup WebSocket server
 function setupWebSocket(server) {
   wsServer = new WebSocketServer({ server, path: '/ws' });
-  
+
   wsServer.on('connection', (ws) => {
     logger.debug('New WebSocket connection');
-    
+
     ws.on('message', (message) => {
       logger.debug('WebSocket message received');
-      ws.send(JSON.stringify({ 
-        type: 'echo', 
+      ws.send(JSON.stringify({
+        type: 'echo',
         data: message.toString(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }));
     });
-    
+
     ws.on('error', (error) => {
       logger.error({ error: error.message }, 'WebSocket error');
     });
@@ -72,11 +72,11 @@ function setupWebSocket(server) {
     ws.on('close', () => {
       logger.debug('WebSocket connection closed');
     });
-    
-    ws.send(JSON.stringify({ 
-      type: 'welcome', 
+
+    ws.send(JSON.stringify({
+      type: 'welcome',
       message: 'Connected to Cliparr backend',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     }));
   });
 
@@ -110,14 +110,14 @@ async function startServer() {
     // Database initialization
     const dbPath = path.join(__dirname, '../database/data/cliparr.db');
     db = getDatabaseSingleton(dbPath);
-    
+
     // Make database and WebSocket server available to routes
     app.set('db', db);
     app.set('logger', logger);
-    
+
     // Middleware
     app.use(express.json());
-    
+
     // CORS for development
     app.use((req, res, next) => {
       res.header('Access-Control-Allow-Origin', 'http://localhost:8484');
@@ -129,7 +129,7 @@ async function startServer() {
       }
       next();
     });
-    
+
     // Mount API route modules
     app.use('/health', healthRoutes);
     app.use('/shows', showRoutes);
@@ -143,7 +143,7 @@ async function startServer() {
 
     // Setup WebSocket after server starts
     setupWebSocket(serverInstance);
-    
+
     // Make WebSocket server available to routes
     app.set('wss', wsServer);
 
@@ -176,7 +176,7 @@ async function stopServer() {
         wsServer = null;
       });
     }
-    
+
     if (serverInstance) {
       serverInstance.close(() => {
         logger.info('Server closed');
@@ -197,21 +197,27 @@ process.on('SIGTERM', async () => {
 });
 
 process.on('SIGINT', () => {
-  if (db) db.close();
-  if (serverInstance) serverInstance.close();
-  if (wsServer) wsServer.close();
+  if (db) {
+    db.close();
+  }
+  if (serverInstance) {
+    serverInstance.close();
+  }
+  if (wsServer) {
+    wsServer.close();
+  }
   process.exit(0);
 });
 
 // ES Module exports
 export {
   startServer,
-  stopServer
+  stopServer,
 };
 
 // For direct execution
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-  startServer().catch(err => {
+  startServer().catch((err) => {
     logger.fatal('Failed to start server:', err);
     process.exit(1);
   });

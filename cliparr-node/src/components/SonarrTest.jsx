@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../integration/api-client.js';
+import { logger } from '../services/logger.frontend.js';
 
 const SonarrTest = () => {
   const [shows, setShows] = useState([]);
@@ -11,35 +12,35 @@ const SonarrTest = () => {
   useEffect(() => {
     // Connect to WebSocket
     const ws = new WebSocket('ws://localhost:8485/ws');
-    
+
     ws.onopen = () => {
-      console.log('WebSocket connected');
+      logger.info('WebSocket connected');
       setWsConnected(true);
     };
-    
+
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'import_progress') {
-        setImportStatus(prev => ({
+        setImportStatus((prev) => ({
           ...prev,
           [data.showId]: {
             status: data.status,
-            message: data.message
-          }
+            message: data.message,
+          },
         }));
       }
     };
-    
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+
+    ws.onerror = (wsError) => {
+      logger.error('WebSocket error:', wsError);
       setWsConnected(false);
     };
-    
+
     ws.onclose = () => {
-      console.log('WebSocket disconnected');
+      logger.info('WebSocket disconnected');
       setWsConnected(false);
     };
-    
+
     return () => {
       ws.close();
     };
@@ -51,9 +52,13 @@ const SonarrTest = () => {
       setError(null);
       const response = await apiClient.getUnimportedShows();
       setShows(response);
-    } catch (error) {
-      console.error('Error fetching shows:', error);
-      setError(error.response?.data?.details || error.message || 'Failed to fetch shows');
+    } catch (fetchError) {
+      logger.error('Error fetching shows:', fetchError);
+      setError(
+        fetchError.response?.data?.details ||
+        fetchError.message ||
+        'Failed to fetch shows',
+      );
     } finally {
       setLoading(false);
     }
@@ -63,18 +68,22 @@ const SonarrTest = () => {
     try {
       setError(null);
       const response = await apiClient.importShow(showId);
-      console.log('Import started:', response);
+      logger.info('Import started:', response);
       // Status updates will come through WebSocket
-    } catch (error) {
-      console.error('Error importing show:', error);
-      setError(error.response?.data?.details || error.message || 'Failed to import show');
+    } catch (importError) {
+      logger.error('Error importing show:', importError);
+      setError(
+        importError.response?.data?.details ||
+        importError.message ||
+        'Failed to import show',
+      );
     }
   };
 
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-4">Sonarr Integration Test</h2>
-      
+
       <div className="mb-4">
         <button
           onClick={fetchShows}
@@ -83,7 +92,7 @@ const SonarrTest = () => {
         >
           {loading ? 'Loading...' : 'Fetch Unimported Shows'}
         </button>
-        
+
         <div className="mt-2 text-sm">
           WebSocket Status: {wsConnected ? '✅ Connected' : '❌ Disconnected'}
         </div>
@@ -96,11 +105,11 @@ const SonarrTest = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {shows.map(show => (
+        {shows.map((show) => (
           <div key={show.id} className="border rounded p-4">
             <h3 className="font-bold">{show.title}</h3>
             <p className="text-sm text-gray-600 mb-2">{show.overview}</p>
-            
+
             {importStatus[show.id] ? (
               <div className="text-sm">
                 Status: {importStatus[show.id].status}
@@ -123,4 +132,4 @@ const SonarrTest = () => {
   );
 };
 
-export default SonarrTest; 
+export default SonarrTest;

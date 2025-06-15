@@ -7,7 +7,9 @@ import { STATEMENTS } from './Schema.mjs';
 let dbInstance = null;
 
 export function getDatabaseSingleton(dbPath) {
-  if (dbInstance) return dbInstance;
+  if (dbInstance) {
+    return dbInstance;
+  }
 
   logger.info({ dbPath }, 'Initializing database');
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -16,7 +18,7 @@ export function getDatabaseSingleton(dbPath) {
 
   // Batch PRAGMA settings
   ['journal_mode = WAL', 'busy_timeout = 5000']
-    .forEach(setting => dbInstance.pragma(setting));
+    .forEach((setting) => dbInstance.pragma(setting));
 
   // Create schema inside a single transaction
   try {
@@ -25,7 +27,7 @@ export function getDatabaseSingleton(dbPath) {
         dbInstance.exec(stmt);
       }
       dbInstance.exec(
-        `INSERT OR IGNORE INTO settings (key, value) VALUES ('import_mode', 'none');`
+        'INSERT OR IGNORE INTO settings (key, value) VALUES (\'import_mode\', \'none\');',
       );
     });
     init();
@@ -39,7 +41,9 @@ export function getDatabaseSingleton(dbPath) {
 }
 
 export function closeDatabase() {
-  if (!dbInstance) return;
+  if (!dbInstance) {
+    return;
+  }
   dbInstance.close();
   dbInstance = null;
   logger.info('Database connection closed');

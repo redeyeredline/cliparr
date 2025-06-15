@@ -22,21 +22,6 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 8484, // Frontend port
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8485', // Backend port
-        changeOrigin: true,
-        secure: false,
-        ws: true,
-        rewrite: (path) => path
-      },
-      '/ws': {
-        target: 'ws://localhost:8485', // WebSocket port
-        ws: true,
-        changeOrigin: true,
-        secure: false
-      }
-    },
     watch: {
       ignored: ['**/src/database/data/**'], // Ignore DB changes
     },

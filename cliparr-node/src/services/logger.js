@@ -11,22 +11,22 @@ export const logger = pino({
   transport: isProd
     ? undefined
     : {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          levelFirst: true,
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname'
-        }
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        levelFirst: true,
+        translateTime: 'SYS:standard',
+        ignore: 'pid,hostname',
       },
+    },
   // automatically serialize Errors (so you get stack traces, etc.)
   serializers: {
     ...pino.stdSerializers,
-    err: pino.stdSerializers.err
+    err: pino.stdSerializers.err,
   },
   // redact any sensitive fields by default
   redact: {
-    paths: ['req.headers.authorization', 'password'], 
-    remove: true
-  }
+    paths: ['req.headers.authorization', 'password'],
+    remove: true,
+  },
 });

@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import { apiClient } from '../integration/api-client';
 
-interface HealthResponse {
-  status: string;
-}
-
 const HealthCheckPage: React.FC = () => {
   const [healthStatus, setHealthStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +19,7 @@ const HealthCheckPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+ 
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">

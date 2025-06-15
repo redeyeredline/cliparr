@@ -8,17 +8,17 @@ const api = axios.create({
   timeout: 5000,
   withCredentials: true,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    'Content-Type': 'application/json',
+  },
 });
 
 // Response interceptor for error handling
 api.interceptors.response.use(
-  response => response,
-  error => {
+  (response) => response,
+  (error) => {
     console.error('API request failed:', error);
     return Promise.reject(error);
-  }
+  },
 );
 
 class ApiClient {
@@ -35,7 +35,7 @@ class ApiClient {
 
   // Shows endpoints
   async getShows(page = 1, pageSize = 10) {
-    const response = await api.get(`/shows`, { params: { page, pageSize } });
+    const response = await api.get('/shows', { params: { page, pageSize } });
     return response.data;
   }
 

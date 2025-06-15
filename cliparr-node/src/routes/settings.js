@@ -11,7 +11,10 @@ router.get('/import-mode', (req, res) => {
     res.json({ mode });
   } catch (error) {
     console.error('Failed to get import mode:', error);
-    res.status(500).json({ error: 'Failed to get import mode', details: error && (error.stack || error.message || error) });
+    res.status(500).json({
+      error: 'Failed to get import mode',
+      details: error && (error.stack || error.message || error),
+    });
   }
 });
 
@@ -27,8 +30,11 @@ router.post('/import-mode', (req, res) => {
     res.json({ status: 'ok', mode });
   } catch (error) {
     console.error('Failed to set import mode:', error);
-    res.status(500).json({ error: 'Failed to set import mode', details: error && (error.stack || error.message || error) });
+    res.status(500).json({
+      error: 'Failed to set import mode',
+      details: error && (error.stack || error.message || error),
+    });
   }
 });
 
-export default router; 
+export default router;

@@ -20,7 +20,7 @@ export default [
   },
   eslint.configs.recommended,
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['**/*.{ts,tsx,js,jsx}'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -38,7 +38,8 @@ export default [
         __dirname: 'readonly',
         console: 'readonly',
         fetch: 'readonly',
-        document: 'readonly'
+        document: 'readonly',
+        URL: 'readonly'
       }
     },
     plugins: {
@@ -169,8 +170,7 @@ export default [
       'no-restricted-globals': 'error',
       'no-shadow-restricted-names': 'error',
       'no-undef-init': 'error',
-      'no-undefined': 'off', // TypeScript handles this
-      'no-use-before-define': 'off', // Using TypeScript's no-use-before-define instead
+      'no-undefined': 'off' // TypeScript handles this
     },
     settings: {
       react: {

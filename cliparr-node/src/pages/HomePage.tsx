@@ -37,7 +37,7 @@ function HomePage() {
           setWsStatus('error');
           setError('WebSocket connection failed');
         };
-      } catch (err) {
+      } catch {
         setWsStatus('error');
         setError('Failed to create WebSocket connection');
       }
@@ -50,9 +50,9 @@ function HomePage() {
         if (!data.success) {
           setError('Database test failed');
         }
-      } catch (err) {
+      } catch {
         setDbStatus({ success: false, message: 'Database test failed' });
-        setError('Failed to test database');
+        setError('Failed to check database status');
       }
     };
 
@@ -65,7 +65,7 @@ function HomePage() {
           connectWebSocket();
           testDatabase();
         }
-      } catch (err) {
+      } catch {
         setHealth('error');
         setError('Failed to connect to server');
       }
@@ -89,30 +89,42 @@ function HomePage() {
               <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
                 <h1 className="text-3xl font-bold text-center mb-8">Cliparr</h1>
                 <p className="text-center text-gray-600 mb-8">
-                  Welcome to asfsadfsafdis is a placeholder page to verify the server is running correctly.
+                  Welcome to Cliparr - a placeholder page to verify the server is running correctly.
                 </p>
                 <div className="space-y-4">
                   <div className="flex items-center space-x-2">
                     <span className="font-semibold">Health Status:</span>
-                    <span className={`px-2 py-1 rounded ${
-                      health === 'healthy' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded ${
+                        health === 'healthy'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {health}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="font-semibold">WebSocket Status:</span>
-                    <span className={`px-2 py-1 rounded ${
-                      wsStatus === 'connected' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded ${
+                        wsStatus === 'connected'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {wsStatus}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="font-semibold">Database Status:</span>
-                    <span className={`px-2 py-1 rounded ${
-                      dbStatus?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded ${
+                        dbStatus?.success
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {dbStatus ? (dbStatus.success ? 'Connected' : 'Error') : 'Checking...'}
                     </span>
                   </div>
