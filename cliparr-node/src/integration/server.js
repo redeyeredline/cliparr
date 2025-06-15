@@ -6,6 +6,7 @@ import { logger } from '../services/logger.js';
 import { WebSocketServer } from 'ws';
 import dotenv from 'dotenv';
 import http from 'http';
+import cors from '../middleware/cors.js';
 
 // Load environment variables
 dotenv.config();
@@ -117,18 +118,7 @@ async function startServer() {
 
     // Middleware
     app.use(express.json());
-
-    // CORS for development
-    app.use((req, res, next) => {
-      res.header('Access-Control-Allow-Origin', 'http://localhost:8484');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-      }
-      next();
-    });
+    app.use(cors);
 
     // Mount API route modules
     app.use('/health', healthRoutes);

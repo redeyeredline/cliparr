@@ -1,9 +1,14 @@
 // src/middleware/cors.js
+import config from '../config/app.js';
+
 export default function cors(req, res, next) {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:8484');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  res.header('Access-Control-Allow-Credentials', 'true');
+  const { cors: corsConfig } = config;
+  
+  res.header('Access-Control-Allow-Origin', corsConfig.origin);
+  res.header('Access-Control-Allow-Methods', corsConfig.methods.join(','));
+  res.header('Access-Control-Allow-Headers', corsConfig.headers.join(','));
+  res.header('Access-Control-Allow-Credentials', corsConfig.credentials.toString());
+  
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
