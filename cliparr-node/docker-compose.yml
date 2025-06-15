@@ -5,10 +5,12 @@ services:
     container_name: cliparr
     build: .
     ports:
-      - "8484:8484"
+      - "8484:8484"  # Frontend port
+      - "5000:5000"  # Backend port
     volumes:
       - /opt/dockerdata/cliparr:/data
     environment:
       - NODE_ENV=production
-      - PORT=8484
+      - PORT=5000    # Backend port
+      - VITE_PORT=8484  # Frontend port
     restart: unless-stopped 

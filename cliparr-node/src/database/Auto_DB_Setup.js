@@ -1,7 +1,7 @@
 const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
-const { SCHEMA } = require('./schema'); // Uses your existing schema definitions
+const { SCHEMA } = require('./Schema'); // Uses your existing schema definitions
 
 /**
  * Automatically ensure database exists and is initialized
