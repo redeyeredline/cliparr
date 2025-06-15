@@ -146,7 +146,6 @@ export default [
       'no-func-assign': 'error',
       'no-inner-declarations': 'error',
       'no-invalid-regexp': 'error',
-      'no-irregular-whitespace': 'error',
       'no-obj-calls': 'error',
       'no-sparse-arrays': 'error',
       'no-unexpected-multiline': 'error',
@@ -160,7 +159,6 @@ export default [
       'no-fallthrough': 'error',
       'no-global-assign': 'error',
       'no-octal': 'error',
-      'no-redeclare': 'error',
       'no-self-assign': 'error',
       'no-unused-labels': 'error',
       'no-useless-catch': 'error',
@@ -172,7 +170,6 @@ export default [
       'no-shadow-restricted-names': 'error',
       'no-undef-init': 'error',
       'no-undefined': 'off', // TypeScript handles this
-      'no-unused-vars': 'off', // Using TypeScript's no-unused-vars instead
       'no-use-before-define': 'off', // Using TypeScript's no-use-before-define instead
     },
     settings: {
