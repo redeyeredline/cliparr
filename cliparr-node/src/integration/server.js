@@ -8,7 +8,7 @@ const { WebSocketServer } = require('ws');
 const { getDatabaseSingleton } = require('../database/Auto_DB_Setup');
 
 // Import API route modules
-const apiRoutes = require('../routes/health');
+const healthRoutes = require('../routes/health');
 const showRoutes = require('../routes/shows');
 
 const logger = pino({
@@ -64,7 +64,6 @@ async function startServer() {
 
   try {
     logger.info('🚀 Starting integrated backend server...');
-    
     const app = express();
     const port = 8485;
     const host = '127.0.0.1';
@@ -83,9 +82,10 @@ async function startServer() {
     
     // CORS for development
     app.use((req, res, next) => {
-      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Origin', 'http://localhost:8484');
       res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
       res.header('Access-Control-Allow-Headers', 'Content-Type');
+      res.header('Access-Control-Allow-Credentials', 'true');
       if (req.method === 'OPTIONS') {
         return res.sendStatus(200);
       }
@@ -93,8 +93,8 @@ async function startServer() {
     });
     
     // Mount API route modules
-    app.use('/api', apiRoutes);
-    app.use('/api/shows', showRoutes);
+    app.use('/health', healthRoutes);
+    app.use('/shows', showRoutes);
 
     // Start HTTP server
     serverInstance = app.listen(port, host, () => {

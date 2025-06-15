@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiClient } from '../integration/api-client';
 
 interface HealthResponse {
   status: string;
@@ -13,8 +14,7 @@ const HealthCheckPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/health');
-      const data: HealthResponse = await response.json();
+      const data = await apiClient.checkHealth();
       setHealthStatus(data.status);
     } catch (err) {
       setError('Failed to check server health');

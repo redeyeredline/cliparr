@@ -1,89 +1,63 @@
 // src/integration/api-client.js - API client for React frontend
-const API_BASE = '/api'; // Proxied by Vite to backend
+import axios from 'axios';
+
+const API_BASE = 'http://localhost:8485';
+
+const api = axios.create({
+  baseURL: API_BASE,
+  timeout: 5000,
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API request failed:', error);
+    return Promise.reject(error);
+  }
+);
 
 class ApiClient {
-  async request(endpoint, options = {}) {
-    const url = `${API_BASE}${endpoint}`;
-    
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    if (config.body && typeof config.body === 'object') {
-      config.body = JSON.stringify(config.body);
-    }
-
-    try {
-      const response = await fetch(url, config);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error(`API request failed: ${endpoint}`, error);
-      throw error;
-    }
+  // Health endpoints
+  async checkHealth() {
+    const response = await api.get('/health/status');
+    return response.data;
   }
 
-  // Health check
-  async health() {
-    return this.request('/health');
+  async testDatabase() {
+    const response = await api.get('/health/db-test');
+    return response.data;
   }
 
-  // Database test
-  async dbTest() {
-    return this.request('/db-test');
-  }
-
-  // Shows API
+  // Shows endpoints
   async getShows(page = 1, pageSize = 10) {
-    return this.request(`/shows?page=${page}&pageSize=${pageSize}`);
-  }
-
-  async createShow(showData) {
-    return this.request('/shows', {
-      method: 'POST',
-      body: showData,
-    });
+    const response = await api.get(`/shows`, { params: { page, pageSize } });
+    return response.data;
   }
 
   async getShow(id) {
-    return this.request(`/shows/${id}`);
+    const response = await api.get(`/shows/${id}`);
+    return response.data;
+  }
+
+  async createShow(showData) {
+    const response = await api.post('/shows', showData);
+    return response.data;
   }
 
   async updateShow(id, showData) {
-    return this.request(`/shows/${id}`, {
-      method: 'PUT',
-      body: showData,
-    });
+    const response = await api.put(`/shows/${id}`, showData);
+    return response.data;
   }
 
   async deleteShow(id) {
-    return this.request(`/shows/${id}`, {
-      method: 'DELETE',
-    });
+    const response = await api.delete(`/shows/${id}`);
+    return response.data;
   }
 }
 
-// Create and export a singleton instance
-const api = new ApiClient();
-
-// For CommonJS environments
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { api, ApiClient };
-}
-
-// For ES6 environments (this will work in React/Vite)
-if (typeof window !== 'undefined') {
-  window.api = api;
-}
-
-// Default export for ES6 imports
-export { api, ApiClient };
-export default api;
+export const apiClient = new ApiClient();

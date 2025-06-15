@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiClient } from '../integration/api-client';
 
 interface DbStatus {
   success: boolean;
@@ -17,8 +18,7 @@ function HomePage() {
 
     const checkHealth = async () => {
       try {
-        const res = await fetch('/api/health');
-        const data = await res.json();
+        const data = await apiClient.checkHealth();
         setHealth(data.status);
         // Only connect WebSocket if health check passes
         if (data.status === 'healthy') {
@@ -33,8 +33,7 @@ function HomePage() {
 
     const testDatabase = async () => {
       try {
-        const res = await fetch('/api/db-test');
-        const data = await res.json();
+        const data = await apiClient.testDatabase();
         setDbStatus(data);
         if (!data.success) {
           setError('Database test failed');

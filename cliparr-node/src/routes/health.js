@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 
 // Health check endpoint
-router.get('/health', (req, res) => {
+router.get('/status', (req, res) => {
   const logger = req.app.get('logger');
   logger.info('Health check requested');
   
