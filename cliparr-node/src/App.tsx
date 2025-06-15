@@ -12,7 +12,7 @@ function App() {
             <Link to="/health" className="text-white hover:text-gray-300">Health Check</Link>
           </div>
         </nav>
-        
+
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/health" element={<HealthCheckPage />} />

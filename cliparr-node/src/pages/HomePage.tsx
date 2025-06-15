@@ -48,18 +48,18 @@ function HomePage() {
     const connectWebSocket = () => {
       try {
         ws = new WebSocket(`ws://${window.location.host}/ws`);
-        
+
         ws.onopen = () => {
           setWsStatus('connected');
           setError(null);
         };
-        
+
         ws.onclose = () => {
           setWsStatus('disconnected');
           // Attempt to reconnect after 5 seconds
           setTimeout(connectWebSocket, 5000);
         };
-        
+
         ws.onerror = () => {
           setWsStatus('error');
           setError('WebSocket connection failed');
@@ -145,4 +145,4 @@ function HomePage() {
   );
 }
 
-export default HomePage; 
+export default HomePage;
