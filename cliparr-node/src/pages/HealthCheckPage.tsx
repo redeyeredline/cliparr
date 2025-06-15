@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { apiClient } from '../integration/api-client';
+import { logger } from '../services/logger.frontend.js';
 
 const HealthCheckPage: React.FC = () => {
   const [healthStatus, setHealthStatus] = useState<string | null>(null);
@@ -12,14 +13,14 @@ const HealthCheckPage: React.FC = () => {
     try {
       const data = await apiClient.checkHealth();
       setHealthStatus(data.status);
-    } catch (err) {
+      logger.info('Health check result:', data);
+    } catch {
       setError('Failed to check server health');
       setHealthStatus(null);
     } finally {
       setIsLoading(false);
     }
   };
- 
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
@@ -29,7 +30,6 @@ const HealthCheckPage: React.FC = () => {
             <div className="divide-y divide-gray-200">
               <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
                 <h1 className="text-3xl font-bold text-center mb-8">Server Health Check</h1>
-
                 <div className="flex justify-center mb-8">
                   <button
                     onClick={checkHealth}
@@ -43,14 +43,12 @@ const HealthCheckPage: React.FC = () => {
                     {isLoading ? 'Checking...' : 'Check Server Health'}
                   </button>
                 </div>
-
                 {healthStatus && (
                   <div className="mt-4 p-4 rounded-md bg-green-100 text-green-800">
                     <p className="font-semibold">Server Status:</p>
                     <p>{healthStatus}</p>
                   </div>
                 )}
-
                 {error && (
                   <div className="mt-4 p-4 rounded-md bg-red-100 text-red-800">
                     <p className="font-semibold">Error:</p>

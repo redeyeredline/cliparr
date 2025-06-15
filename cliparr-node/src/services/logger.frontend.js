@@ -1,30 +1,16 @@
-import pino from 'pino';
-
-// Pino browser transport: logs to console
-const logger = pino({
-  browser: {
-    asObject: true,
-    write: (msg) => {
-      // Use appropriate console method based on level
-      switch (msg.level) {
-        case 50:
-          console.error('[ERROR]', msg.msg);
-          break;
-        case 40:
-          console.warn('[WARN]', msg.msg);
-          break;
-        case 30:
-          console.info('[INFO]', msg.msg);
-          break;
-        case 20:
-          console.debug('[DEBUG]', msg.msg);
-          break;
-        default:
-          console.log('[LOG]', msg.msg);
-      }
-    },
+const logger = {
+  info: (message, ...args) => {
+    console.warn(`[INFO] ${message}`, ...args);
   },
-  level: 'debug',
-});
+  debug: (message, ...args) => {
+    console.warn(`[DEBUG] ${message}`, ...args);
+  },
+  warn: (message, ...args) => {
+    console.warn(`[WARN] ${message}`, ...args);
+  },
+  error: (message, ...args) => {
+    console.error(`[ERROR] ${message}`, ...args);
+  },
+};
 
-export { logger }; 
+export { logger };

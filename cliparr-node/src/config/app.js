@@ -26,4 +26,4 @@ const config = isProduction ? prodConfig : devConfig;
 
 logger.info(`Using ${isProduction ? 'production' : 'development'} configuration`);
 
-export default config; 
+export default config;
