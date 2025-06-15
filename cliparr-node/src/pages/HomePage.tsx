@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../integration/api-client';
 import SonarrTest from '../components/SonarrTest';
+import ImportModeTest from '../components/ImportModeTest';
 
 interface DbStatus {
   success: boolean;
@@ -17,37 +18,9 @@ function HomePage() {
   useEffect(() => {
     let ws: WebSocket | null = null;
 
-    const checkHealth = async () => {
-      try {
-        const data = await apiClient.checkHealth();
-        setHealth(data.status);
-        // Only connect WebSocket if health check passes
-        if (data.status === 'healthy') {
-          connectWebSocket();
-          testDatabase();
-        }
-      } catch (err) {
-        setHealth('error');
-        setError('Failed to connect to server');
-      }
-    };
-
-    const testDatabase = async () => {
-      try {
-        const data = await apiClient.testDatabase();
-        setDbStatus(data);
-        if (!data.success) {
-          setError('Database test failed');
-        }
-      } catch (err) {
-        setDbStatus({ success: false, message: 'Database test failed' });
-        setError('Failed to test database');
-      }
-    };
-
     const connectWebSocket = () => {
       try {
-        ws = new WebSocket(`ws://${window.location.host}/ws`);
+        ws = new WebSocket('ws://localhost:8485/ws');
 
         ws.onopen = () => {
           setWsStatus('connected');
@@ -67,6 +40,34 @@ function HomePage() {
       } catch (err) {
         setWsStatus('error');
         setError('Failed to create WebSocket connection');
+      }
+    };
+
+    const testDatabase = async () => {
+      try {
+        const data = await apiClient.testDatabase();
+        setDbStatus(data);
+        if (!data.success) {
+          setError('Database test failed');
+        }
+      } catch (err) {
+        setDbStatus({ success: false, message: 'Database test failed' });
+        setError('Failed to test database');
+      }
+    };
+
+    const checkHealth = async () => {
+      try {
+        const data = await apiClient.checkHealth();
+        setHealth(data.status);
+        // Only connect WebSocket if health check passes
+        if (data.status === 'healthy') {
+          connectWebSocket();
+          testDatabase();
+        }
+      } catch (err) {
+        setHealth('error');
+        setError('Failed to connect to server');
       }
     };
 
@@ -136,6 +137,9 @@ function HomePage() {
 
                 {/* Add Sonarr Test Component */}
                 <SonarrTest />
+
+                {/* Add Import Mode Test Component */}
+                <ImportModeTest />
               </div>
             </div>
           </div>

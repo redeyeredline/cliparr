@@ -1,5 +1,5 @@
 // src/integration/routes/api.js - General API routes
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 
 // Health check endpoint
@@ -47,4 +47,4 @@ router.get('/db-test', (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

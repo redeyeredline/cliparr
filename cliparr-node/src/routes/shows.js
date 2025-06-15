@@ -1,5 +1,5 @@
 // src/integration/routes/shows.js - Shows API routes
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 
 // Get shows with pagination
@@ -202,4 +202,4 @@ router.delete('/:id', (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

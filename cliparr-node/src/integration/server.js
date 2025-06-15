@@ -17,6 +17,7 @@ import { getDatabaseSingleton } from '../database/Auto_DB_Setup.js';
 import healthRoutes from '../routes/health.js';
 import showRoutes from '../routes/shows.js';
 import sonarrRoutes from '../routes/sonarr.js';
+import settingsRoutes from '../routes/settings.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -147,6 +148,9 @@ async function startServer() {
     app.use('/health', healthRoutes);
     app.use('/shows', showRoutes);
     app.use('/sonarr', sonarrRoutes);
+    app.use('/settings', settingsRoutes);
+
+    logger.info('Settings routes registered at /settings');
 
     // Create HTTP server
     serverInstance = http.createServer(app);
@@ -220,7 +224,7 @@ export {
 };
 
 // For direct execution
-if (require.main === module) {
+if (process.argv[1] === new URL(import.meta.url).pathname) {
   startServer().catch(err => {
     logger.fatal('Failed to start server:', err);
     process.exit(1);

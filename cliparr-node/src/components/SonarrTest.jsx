@@ -10,9 +10,7 @@ const SonarrTest = () => {
 
   useEffect(() => {
     // Connect to WebSocket
-    const ws = new WebSocket(`ws://${window.location.host}/ws`);
-    
-    //  new WebSocket('ws://localhost:8485/ws');
+    const ws = new WebSocket('ws://localhost:8485/ws');
     
     ws.onopen = () => {
       console.log('WebSocket connected');
