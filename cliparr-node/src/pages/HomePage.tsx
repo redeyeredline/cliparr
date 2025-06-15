@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../integration/api-client';
+import SonarrTest from '../components/SonarrTest';
 
 interface DbStatus {
   success: boolean;
@@ -132,6 +133,9 @@ function HomePage() {
                     WebSocket connection will be established automatically.
                   </p>
                 </div>
+
+                {/* Add Sonarr Test Component */}
+                <SonarrTest />
               </div>
             </div>
           </div>

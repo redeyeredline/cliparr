@@ -1,125 +1,128 @@
-const Database = require('better-sqlite3');
-const fs = require('fs');
-const path = require('path');
-const { SCHEMA } = require('./Schema'); // Uses your existing schema definitions
+import Database from 'better-sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import pino from 'pino';
 
-/**
- * Automatically ensure database exists and is initialized
- * This function will:
- * 1. Create the directory if it doesn't exist
- * 2. Create the .db file if it doesn't exist
- * 3. Initialize all tables and indexes if they don't exist
- * 4. Return a ready-to-use database connection
- */
-function ensureDatabase(dbPath = 'data/cliparr.db') {
-  const absolutePath = path.resolve(dbPath);
-  const dir = path.dirname(absolutePath);
-  
-  // Step 1: Ensure directory exists
-  if (!fs.existsSync(dir)) {
-    console.log(`Creating database directory: ${dir}`);
-    fs.mkdirSync(dir, { recursive: true });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Initialize logger
+const logger = pino({
+  level: 'info',
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      levelFirst: true,
+      translateTime: 'SYS:standard',
+      ignore: 'pid,hostname'
+    }
   }
-  
-  // Step 2: Check if database file exists
-  const dbExists = fs.existsSync(absolutePath);
-  if (!dbExists) {
-    console.log(`Database file doesn't exist, will create: ${absolutePath}`);
-  }
-  
-  // Step 3: Connect to database (this creates the file if it doesn't exist)
-  const db = new Database(absolutePath);
-  
-  // Step 4: Initialize schema (safe to run multiple times)
-  console.log('Initializing database schema...');
-  
-  const initSchema = db.transaction(() => {
-    // Create all tables
-    Object.entries(SCHEMA.tables).forEach(([tableName, sql]) => {
-      console.log(`Creating table: ${tableName}`);
-      db.exec(sql);
-    });
+});
 
-    // Create all indexes
-    SCHEMA.indexes.forEach((sql, index) => {
-      console.log(`Creating index: ${index + 1}/${SCHEMA.indexes.length}`);
-      db.exec(sql);
-    });
-  });
+let dbInstance = null;
 
-  // Execute the schema initialization
-  initSchema();
-  
-  console.log(`Database ready at: ${absolutePath}`);
-  return db;
+// Function to drop all tables
+function dropAllTables(db) {
+  logger.info('Dropping all existing tables');
+  db.exec(`
+    DROP TABLE IF EXISTS episode_files;
+    DROP TABLE IF EXISTS episodes;
+    DROP TABLE IF EXISTS seasons;
+    DROP TABLE IF EXISTS shows;
+    DROP TABLE IF EXISTS settings;
+  `);
 }
 
-/**
- * Get a database connection with automatic initialization
- * This is the main function you should use - it handles everything
- */
-function getDatabase(dbPath = 'data/cliparr.db') {
-  return ensureDatabase(dbPath);
+// Function to create all tables
+function createTables(db) {
+  logger.info('Creating database tables');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS shows (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sonarr_id INTEGER UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      overview TEXT,
+      path TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS seasons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      show_id INTEGER NOT NULL,
+      season_number INTEGER NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (show_id) REFERENCES shows(id),
+      UNIQUE(show_id, season_number)
+    );
+
+    CREATE TABLE IF NOT EXISTS episodes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      season_id INTEGER NOT NULL,
+      episode_number INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      sonarr_episode_id INTEGER UNIQUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (season_id) REFERENCES episodes(id),
+      UNIQUE(season_id, episode_number)
+    );
+
+    CREATE TABLE IF NOT EXISTS episode_files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      episode_id INTEGER NOT NULL,
+      file_path TEXT NOT NULL,
+      size INTEGER,
+      quality TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (episode_id) REFERENCES episodes(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `);
+
+  // Create indexes for better query performance
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_shows_title ON shows(title COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS idx_shows_sonarr_id ON shows(sonarr_id);
+    CREATE INDEX IF NOT EXISTS idx_seasons_show_id ON seasons(show_id);
+    CREATE INDEX IF NOT EXISTS idx_episodes_season_id ON episodes(season_id);
+    CREATE INDEX IF NOT EXISTS idx_episodes_sonarr_episode_id ON episodes(sonarr_episode_id);
+  `);
 }
 
-/**
- * Singleton pattern - ensure only one database connection per path
- */
-const connections = new Map();
+export function getDatabaseSingleton(dbPath) {
+  if (dbInstance) {
+    return dbInstance;
+  }
 
-function getDatabaseSingleton(dbPath = 'data/cliparr.db') {
-  const absolutePath = path.resolve(dbPath);
-  
-  if (!connections.has(absolutePath)) {
-    const db = ensureDatabase(absolutePath);
-    connections.set(absolutePath, db);
+  try {
+    logger.info(`Initializing database at ${dbPath}`);
+    dbInstance = new Database(dbPath);
     
-    // Cleanup on process exit
-    process.on('exit', () => {
-      if (connections.has(absolutePath)) {
-        connections.get(absolutePath).close();
-        connections.delete(absolutePath);
-      }
-    });
+    // Enable WAL mode for better concurrency
+    dbInstance.pragma('journal_mode = WAL');
+    
+    // Set busy timeout to handle concurrent access
+    dbInstance.pragma('busy_timeout = 5000');
+
+    // Drop and recreate tables to ensure schema is up to date
+    dropAllTables(dbInstance);
+    createTables(dbInstance);
+
+    logger.info('Database initialized successfully');
+    return dbInstance;
+  } catch (error) {
+    logger.error({ error: error.message }, 'Failed to initialize database');
+    throw error;
   }
-  
-  return connections.get(absolutePath);
 }
 
-/**
- * Force recreation of database (useful for development/testing)
- */
-function recreateDatabase(dbPath = 'data/cliparr.db') {
-  const absolutePath = path.resolve(dbPath);
-  
-  // Close existing connection if any
-  if (connections.has(absolutePath)) {
-    connections.get(absolutePath).close();
-    connections.delete(absolutePath);
+export function closeDatabase() {
+  if (dbInstance) {
+    dbInstance.close();
+    dbInstance = null;
+    logger.info('Database connection closed');
   }
-  
-  // Delete the file if it exists
-  if (fs.existsSync(absolutePath)) {
-    console.log(`Deleting existing database: ${absolutePath}`);
-    fs.unlinkSync(absolutePath);
-  }
-  
-  // Create fresh database
-  return ensureDatabase(absolutePath);
-}
-
-// Export functions
-module.exports = {
-  ensureDatabase,
-  getDatabase,
-  getDatabaseSingleton,
-  recreateDatabase
-};
-
-// If this file is run directly, create the database
-if (require.main === module) {
-  console.log('Creating database automatically...');
-  const db = getDatabase();
-  console.log('Database created successfully!');
-  db.close();
 }

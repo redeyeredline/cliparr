@@ -58,6 +58,27 @@ class ApiClient {
     const response = await api.delete(`/shows/${id}`);
     return response.data;
   }
+
+  // Sonarr endpoints
+  async getUnimportedShows() {
+    const response = await api.get('/sonarr/unimported');
+    return response.data;
+  }
+
+  async importShow(sonarrId) {
+    const response = await api.post(`/sonarr/import/${sonarrId}`);
+    return response.data;
+  }
+
+  async getSeriesDetails(sonarrId) {
+    const response = await api.get(`/sonarr/series/${sonarrId}`);
+    return response.data;
+  }
+
+  async getEpisodes(sonarrId) {
+    const response = await api.get(`/sonarr/series/${sonarrId}/episodes`);
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();

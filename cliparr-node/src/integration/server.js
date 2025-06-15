@@ -1,36 +1,76 @@
-// src/integration/index.js - Main backend server initialization
-const express = require('express');
-const path = require('path');
-const pino = require('pino');
-const { WebSocketServer } = require('ws');
+// src/integration/server.js - Main backend server initialization
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import pino from 'pino';
+import { WebSocketServer } from 'ws';
+import dotenv from 'dotenv';
+import http from 'http';
+
+// Load environment variables
+dotenv.config();
 
 // Import your existing database setup
-const { getDatabaseSingleton } = require('../database/Auto_DB_Setup');
+import { getDatabaseSingleton } from '../database/Auto_DB_Setup.js';
 
 // Import API route modules
-const healthRoutes = require('../routes/health');
-const showRoutes = require('../routes/shows');
+import healthRoutes from '../routes/health.js';
+import showRoutes from '../routes/shows.js';
+import sonarrRoutes from '../routes/sonarr.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Initialize logger with less verbose settings
 const logger = pino({
+  level: 'info',
   transport: {
     target: 'pino-pretty',
-    options: { colorize: true }
+    options: {
+      colorize: true,
+      levelFirst: true,
+      translateTime: 'SYS:standard',
+      ignore: 'pid,hostname'
+    }
   }
 });
+
+// Validate required environment variables
+const requiredEnvVars = ['SONARR_API_KEY'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  logger.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+}
 
 let serverInstance = null;
 let wsServer = null;
 let db = null;
 
+// Function to check if port is in use
+async function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const server = http.createServer();
+    server.once('error', () => {
+      resolve(true);
+    });
+    server.once('listening', () => {
+      server.close();
+      resolve(false);
+    });
+    server.listen(port);
+  });
+}
+
 // Setup WebSocket server
-function setupWebSocket() {
-  wsServer = new WebSocketServer({ server: serverInstance });
+function setupWebSocket(server) {
+  wsServer = new WebSocketServer({ server });
   
   wsServer.on('connection', (ws) => {
-    logger.info('New WebSocket connection');
+    logger.debug('New WebSocket connection');
     
     ws.on('message', (message) => {
-      logger.info('Received WebSocket message:', message.toString());
+      logger.debug('WebSocket message received');
       ws.send(JSON.stringify({ 
         type: 'echo', 
         data: message.toString(),
@@ -39,11 +79,11 @@ function setupWebSocket() {
     });
     
     ws.on('error', (error) => {
-      logger.error('WebSocket error:', error);
+      logger.error({ error: error.message }, 'WebSocket error');
     });
 
     ws.on('close', () => {
-      logger.info('WebSocket connection closed');
+      logger.debug('WebSocket connection closed');
     });
     
     ws.send(JSON.stringify({ 
@@ -53,27 +93,38 @@ function setupWebSocket() {
     }));
   });
 
-  logger.info('✅ WebSocket server initialized');
+  logger.info('WebSocket server initialized');
+}
+
+// Get WebSocket server instance
+export function getWebSocketServer() {
+  return wsServer;
 }
 
 async function startServer() {
   if (serverInstance) {
-    logger.warn('Backend server already running');
+    logger.warn('Server already running');
     return serverInstance;
   }
 
   try {
-    logger.info('🚀 Starting integrated backend server...');
+    logger.info('Starting backend server...');
     const app = express();
     const port = 8485;
-    const host = '127.0.0.1';
+    const host = '0.0.0.0';
+
+    // Check if port is in use
+    const portInUse = await isPortInUse(port);
+    if (portInUse) {
+      logger.error(`Port ${port} is already in use`);
+      throw new Error(`Port ${port} is already in use. Please stop any existing server instances.`);
+    }
 
     // Database initialization
     const dbPath = path.join(__dirname, '../database/data/cliparr.db');
-    logger.info(`Database path: ${dbPath}`);
     db = getDatabaseSingleton(dbPath);
     
-    // Make database available to routes
+    // Make database and WebSocket server available to routes
     app.set('db', db);
     app.set('logger', logger);
     
@@ -95,44 +146,75 @@ async function startServer() {
     // Mount API route modules
     app.use('/health', healthRoutes);
     app.use('/shows', showRoutes);
+    app.use('/sonarr', sonarrRoutes);
 
-    // Start HTTP server
-    serverInstance = app.listen(port, host, () => {
-      logger.info(`✅ Backend server running on ${host}:${port}`);
-      logger.info(`📊 Database ready at: ${dbPath}`);
-      logger.info(`🔗 Proxied through Vite dev server`);
-    });
+    // Create HTTP server
+    serverInstance = http.createServer(app);
 
     // Setup WebSocket after server starts
-    setupWebSocket();
+    setupWebSocket(serverInstance);
+    
+    // Make WebSocket server available to routes
+    app.set('wss', wsServer);
+
+    // Start server
+    serverInstance.listen(port, host, () => {
+      logger.info(`Server running on ${host}:${port}`);
+    });
+
+    // Handle server errors
+    serverInstance.on('error', (error) => {
+      logger.error({ error: error.message }, 'Server error');
+      stopServer();
+    });
 
     return serverInstance;
 
   } catch (error) {
-    logger.error('Failed to start backend server:', error);
+    logger.error({ error: error.message }, 'Server startup failed');
+    await stopServer();
     throw error;
   }
 }
 
 // Graceful shutdown
-function stopServer() {
-  if (wsServer) {
-    wsServer.close();
-    logger.info('WebSocket server closed');
-  }
-  
-  if (serverInstance) {
-    serverInstance.close();
-    logger.info('Backend server closed');
-  }
-  
-  serverInstance = null;
-  wsServer = null;
-  db = null;
+async function stopServer() {
+  return new Promise((resolve) => {
+    if (wsServer) {
+      wsServer.close(() => {
+        logger.info('WebSocket server closed');
+        wsServer = null;
+      });
+    }
+    
+    if (serverInstance) {
+      serverInstance.close(() => {
+        logger.info('Server closed');
+        serverInstance = null;
+        resolve();
+      });
+    } else {
+      resolve();
+    }
+  });
 }
 
-// CommonJS exports
-module.exports = {
+// Handle process termination
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  await stopServer();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  if (db) db.close();
+  if (serverInstance) serverInstance.close();
+  if (wsServer) wsServer.close();
+  process.exit(0);
+});
+
+// ES Module exports
+export {
   startServer,
   stopServer
 };

@@ -57,16 +57,15 @@ function insertShow(db, show) {
   try {
     const insertStmt = db.prepare(`
       INSERT OR REPLACE INTO shows 
-      (sonarr_id, title, overview, path, status) 
-      VALUES (?, ?, ?, ?, ?)
+      (sonarr_id, title, overview, path) 
+      VALUES (?, ?, ?, ?)
     `);
     
     const result = insertStmt.run(
       show.id,
       show.title || '',
       show.overview || '',
-      show.path || '',
-      show.status || ''
+      show.path || ''
     );
     
     // If lastInsertRowid is 0, it means we replaced an existing record
@@ -102,11 +101,11 @@ function insertSeason(db, showId, seasonNumber) {
   try {
     const insertStmt = db.prepare(`
       INSERT OR IGNORE INTO seasons 
-      (show_id, season_number, monitored) 
-      VALUES (?, ?, ?)
+      (show_id, season_number) 
+      VALUES (?, ?)
     `);
     
-    insertStmt.run(showId, seasonNumber, 1);
+    insertStmt.run(showId, seasonNumber);
     
     // Fetch the season ID (whether it was just inserted or already existed)
     const selectStmt = db.prepare(`
@@ -141,16 +140,15 @@ function insertEpisode(db, seasonId, episode) {
   try {
     const insertStmt = db.prepare(`
       INSERT OR REPLACE INTO episodes 
-      (season_id, episode_number, title, sonarr_episode_id, monitored) 
-      VALUES (?, ?, ?, ?, ?)
+      (season_id, episode_number, title, sonarr_episode_id) 
+      VALUES (?, ?, ?, ?)
     `);
     
     const result = insertStmt.run(
       seasonId,
       episode.episodeNumber || null,
       episode.title || '',
-      episode.id,
-      episode.monitored !== undefined ? (episode.monitored ? 1 : 0) : 1
+      episode.id
     );
     
     // Handle case where we replaced an existing episode
