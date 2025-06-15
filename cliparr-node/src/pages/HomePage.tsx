@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '../integration/api-client';
 import SonarrTest from '../components/SonarrTest';
 import ImportModeTest from '../components/ImportModeTest';
+import { logger } from '../services/logger.frontend.js';
 
 interface DbStatus {
   success: boolean;
@@ -15,6 +16,7 @@ function HomePage() {
   const [dbStatus, setDbStatus] = useState<DbStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [healthCheckMsg, setHealthCheckMsg] = useState<string | null>(null);
 
   let ws: WebSocket | null = null;
 
@@ -55,15 +57,23 @@ function HomePage() {
   const checkHealth = async () => {
     setIsLoading(true);
     setError(null);
+    setHealthCheckMsg(null);
     try {
       const data = await apiClient.checkHealth();
       setHealth(data.status);
       if (data.status === 'healthy') {
         connectWebSocket();
         testDatabase();
+        setHealthCheckMsg('✅ Server health check successful!');
+        logger.info('Health check result:', data);
+      } else {
+        setHealthCheckMsg('❌ Server health check failed.');
+        logger.error('Health check failed:', data);
       }
-    } catch {
+    } catch (err) {
       setHealth('error');
+      setHealthCheckMsg('❌ Failed to connect to server.');
+      logger.error('Health check error:', err);
       setError('Failed to connect to server');
     } finally {
       setIsLoading(false);
@@ -77,7 +87,7 @@ function HomePage() {
         ws.close();
       }
     };
-  }, [checkHealth]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
@@ -91,7 +101,7 @@ function HomePage() {
                   Welcome to Cliparr - a placeholder page to verify the server is running correctly.
                 </p>
                 {/* Health Check Button */}
-                <div className="flex justify-center mb-4">
+                <div className="flex flex-col items-center mb-4">
                   <button
                     onClick={checkHealth}
                     disabled={isLoading}
@@ -103,6 +113,9 @@ function HomePage() {
                   >
                     {isLoading ? 'Checking...' : 'Check Server Health'}
                   </button>
+                  {healthCheckMsg && (
+                    <div className={`mt-2 text-sm font-semibold ${healthCheckMsg.startsWith('✅') ? 'text-green-700' : 'text-red-700'}`}>{healthCheckMsg}</div>
+                  )}
                 </div>
                 {/* Status blocks */}
                 <div className="space-y-4">
