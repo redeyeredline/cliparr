@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../integration/api-client';
 import SonarrTest from '../components/SonarrTest';
 import ImportModeTest from '../components/ImportModeTest';
 import { logger } from '../services/logger.frontend.js';
+import { wsClient } from '../services/websocket.frontend.js';
 
 interface DbStatus {
   success: boolean;
@@ -18,30 +19,34 @@ function HomePage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [healthCheckMsg, setHealthCheckMsg] = useState<string | null>(null);
 
-  let ws: WebSocket | null = null;
-
-  const connectWebSocket = () => {
-    try {
-      ws = new WebSocket('ws://localhost:8485/ws');
-      ws.onopen = () => {
-        setWsStatus('connected');
-        setError(null);
-      };
-      ws.onclose = () => {
-        setWsStatus('disconnected');
-        setTimeout(connectWebSocket, 5000);
-      };
-      ws.onerror = () => {
-        setWsStatus('error');
+  useEffect(() => {
+    // Set up WebSocket event listeners
+    const handleConnection = (data: { status: string }) => {
+      setWsStatus(data.status);
+      if (data.status === 'error') {
         setError('WebSocket connection failed');
-      };
-    } catch {
-      setWsStatus('error');
-      setError('Failed to create WebSocket connection');
-    }
-  };
+      } else {
+        setError(null);
+      }
+    };
 
-  const testDatabase = async () => {
+    const handleError = () => {
+      setWsStatus('error');
+      setError('WebSocket connection failed');
+    };
+
+    // Add event listeners
+    wsClient.addEventListener('connection', handleConnection);
+    wsClient.addEventListener('error', handleError);
+
+    // Cleanup
+    return () => {
+      wsClient.removeEventListener('connection', handleConnection);
+      wsClient.removeEventListener('error', handleError);
+    };
+  }, []);
+
+  const testDatabase = useCallback(async () => {
     try {
       const data = await apiClient.testDatabase();
       setDbStatus(data);
@@ -52,9 +57,9 @@ function HomePage() {
       setDbStatus({ success: false, message: 'Database test failed' });
       setError('Failed to check database status');
     }
-  };
+  }, []);
 
-  const checkHealth = async () => {
+  const checkHealth = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     setHealthCheckMsg(null);
@@ -62,7 +67,7 @@ function HomePage() {
       const data = await apiClient.checkHealth();
       setHealth(data.status);
       if (data.status === 'healthy') {
-        connectWebSocket();
+        wsClient.connect();
         testDatabase();
         setHealthCheckMsg('✅ Server health check successful!');
         logger.info('Health check result:', data);
@@ -78,16 +83,11 @@ function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [testDatabase]);
 
   useEffect(() => {
     checkHealth();
-    return () => {
-      if (ws) {
-        ws.close();
-      }
-    };
-  }, []);
+  }, [checkHealth]);
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">

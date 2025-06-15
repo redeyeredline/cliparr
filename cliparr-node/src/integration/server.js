@@ -1,214 +1,114 @@
-// src/integration/server.js - Main backend server initialization
+// src/integration/server.js
 import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { logger } from '../services/logger.js';
-import { WebSocketServer } from 'ws';
-import dotenv from 'dotenv';
 import http from 'http';
+import { logger } from '../services/logger.js';
 import cors from '../middleware/cors.js';
-
-// Load environment variables
-dotenv.config();
-
-// Import your existing database setup
+import config from '../config/index.js';
+import { setupWebSocket, getWebSocketServer } from '../services/websocket.js';
 import { getDatabaseSingleton } from '../database/Auto_DB_Setup.js';
-
-// Import API route modules
 import healthRoutes from '../routes/health.js';
 import showRoutes from '../routes/shows.js';
 import sonarrRoutes from '../routes/sonarr.js';
 import settingsRoutes from '../routes/settings.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Validate required environment variables
-const requiredEnvVars = ['SONARR_API_KEY'];
-const missingEnvVars = requiredEnvVars.filter((varName) => !process.env[varName]);
-
-if (missingEnvVars.length > 0) {
-  logger.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
-  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
-}
-
 let serverInstance = null;
-let wsServer = null;
-let db = null;
+let dbInstance = null;
 
-// Function to check if port is in use
+/** Returns true if something is already listening on the given port */
 async function isPortInUse(port) {
   return new Promise((resolve) => {
-    const server = http.createServer();
-    server.once('error', () => {
-      resolve(true);
-    });
-    server.once('listening', () => {
-      server.close();
-      resolve(false);
-    });
-    server.listen(port);
+    const tester = http.createServer();
+    tester.once('error', () => resolve(true));
+    tester.once('listening', () => tester.close(() => resolve(false)));
+    tester.listen(port);
   });
 }
 
-// Setup WebSocket server
-function setupWebSocket(server) {
-  wsServer = new WebSocketServer({ server, path: '/ws' });
-
-  wsServer.on('connection', (ws) => {
-    logger.debug('New WebSocket connection');
-
-    ws.on('message', (message) => {
-      logger.debug('WebSocket message received');
-      ws.send(JSON.stringify({
-        type: 'echo',
-        data: message.toString(),
-        timestamp: new Date().toISOString(),
-      }));
-    });
-
-    ws.on('error', (error) => {
-      logger.error({ error: error.message }, 'WebSocket error');
-    });
-
-    ws.on('close', () => {
-      logger.debug('WebSocket connection closed');
-    });
-
-    ws.send(JSON.stringify({
-      type: 'welcome',
-      message: 'Connected to Cliparr backend',
-      timestamp: new Date().toISOString(),
-    }));
-  });
-
-  logger.info('WebSocket server initialized');
-}
-
-// Get WebSocket server instance
-export function getWebSocketServer() {
-  return wsServer;
-}
-
-async function startServer() {
+export async function startServer() {
   if (serverInstance) {
     logger.warn('Server already running');
     return serverInstance;
   }
 
-  try {
-    logger.info('Starting backend server...');
-    const app = express();
-    const port = 8485;
-    const host = '0.0.0.0';
+  const { host, port, db, ws } = config;
 
-    // Check if port is in use
-    const portInUse = await isPortInUse(port);
-    if (portInUse) {
-      logger.error(`Port ${port} is already in use`);
-      throw new Error(`Port ${port} is already in use. Please stop any existing server instances.`);
-    }
-
-    // Database initialization
-    const dbPath = path.join(__dirname, '../database/data/cliparr.db');
-    db = getDatabaseSingleton(dbPath);
-
-    // Make database and WebSocket server available to routes
-    app.set('db', db);
-    app.set('logger', logger);
-
-    // Middleware
-    app.use(express.json());
-    app.use(cors);
-
-    // Mount API route modules
-    app.use('/health', healthRoutes);
-    app.use('/shows', showRoutes);
-    app.use('/sonarr', sonarrRoutes);
-    app.use('/settings', settingsRoutes);
-
-    logger.info('Settings routes registered at /settings');
-
-    // Create HTTP server
-    serverInstance = http.createServer(app);
-
-    // Setup WebSocket after server starts
-    setupWebSocket(serverInstance);
-
-    // Make WebSocket server available to routes
-    app.set('wss', wsServer);
-
-    // Start server
-    serverInstance.listen(port, host, () => {
-      logger.info(`Server running on ${host}:${port}`);
-    });
-
-    // Handle server errors
-    serverInstance.on('error', (error) => {
-      logger.error({ error: error.message }, 'Server error');
-      stopServer();
-    });
-
-    return serverInstance;
-
-  } catch (error) {
-    logger.error({ error: error.message }, 'Server startup failed');
-    await stopServer();
-    throw error;
+  // ensure port is free
+  if (await isPortInUse(port)) {
+    const msg = `Port ${port} is already in use`;
+    logger.error(msg);
+    throw new Error(msg);
   }
-}
 
-// Graceful shutdown
-async function stopServer() {
-  return new Promise((resolve) => {
-    if (wsServer) {
-      wsServer.close(() => {
-        logger.info('WebSocket server closed');
-        wsServer = null;
-      });
-    }
+  logger.info(`Starting server on ${host}:${port} in ${config.env} mode`);
 
-    if (serverInstance) {
-      serverInstance.close(() => {
-        logger.info('Server closed');
-        serverInstance = null;
-        resolve();
-      });
-    } else {
-      resolve();
-    }
+  // init DB
+  dbInstance = getDatabaseSingleton(db.path);
+
+  // express app
+  const app = express();
+  app.set('db', dbInstance);
+  app.set('logger', logger);
+
+  // middleware
+  app.use(express.json());
+  app.use(cors);
+
+  // routes
+  app.use('/health', healthRoutes);
+  app.use('/shows', showRoutes);
+  app.use('/sonarr', sonarrRoutes);
+  app.use('/settings', settingsRoutes);
+
+  // HTTP + WS
+  const server = http.createServer(app);
+  setupWebSocket(server, { path: ws.path, heartbeat: ws.heartbeat });
+  app.set('wss', getWebSocketServer());
+
+  server.listen(port, host, () => {
+    serverInstance = server;
+    logger.info(`Server listening at http://${host}:${port}`);
   });
+
+  server.on('error', (error) => {
+    logger.error({ error }, 'Server error');
+    stopServer();
+  });
+
+  return serverInstance;
 }
 
-// Handle process termination
+export async function stopServer() {
+  if (!serverInstance) {
+    return;
+  }
+  // close WebSocket first
+  const wss = getWebSocketServer();
+  if (wss) {
+    wss.close(() => logger.info('WebSocket server closed'));
+  }
+  // then HTTP
+  await new Promise((res) => serverInstance.close(res));
+  logger.info('HTTP server closed');
+  dbInstance = null;
+  serverInstance = null;
+}
+
+// handle termination signals
 process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully');
+  logger.info('SIGTERM received—shutting down');
+  await stopServer();
+  process.exit(0);
+});
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received—shutting down');
   await stopServer();
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
-  if (db) {
-    db.close();
-  }
-  if (serverInstance) {
-    serverInstance.close();
-  }
-  if (wsServer) {
-    wsServer.close();
-  }
-  process.exit(0);
-});
-
-// ES Module exports
-export {
-  startServer,
-  stopServer,
-};
-
-// For direct execution
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+// allow `node src/integration/server.js` to start directly
+if (process.argv[1].endsWith('server.js')) {
   startServer().catch((err) => {
-    logger.fatal('Failed to start server:', err);
+    logger.fatal({ err }, 'Failed to start server');
     process.exit(1);
   });
 }

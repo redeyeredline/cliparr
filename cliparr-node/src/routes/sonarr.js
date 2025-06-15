@@ -4,6 +4,7 @@ import axios from 'axios';
 import { logger } from '../services/logger.js';
 import dotenv from 'dotenv';
 import process from 'process';
+import WebSocket from 'ws';
 
 // Load environment variables
 dotenv.config();
@@ -140,10 +141,43 @@ router.post('/import/:id', async (req, res) => {
     const showId = req.params.id;
     logger.info(`Starting import for show ID: ${showId}`);
 
+    // Get WebSocket server instance
+    const wss = req.app.get('wss');
+    if (!wss) {
+      logger.error('WebSocket server is not set on app');
+      return res.status(500).json({ success: false, message: 'WebSocket server not initialized' });
+    }
+
+    // Send initial progress
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'import_progress',
+          showId,
+          status: 'started',
+          message: 'Starting import process...',
+          timestamp: new Date().toISOString(),
+        }));
+      }
+    });
+
     // Get show details from Sonarr
     const showResponse = await sonarrClient.get(`/api/v3/series/${showId}`);
     const show = showResponse.data;
     logger.info({ show }, 'Fetched show details from Sonarr');
+
+    // Send progress update
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'import_progress',
+          showId,
+          status: 'fetching_episodes',
+          message: 'Fetching episodes...',
+          timestamp: new Date().toISOString(),
+        }));
+      }
+    });
 
     // Get episodes for the show
     const episodeResponse = await sonarrClient.get(`/api/v3/episode?seriesId=${showId}`);
@@ -166,6 +200,19 @@ router.post('/import/:id', async (req, res) => {
     });
 
     logger.info({ seasonCount: Object.keys(seasons).length }, 'Prepared seasons grouping');
+
+    // Send progress update
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'import_progress',
+          showId,
+          status: 'importing',
+          message: `Importing ${Object.keys(seasons).length} seasons...`,
+          timestamp: new Date().toISOString(),
+        }));
+      }
+    });
 
     // Use a transaction for data consistency
     try {
@@ -240,15 +287,42 @@ router.post('/import/:id', async (req, res) => {
         });
       })();
       logger.info('Database transaction for import completed successfully');
+
+      // Send completion update
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'import_progress',
+            showId,
+            status: 'completed',
+            message: 'Import completed successfully',
+            timestamp: new Date().toISOString(),
+          }));
+        }
+      });
+
+      res.json({ success: true, message: 'Show imported successfully' });
     } catch (txError) {
       logger.error(
         { txError: txError.stack || txError },
         'Database transaction failed during import',
       );
+
+      // Send error update
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'import_progress',
+            showId,
+            status: 'error',
+            message: 'Import failed: ' + txError.message,
+            timestamp: new Date().toISOString(),
+          }));
+        }
+      });
+
       throw txError;
     }
-
-    res.json({ success: true, message: 'Show imported successfully' });
   } catch (error) {
     logger.error({ error: error.message }, 'Failed to import show');
     res.status(500).json({

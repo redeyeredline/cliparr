@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [
@@ -10,11 +13,14 @@ export default defineConfig({
       name: 'backend-integration',
       configureServer() {
         // Start your backend server when Vite starts
-        setTimeout(() => {
-          const { startServer } = require('./src/integration/server.js');
-          startServer().catch(err => {
+        setTimeout(async () => {
+          try {
+            const { startServer } = await import('./src/integration/server.js');
+            await startServer();
+            console.log('✅ Backend server started successfully');
+          } catch (err) {
             console.error('❌ Failed to start backend server:', err);
-          });
+          }
         }, 1000); // Small delay to let Vite start first
       }
     }

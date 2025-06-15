@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../integration/api-client.js';
 import { logger } from '../services/logger.frontend.js';
+import { wsClient } from '../services/websocket.frontend.js';
 
 const SonarrTest = ({ backendReady }) => {
   const [shows, setShows] = useState([]);
@@ -8,23 +9,21 @@ const SonarrTest = ({ backendReady }) => {
   const [error, setError] = useState(null);
   const [importStatus, setImportStatus] = useState({});
   const [wsConnected, setWsConnected] = useState(false);
-  const wsRef = React.useRef(null);
 
   useEffect(() => {
     if (!backendReady) {
       return;
     }
-    // Connect to WebSocket only when backend is ready
-    const ws = new window.WebSocket('ws://localhost:8485/ws');
-    wsRef.current = ws;
 
-    ws.onopen = () => {
-      logger.info('WebSocket connected');
-      setWsConnected(true);
+    // Connect to WebSocket
+    wsClient.connect();
+
+    // Set up event listeners
+    const handleConnection = (data) => {
+      setWsConnected(data.status === 'connected');
     };
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+    const handleMessage = (data) => {
       if (data.type === 'import_progress') {
         setImportStatus((prev) => ({
           ...prev,
@@ -36,18 +35,22 @@ const SonarrTest = ({ backendReady }) => {
       }
     };
 
-    ws.onerror = (wsError) => {
+    const handleError = (wsError) => {
       logger.error('WebSocket error:', wsError);
       setWsConnected(false);
     };
 
-    ws.onclose = () => {
-      logger.info('WebSocket disconnected');
-      setWsConnected(false);
-    };
+    // Add event listeners
+    wsClient.addEventListener('connection', handleConnection);
+    wsClient.addEventListener('message', handleMessage);
+    wsClient.addEventListener('error', handleError);
 
+    // Cleanup
     return () => {
-      ws.close();
+      wsClient.removeEventListener('connection', handleConnection);
+      wsClient.removeEventListener('message', handleMessage);
+      wsClient.removeEventListener('error', handleError);
+      wsClient.disconnect();
     };
   }, [backendReady]);
 

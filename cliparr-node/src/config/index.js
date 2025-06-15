@@ -1,16 +1,47 @@
 // src/config/index.js
+import path from 'path';
 import dotenv from 'dotenv';
 dotenv.config();
 
-// required env vars
-const required = ['SONARR_API_KEY'];
-const missing = required.filter((k) => !process.env[k]);
-if (missing.length) {
-  throw new Error(`Missing ENV vars: ${missing.join(', ')}`);
+const isProd = process.env.NODE_ENV === 'production';
+
+const config = {
+  env: process.env.NODE_ENV || 'development',
+  host: process.env.HOST || '0.0.0.0',
+  port: +(process.env.PORT || 8485),
+
+  // Sonarr
+  sonarr: {
+    apiKey: process.env.SONARR_API_KEY,
+    url: process.env.SONARR_URL || 'http://localhost:8989',
+  },
+
+  // Database
+  db: {
+    path: process.env.DB_PATH
+      || path.join(__dirname, '..', 'database', 'data', 'cliparr.db'),
+  },
+
+  // WebSocket
+  ws: {
+    path: process.env.WS_PATH || '/ws',
+    heartbeat: +(process.env.WS_PING_MS || 30000),
+  },
+
+  // CORS (used in your cors middleware)
+  cors: {
+    origin: isProd
+      ? process.env.FRONTEND_URL || 'https://cliprr.example.com'
+      : 'http://localhost:8484',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  },
+};
+
+// fail fast on critical ENV
+if (!config.sonarr.apiKey) {
+  throw new Error('Missing ENV var: SONARR_API_KEY');
 }
 
-export const PORT = parseInt(process.env.PORT, 10) || 8485;
-export const HOST = process.env.HOST || '0.0.0.0';
-export const SONARR_API_KEY = process.env.SONARR_API_KEY;
-// Base URL for your Sonarr instance (fallback to localhost)
-export const SONARR_URL = process.env.SONARR_URL || 'http://localhost:8989';
+export default config;
