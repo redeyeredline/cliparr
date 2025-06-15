@@ -8,7 +8,6 @@ import { getWebSocketServer } from '../integration/server.js';
 
 // Load environment variables
 dotenv.config();
-const db = getDb();
 const router = express.Router();
 const logger = pino({
   level: 'info',
@@ -130,7 +129,7 @@ router.post('/import/:id', async (req, res) => {
   console.log('Importing show from Sonarr');
 
   
-  if (!db) {
+  if (!req.app.get('db')) {
     console.error('Database instance is not set on app');
     return res.status(500).json({ success: false, message: 'Database not initialized' });
   }
@@ -175,10 +174,10 @@ router.post('/import/:id', async (req, res) => {
     let result;
     try {
       logger.info('Beginning database transaction for import');
-      result = db.transaction(() => {
+      result = req.app.get('db').transaction(() => {
         // Insert the show
         logger.info({ showInsert: { sonarr_id: show.id, title: show.title, overview: show.overview, path: show.path } }, 'Inserting show');
-        const showResult = db.prepare(`
+        const showResult = req.app.get('db').prepare(`
           INSERT OR REPLACE INTO shows (
             sonarr_id, title, overview, path
           ) VALUES (?, ?, ?, ?)
@@ -192,7 +191,7 @@ router.post('/import/:id', async (req, res) => {
         // Insert seasons and episodes
         Object.values(seasons).forEach(season => {
           logger.info({ seasonInsert: { show_id: showResult.lastInsertRowid, season_number: season.seasonNumber } }, 'Inserting season');
-          const seasonResult = db.prepare(`
+          const seasonResult = req.app.get('db').prepare(`
             INSERT OR IGNORE INTO seasons (
               show_id, season_number
             ) VALUES (?, ?)
@@ -203,7 +202,7 @@ router.post('/import/:id', async (req, res) => {
 
           season.episodes.forEach(episode => {
             logger.info({ episodeInsert: { season_id: seasonResult.lastInsertRowid, episode_number: episode.episodeNumber, title: episode.title, sonarr_episode_id: episode.id } }, 'Inserting episode');
-            db.prepare(`
+            req.app.get('db').prepare(`
               INSERT OR REPLACE INTO episodes (
                 season_id, episode_number, title, sonarr_episode_id
               ) VALUES (?, ?, ?, ?)
@@ -243,7 +242,7 @@ router.post('/import/:id', async (req, res) => {
 // Get imported shows
 router.get('/imported', async (req, res) => {
   try {
-    const db = getDb();
+    const db = req.app.get('db');
     const { page = 1, pageSize = 100 } = req.query;
     const result = getImportedShows(db, parseInt(page), parseInt(pageSize));
     res.json(result);
