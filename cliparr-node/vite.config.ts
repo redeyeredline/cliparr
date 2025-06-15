@@ -37,6 +37,9 @@ export default defineConfig({
         secure: false
       }
     },
+    watch: {
+      ignored: ['**/src/database/data/**'], // Ignore DB changes
+    },
   },
   build: {
     outDir: 'dist',

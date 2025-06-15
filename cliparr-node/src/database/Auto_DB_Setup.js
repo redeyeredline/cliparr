@@ -108,7 +108,7 @@ export function getDatabaseSingleton(dbPath) {
     dbInstance.pragma('busy_timeout = 5000');
 
     // Drop and recreate tables to ensure schema is up to date
-    dropAllTables(dbInstance);
+    // dropAllTables(dbInstance);
     createTables(dbInstance);
 
     logger.info('Database initialized successfully');

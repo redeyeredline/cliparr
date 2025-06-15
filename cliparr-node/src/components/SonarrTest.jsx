@@ -10,7 +10,9 @@ const SonarrTest = () => {
 
   useEffect(() => {
     // Connect to WebSocket
-    const ws = new WebSocket('ws://localhost:8485');
+    const ws = new WebSocket(`ws://${window.location.host}/ws`);
+    
+    //  new WebSocket('ws://localhost:8485/ws');
     
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -109,6 +111,7 @@ const SonarrTest = () => {
               </div>
             ) : (
               <button
+                type="button"
                 onClick={() => importShow(show.id)}
                 className="bg-green-500 text-white px-3 py-1 rounded text-sm"
               >

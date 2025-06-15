@@ -64,7 +64,7 @@ async function isPortInUse(port) {
 
 // Setup WebSocket server
 function setupWebSocket(server) {
-  wsServer = new WebSocketServer({ server });
+  wsServer = new WebSocketServer({ server, path: '/ws' });
   
   wsServer.on('connection', (ws) => {
     logger.debug('New WebSocket connection');

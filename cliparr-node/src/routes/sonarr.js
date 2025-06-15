@@ -224,6 +224,19 @@ router.post('/import/:id', async (req, res) => {
     }
 
     logger.info(`Successfully imported show: ${show.title}`);
+    const wss = req.app.get('wss');
+    if (wss) {
+      wss.clients.forEach(client => {
+        if (client.readyState === 1) {
+          client.send(JSON.stringify({
+            type: 'import_progress',
+            showId: show.id,
+            status: 'imported',
+            message: `Imported ${show.title}`
+          }));
+        }
+      });
+    }
     res.json({
       success: true,
       message: `Successfully imported ${show.title}`,
