@@ -79,6 +79,11 @@ class ApiClient {
     const response = await api.get(`/sonarr/series/${sonarrId}/episodes`);
     return response.data;
   }
+
+  async importShows(showIds) {
+    const response = await api.post('/sonarr/import', { showIds });
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();

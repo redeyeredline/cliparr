@@ -120,33 +120,10 @@ router.get('/unimported', async (req, res) => {
   }
 });
 
-// Import a show from Sonarr
-router.post('/import/:id', async (req, res) => {
-  logger.info('Importing show from Sonarr');
-
-  if (!req.app.get('db')) {
-    logger.error('Database instance is not set on app');
-    return res.status(500).json({ success: false, message: 'Database not initialized' });
-  }
-  if (!logger) {
-    logger.error('Logger is not set on app');
-    return res.status(500).json({ success: false, message: 'Logger not initialized' });
-  }
-  if (!sonarrClient) {
-    logger.error('Sonarr client is not set on app');
-    return res.status(500).json({ success: false, message: 'Sonarr client not initialized' });
-  }
-
+// --- REFACTOR: Extract import logic to a function ---
+async function importShowById(showId, req, logger, sonarrClient, wss, db) {
   try {
-    const showId = req.params.id;
     logger.info(`Starting import for show ID: ${showId}`);
-
-    // Get WebSocket server instance
-    const wss = req.app.get('wss');
-    if (!wss) {
-      logger.error('WebSocket server is not set on app');
-      return res.status(500).json({ success: false, message: 'WebSocket server not initialized' });
-    }
 
     // Send initial progress
     wss.clients.forEach((client) => {
@@ -217,7 +194,7 @@ router.post('/import/:id', async (req, res) => {
     // Use a transaction for data consistency
     try {
       logger.info('Beginning database transaction for import');
-      req.app.get('db').transaction(() => {
+      db.transaction(() => {
         // Insert the show
         logger.info(
           {
@@ -230,7 +207,7 @@ router.post('/import/:id', async (req, res) => {
           },
           'Inserting show',
         );
-        const showResult = req.app.get('db').prepare(`
+        const showResult = db.prepare(`
           INSERT OR REPLACE INTO shows (
             sonarr_id, title, overview, path
           ) VALUES (?, ?, ?, ?)
@@ -252,7 +229,7 @@ router.post('/import/:id', async (req, res) => {
             },
             'Inserting season',
           );
-          const seasonResult = req.app.get('db').prepare(`
+          const seasonResult = db.prepare(`
             INSERT OR IGNORE INTO seasons (
               show_id, season_number
             ) VALUES (?, ?)
@@ -273,7 +250,7 @@ router.post('/import/:id', async (req, res) => {
               },
               'Inserting episode',
             );
-            req.app.get('db').prepare(`
+            db.prepare(`
               INSERT OR REPLACE INTO episodes (
                 season_id, episode_number, title, sonarr_episode_id
               ) VALUES (?, ?, ?, ?)
@@ -301,7 +278,7 @@ router.post('/import/:id', async (req, res) => {
         }
       });
 
-      res.json({ success: true, message: 'Show imported successfully' });
+      return { success: true, showId };
     } catch (txError) {
       logger.error(
         { txError: txError.stack || txError },
@@ -321,15 +298,73 @@ router.post('/import/:id', async (req, res) => {
         }
       });
 
-      throw txError;
+      return { success: false, showId, error: txError.message };
     }
   } catch (error) {
     logger.error({ error: error.message }, 'Failed to import show');
-    res.status(500).json({
-      error: 'Failed to import show',
-      details: error.message,
-    });
+    // Don't throw, just return error object
+    return { success: false, showId, error: error.message };
   }
+}
+
+// --- Single import route ---
+router.post('/import/:id', async (req, res) => {
+  if (!req.app.get('db')) {
+    logger.error('Database instance is not set on app');
+    return res.status(500).json({ success: false, message: 'Database not initialized' });
+  }
+  if (!logger) {
+    logger.error('Logger is not set on app');
+    return res.status(500).json({ success: false, message: 'Logger not initialized' });
+  }
+  if (!sonarrClient) {
+    logger.error('Sonarr client is not set on app');
+    return res.status(500).json({ success: false, message: 'Sonarr client not initialized' });
+  }
+  try {
+    const showId = req.params.id;
+    const wss = req.app.get('wss');
+    const db = req.app.get('db');
+    const result = await importShowById(showId, req, logger, sonarrClient, wss, db);
+    if (result.success) {
+      res.json({ success: true, message: 'Show imported successfully' });
+    } else {
+      res.status(500).json({ error: result.error });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Batch import route ---
+router.post('/import', async (req, res) => {
+  if (!req.app.get('db')) {
+    logger.error('Database instance is not set on app');
+    return res.status(500).json({ success: false, message: 'Database not initialized' });
+  }
+  if (!logger) {
+    logger.error('Logger is not set on app');
+    return res.status(500).json({ success: false, message: 'Logger not initialized' });
+  }
+  if (!sonarrClient) {
+    logger.error('Sonarr client is not set on app');
+    return res.status(500).json({ success: false, message: 'Sonarr client not initialized' });
+  }
+  const { showIds } = req.body;
+  if (!Array.isArray(showIds) || showIds.length === 0) {
+    return res.status(400).json({ error: 'showIds must be a non-empty array' });
+  }
+  const wss = req.app.get('wss');
+  const db = req.app.get('db');
+  const results = [];
+  for (const showId of showIds) {
+    const result = await importShowById(showId, req, logger, sonarrClient, wss, db);
+    results.push(result);
+  }
+  res.json({
+    importedCount: results.filter(r => r.success).length,
+    results,
+  });
 });
 
 export default router;
