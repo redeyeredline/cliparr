@@ -1,23 +1,29 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import HealthCheckPage from './pages/HealthCheckPage';
+import ToastTest from './pages/ToastTest';
+import { ToastProvider } from './components/ToastProvider';
 
 function App() {
   return (
     <Router>
-      <div>
-        <nav className="bg-gray-800 p-4">
-          <div className="container mx-auto flex space-x-4">
-            <Link to="/" className="text-white hover:text-gray-300">Home</Link>
-            <Link to="/health" className="text-white hover:text-gray-300">Health Check</Link>
-          </div>
-        </nav>
+      <ToastProvider>
+        <div>
+          <nav className="bg-gray-800 p-4">
+            <div className="container mx-auto flex space-x-4">
+              <Link to="/" className="text-white hover:text-gray-300">Home</Link>
+              <Link to="/health" className="text-white hover:text-gray-300">Health Check</Link>
+              <Link to="/toast-test" className="text-white hover:text-gray-300">Toast Test</Link>
+            </div>
+          </nav>
 
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/health" element={<HealthCheckPage />} />
-        </Routes>
-      </div>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/health" element={<HealthCheckPage />} />
+            <Route path="/toast-test" element={<ToastTest />} />
+          </Routes>
+        </div>
+      </ToastProvider>
     </Router>
   );
 }
