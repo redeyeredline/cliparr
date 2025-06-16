@@ -8,7 +8,7 @@ interface ShowStatistics {
   episodeFileCount: number;
 }
 
-interface Show {
+export interface Show {
   id: number;
   title: string;
   seasons?: Season[];
@@ -68,13 +68,13 @@ const tableStyle = {
   marginBottom: '1rem',
 } as const;
 
-export default function ImportModal({ 
-  open, 
-  onClose, 
-  onImport, 
-  shows, 
-  loading = false, 
-  error = null 
+export default function ImportModal({
+  open,
+  onClose,
+  onImport,
+  shows,
+  loading = false,
+  error = null,
 }: ImportModalProps) {
   const [selected, setSelected] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
@@ -86,15 +86,21 @@ export default function ImportModal({
   }, [shows, open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
@@ -104,7 +110,7 @@ export default function ImportModal({
 
   const handleToggle = (id: number) => {
     setSelected((prev) =>
-      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id],
     );
   };
 
@@ -124,17 +130,17 @@ export default function ImportModal({
 
   return (
     <div style={modalOverlayStyle} onMouseDown={handleOverlayClick}>
-      <div 
-        ref={modalRef} 
-        style={{ 
-          ...modalStyle, 
-          minHeight: Math.min(400, 80 * (shows.length + 2)), 
-          maxHeight: '80vh' 
+      <div
+        ref={modalRef}
+        style={{
+          ...modalStyle,
+          minHeight: Math.min(400, 80 * (shows.length + 2)),
+          maxHeight: '80vh',
         }}
       >
-        <button 
-          style={closeButtonStyle} 
-          onClick={onClose} 
+        <button
+          style={closeButtonStyle}
+          onClick={onClose}
           aria-label="Close"
         >
           ×
@@ -149,8 +155,8 @@ export default function ImportModal({
           <div>Loading...</div>
         ) : (
           <>
-            <button 
-              onClick={handleSelectAll} 
+            <button
+              onClick={handleSelectAll}
               style={{ marginBottom: '1rem' }}
             >
               {selectAll ? 'Unselect All' : 'Select All'}
@@ -167,7 +173,7 @@ export default function ImportModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {shows.map(show => (
+                  {shows.map((show) => (
                     <tr key={show.id}>
                       <td>
                         <input
@@ -185,15 +191,15 @@ export default function ImportModal({
                 </tbody>
               </table>
             </div>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'flex-end', 
-              gap: '1rem', 
-              marginTop: '1rem' 
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem',
+              marginTop: '1rem',
             }}>
-              <button 
-                onClick={handleOk} 
-                disabled={selected.length === 0} 
+              <button
+                onClick={handleOk}
+                disabled={selected.length === 0}
                 style={{ fontWeight: 'bold' }}
               >
                 OK
@@ -205,4 +211,4 @@ export default function ImportModal({
       </div>
     </div>
   );
-} 
+}

@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import ImportModal from '../components/ImportModal';
-import { useToast } from '../components/ToastProvider';
+import ImportModal, { Show } from '../components/ImportModal';
+import { useToast } from '../components/ToastContext';
 import { apiClient } from '../integration/api-client';
 
 export default function ImportModalTest() {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [shows, setShows] = useState<any[]>([]);
+  const [shows, setShows] = useState<Show[]>([]);
   const [importing, setImporting] = useState(false);
   const toast = useToast();
 
   // Fetch unimported shows from API
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     setLoading(true);
     setError(null);
     apiClient.getUnimportedShows()
@@ -35,14 +37,14 @@ export default function ImportModalTest() {
       const res = await apiClient.importShows(selectedIds);
       toast({
         type: 'success',
-        message: `Imported ${selectedIds.length} shows successfully!`
+        message: `Imported ${selectedIds.length} shows successfully!`,
       });
       setIsOpen(false);
     } catch (err) {
       setError('Failed to import shows');
       toast({
         type: 'error',
-        message: 'Failed to import shows'
+        message: 'Failed to import shows',
       });
     } finally {
       setImporting(false);
@@ -69,4 +71,4 @@ export default function ImportModalTest() {
       />
     </div>
   );
-} 
+}

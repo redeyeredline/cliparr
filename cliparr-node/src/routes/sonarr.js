@@ -121,7 +121,7 @@ router.get('/unimported', async (req, res) => {
 });
 
 // --- REFACTOR: Extract import logic to a function ---
-async function importShowById(showId, req, logger, sonarrClient, wss, db) {
+async function importShowById(showId, req, wss, db) {
   try {
     logger.info(`Starting import for show ID: ${showId}`);
 
@@ -325,7 +325,7 @@ router.post('/import/:id', async (req, res) => {
     const showId = req.params.id;
     const wss = req.app.get('wss');
     const db = req.app.get('db');
-    const result = await importShowById(showId, req, logger, sonarrClient, wss, db);
+    const result = await importShowById(showId, req, wss, db);
     if (result.success) {
       res.json({ success: true, message: 'Show imported successfully' });
     } else {
@@ -358,11 +358,11 @@ router.post('/import', async (req, res) => {
   const db = req.app.get('db');
   const results = [];
   for (const showId of showIds) {
-    const result = await importShowById(showId, req, logger, sonarrClient, wss, db);
+    const result = await importShowById(showId, req, wss, db);
     results.push(result);
   }
   res.json({
-    importedCount: results.filter(r => r.success).length,
+    importedCount: results.filter((r) => r.success).length,
     results,
   });
 });

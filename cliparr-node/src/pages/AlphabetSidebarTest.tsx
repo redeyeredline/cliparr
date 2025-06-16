@@ -3,10 +3,10 @@ import AlphabetSidebar from '../components/AlphabetSidebar';
 
 export default function AlphabetSidebarTest() {
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
-  
+
   // Generate alphabet letters
-  const letters = Array.from({ length: 26 }, (_, i) => 
-    String.fromCharCode(65 + i)
+  const letters = Array.from({ length: 26 }, (_, i) =>
+    String.fromCharCode(65 + i),
   );
 
   return (
@@ -27,4 +27,4 @@ export default function AlphabetSidebarTest() {
       </div>
     </div>
   );
-} 
+}

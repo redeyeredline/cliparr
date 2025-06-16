@@ -69,16 +69,15 @@ interface AlphabetSidebarProps {
   letters?: string[];
 }
 
-export default function AlphabetSidebar({ 
-  onLetterClick, 
-  activeLetter, 
-  letters = [] 
+export default function AlphabetSidebar({
+  onLetterClick,
+  activeLetter,
+  letters = [],
 }: AlphabetSidebarProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [maxLetters, setMaxLetters] = useState(letters.length);
   const [fontSize, setFontSize] = useState(MAX_FONT);
   const [padding, setPadding] = useState(MAX_PADDING);
-  const [truncating, setTruncating] = useState(false);
 
   useEffect(() => {
     function updateMax() {
@@ -98,7 +97,9 @@ export default function AlphabetSidebar({
               break;
             }
           }
-          if (found) break;
+          if (found) {
+            break;
+          }
         }
         setFontSize(found ? bestFont : MIN_FONT);
         setPadding(found ? bestPad : MIN_PADDING);
@@ -106,7 +107,6 @@ export default function AlphabetSidebar({
         const minLetterHeight = MIN_FONT + 2 + 2 * MIN_PADDING;
         const maxL = Math.floor(height / minLetterHeight);
         setMaxLetters(maxL);
-        setTruncating(!found);
       }
     }
     updateMax();
@@ -144,12 +144,12 @@ export default function AlphabetSidebar({
             key={letter}
             style={getLetterStyle({ active: activeLetter === letter, fontSize: useFont, padding: usePad })}
             onClick={() => onLetterClick?.(letter)}
-            onMouseDown={e => e.preventDefault()}
+            onMouseDown={(e) => e.preventDefault()}
           >
             {letter}
           </div>
-        )
+        ),
       )}
     </div>
   );
-} 
+}

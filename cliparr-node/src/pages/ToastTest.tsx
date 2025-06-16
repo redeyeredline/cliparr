@@ -1,5 +1,5 @@
 import React from 'react';
-import { useToast } from '../components/ToastProvider';
+import { useToast } from '../components/ToastContext';
 
 export default function ToastTest() {
   const toast = useToast();
@@ -31,4 +31,4 @@ export default function ToastTest() {
       </div>
     </div>
   );
-} 
+}
