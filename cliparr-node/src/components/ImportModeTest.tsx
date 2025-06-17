@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 function ImportModeTest() {
   const [mode, setMode] = useState('loading...');
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   // Fetch current mode
   const fetchMode = async () => {
@@ -22,6 +23,7 @@ function ImportModeTest() {
 
   // Set mode
   const updateMode = async (newMode: string) => {
+    setSaving(true);
     try {
       const res = await fetch('http://localhost:8485/settings/import-mode', {
         method: 'POST',
@@ -37,6 +39,8 @@ function ImportModeTest() {
       }
     } catch (err) {
       setError(err.message || 'Network error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -47,14 +51,20 @@ function ImportModeTest() {
   return (
     <div>
       <h2>Import Mode Test</h2>
-      <div>Current Mode: <b>{mode}</b></div>
-      <div>
-        {['none', 'import', 'auto'].map((m) => (
-          <button key={m} onClick={() => updateMode(m)} disabled={mode === m}>
-            Set {m}
-          </button>
-        ))}
-      </div>
+      <div className="mb-2">Current Mode: <b>{mode}</b></div>
+      <label htmlFor="import-mode-select" className="mr-2">Import Mode:</label>
+      <select
+        id="import-mode-select"
+        value={mode}
+        onChange={e => updateMode(e.target.value)}
+        disabled={saving || mode === 'loading...'}
+        className="border rounded px-2 py-1"
+      >
+        <option value="none">None</option>
+        <option value="import">Import</option>
+        <option value="auto">Auto</option>
+      </select>
+      {saving && <span className="ml-2 text-sm text-gray-500">Saving...</span>}
       {error && <div style={{ color: 'red' }}>Error: {error}</div>}
     </div>
   );

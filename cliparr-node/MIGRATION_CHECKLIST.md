@@ -28,7 +28,7 @@
 - ✅ `/imported-shows`
 - ✅ `/series/{show_id}`
 - ✅ `/settings/import-mode`
-- ❌ `/websocket-test`
+- ✅ `/websocket-test`
 
 ## 5. WebSocket Events
 - ✅ WebSocket server runs and connects
@@ -36,10 +36,6 @@
 - ❌ Audio analysis jobs/events
 - ❌ Diagnostics events
 
-## 6. Audio Analysis Jobs
-- ❌ List jobs
-- ❌ Schedule jobs
-- ❌ Cleanup jobs
 
 ## 7. Health & Diagnostics
 - ✅ Health check endpoint
