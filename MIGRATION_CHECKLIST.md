@@ -94,5 +94,6 @@ currently broken
     The thin line divides content, but you could add a subtle drop-shadow or slightly darker line to strengthen the separation, especially on very large screens.
   Responsive behavior
     On narrower viewports, you may want the two sections to stack vertically rather than squeeze horizontally. Ensuring both labels and controls wrap cleanly will maintain ease of use on tablet or phone.
-
+  the alphabet bar should expand to fill all avail vertical space more gracefully
+  
   a previous chat was going to review tdarr to see its mongo db setup in the background to advise on more robust db solution
