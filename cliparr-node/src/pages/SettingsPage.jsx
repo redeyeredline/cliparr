@@ -45,7 +45,7 @@ const SettingsPage = () => {
     <div className="py-8 px-4 bg-gray-900 min-h-full text-gray-100">
       <h1 className="text-3xl font-bold mb-8">Settings</h1>
       <div className="flex justify-center">
-        <div className="bg-gray-800 rounded-2xl shadow-xl border border-gray-700 p-8 w-full max-w-3xl relative">
+        <div className="bg-gray-800 rounded-2xl shadow-xl border border-gray-700 p-12 w-full max-w-4xl relative">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold tracking-tight">Import Settings</h2>
             {pendingMode && pendingMode !== importMode && (

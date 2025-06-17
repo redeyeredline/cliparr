@@ -8,11 +8,23 @@ interface ImportModeControlProps {
 
 function ImportModeControl({ value, onValueChange, disabled = false }: ImportModeControlProps) {
   // Descriptions for each mode
-  const modeDescriptions: Record<string, string> = {
-    auto: 'Automatically import all shows from Sonarr and schedule audio fingerprinting.',
-    import: 'Only schedule fingerprinting for shows you import manually.',
-    none: 'No automatic imports; you must import shows manually.',
-  };
+  const modeDescriptions: { key: string; label: string; desc: string }[] = [
+    {
+      key: 'auto',
+      label: 'Auto',
+      desc: 'Automatically import all shows from Sonarr and schedule audio fingerprinting.',
+    },
+    {
+      key: 'import',
+      label: 'Import',
+      desc: 'Only schedule fingerprinting for shows you import manually.',
+    },
+    {
+      key: 'none',
+      label: 'None',
+      desc: 'No automatic imports; you must import shows manually.',
+    },
+  ];
 
   useEffect(() => {
     // No-op, just for consistency if you want to add effects later
@@ -21,9 +33,21 @@ function ImportModeControl({ value, onValueChange, disabled = false }: ImportMod
   return (
     <div className="flex flex-col items-center justify-center w-full">
       <label htmlFor="import-mode-select" className="font-semibold mb-2 text-lg text-center">Import Mode</label>
-      <p className="text-gray-400 text-sm mb-4 text-center" style={{ minHeight: 40 }}>
-        {modeDescriptions[value] || ''}
-      </p>
+      <ul className="mb-4 w-full max-w-xs text-sm">
+        {modeDescriptions.map((mode) => (
+          <li
+            key={mode.key}
+            className={`mb-1 px-2 py-1 rounded transition-colors ${
+              value === mode.key
+                ? 'bg-blue-900 text-blue-200 font-semibold'
+                : 'text-gray-400'
+            }`}
+          >
+            <span className="font-bold mr-2">{mode.label}:</span>
+            <span>{mode.desc}</span>
+          </li>
+        ))}
+      </ul>
       <select
         id="import-mode-select"
         value={value}

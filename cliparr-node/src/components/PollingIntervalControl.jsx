@@ -77,7 +77,6 @@ const PollingIntervalControl = ({ disabled = false }) => {
           onChange={handleChange}
           disabled={loading || disabled}
           className="text-sm px-3 py-2 rounded-md border border-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition w-48 bg-gray-800 text-gray-100 placeholder-gray-400 text-center"
-          onClick={handleDisabledClick}
         >
           {INTERVAL_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -85,8 +84,15 @@ const PollingIntervalControl = ({ disabled = false }) => {
             </option>
           ))}
         </select>
+        {disabled && (
+          <div
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-full cursor-not-allowed z-10"
+            onClick={handleDisabledClick}
+            style={{ background: 'rgba(0,0,0,0)', pointerEvents: 'auto' }}
+          />
+        )}
         {showDisabledMsg && (
-          <div className="absolute left-1/2 -translate-x-1/2 top-14 bg-gray-900 text-yellow-300 px-4 py-2 rounded shadow text-xs z-10 border border-yellow-400">
+          <div className="absolute left-1/2 -translate-x-1/2 top-14 bg-gray-900 text-yellow-300 px-4 py-2 rounded shadow text-xs z-20 border border-yellow-400">
             Disabled: Set Import Mode to Auto or Import to enable
           </div>
         )}
