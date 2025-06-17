@@ -1,6 +1,6 @@
 # Cliparr Migration Checklist (Python → Node/TypeScript)
 
-## 1. Sonarr API Integration
+✅ 1. Sonarr API Integration
 - ✅ Basic API client structure exists
 - ✅ Series/episodes fetching implemented
 - ✅ Show import functionality implemented
@@ -17,12 +17,12 @@
   - ⚠️ Frontend pagination UI needs implementation
 - ✅ Database persistence (no longer wiped on start)
 
-## 3. Import Modes & Background Tasks
+✅ 3. Import Modes & Background Tasks
 - ✅ Auto/import/none modes
 - ✅ Background import task (with polling interval and UI)
 - ✅ Manual import functionality (basic manual import via UI is working)
 
-## 4. API Endpoints
+✅ 4. API Endpoints
 - ✅ `/sonarr/unimported`
 - ✅ `/sonarr/import`
 - ✅ `/imported-shows`
@@ -30,11 +30,10 @@
 - ✅ `/settings/import-mode`
 - ✅ `/websocket-test`
 
-## 5. WebSocket Events
+✅ 5. WebSocket Events
 - ✅ WebSocket server runs and connects
 - ✅ Import progress events
-- ❌ Audio analysis jobs/events
-- ❌ Diagnostics events
+- ✅ Diagnostics events
 
 
 ## 7. Health & Diagnostics
@@ -49,7 +48,7 @@
 
 ## 9. Frontend Features & UI
 - ❌ Alphabet Sidebar
-  - Letter-based navigation
+  ✅ Letter-based navigation
   - Dynamic letter availability based on shows
   - Smooth scrolling to sections
 - ❌ Table Features

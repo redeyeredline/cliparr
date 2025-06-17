@@ -39,18 +39,19 @@ const PollingIntervalControl = () => {
     try {
       const data = await apiClient.setPollingInterval(newValue);
       setCurrentInterval(Number(data.interval));
-      toast({ type: 'success', message: 'Interval updated successfully' });
+      toast({
+        type: 'success',
+        message: 'Interval updated successfully',
+      });
     } catch (err) {
       setError(err.message);
-      toast({ type: 'error', message: 'Failed to update interval' });
+      toast({
+        type: 'error',
+        message: 'Failed to update interval',
+      });
     } finally {
       setLoading(false);
     }
-  };
-
-  const getLabel = (value) => {
-    const found = INTERVAL_OPTIONS.find((opt) => opt.value === value);
-    return found ? found.label : `${Math.floor(value / 60)} minutes`;
   };
 
   return (
@@ -58,16 +59,24 @@ const PollingIntervalControl = () => {
       <select
         value={currentInterval}
         onChange={handleChange}
+
         disabled={loading}
-        className="text-sm px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition w-56 bg-white"
+        className={`
+          text-sm px-3 py-2 rounded-md border border-gray-300 shadow-sm 
+          focus:outline-none focus:ring-2 focus:ring-blue-400 transition w-56 bg-white
+        `}
         style={{ maxWidth: 240 }}
       >
         {INTERVAL_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
         ))}
       </select>
       {error && (
-        <div className="mt-2 p-2 bg-red-100 text-red-800 rounded text-xs text-center w-full max-w-xs">
+        <div className={`
+          mt-2 p-2 bg-red-100 text-red-800 rounded text-xs text-center w-full max-w-xs
+        `}>
           {error}
         </div>
       )}

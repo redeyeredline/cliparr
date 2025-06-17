@@ -26,8 +26,12 @@ export function getDatabaseSingleton(dbPath) {
       for (const stmt of STATEMENTS) {
         dbInstance.exec(stmt);
       }
+      // Set default settings
       dbInstance.exec(
         'INSERT OR IGNORE INTO settings (key, value) VALUES (\'import_mode\', \'none\');',
+      );
+      dbInstance.exec(
+        'INSERT OR IGNORE INTO settings (key, value) VALUES (\'polling_interval\', \'900\');',
       );
     });
     init();

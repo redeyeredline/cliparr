@@ -16,8 +16,12 @@ export default function AlphabetSidebarTest() {
         <div className="w-96 h-[600px] bg-gray-100 rounded-lg p-4">
           <h2 className="text-lg font-semibold mb-4">Content Area</h2>
           <p>Active Letter: {activeLetter || 'None'}</p>
-          <p className="mt-4">This is a test area to demonstrate the alphabet sidebar functionality.</p>
-          <p className="mt-2">Try clicking different letters in the sidebar to see the active state.</p>
+          <p className="mt-4">
+            This is a test area to demonstrate the alphabet sidebar functionality.
+          </p>
+          <p className="mt-2">
+            Try clicking different letters in the sidebar to see the active state.
+          </p>
         </div>
         <AlphabetSidebar
           letters={letters}

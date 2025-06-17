@@ -23,7 +23,7 @@ export default function ImportModalTest() {
         setShows(data);
         setLoading(false);
       })
-      .catch((err) => {
+      .catch(() => {
         setError('Failed to fetch unimported shows');
         setLoading(false);
       });
@@ -34,13 +34,13 @@ export default function ImportModalTest() {
     setImporting(true);
     setError(null);
     try {
-      const res = await apiClient.importShows(selectedIds);
+      await apiClient.importShows(selectedIds);
       toast({
         type: 'success',
         message: `Imported ${selectedIds.length} shows successfully!`,
       });
       setIsOpen(false);
-    } catch (err) {
+    } catch {
       setError('Failed to import shows');
       toast({
         type: 'error',

@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { ToastContext, useToast } from './ToastContext';
+import { useState, useCallback, ReactNode } from 'react';
+import { ToastContext } from './ToastContext';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -7,10 +7,6 @@ interface Toast {
   id: string;
   type: ToastType;
   message: string;
-}
-
-interface ToastContextType {
-  (params: { type?: ToastType; message: string; duration?: number }): void;
 }
 
 const toastStyles = {

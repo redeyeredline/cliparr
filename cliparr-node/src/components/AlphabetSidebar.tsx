@@ -142,7 +142,11 @@ export default function AlphabetSidebar({
         ) : (
           <div
             key={letter}
-            style={getLetterStyle({ active: activeLetter === letter, fontSize: useFont, padding: usePad })}
+            style={getLetterStyle({
+              active: activeLetter === letter,
+              fontSize: useFont,
+              padding: usePad,
+            })}
             onClick={() => onLetterClick?.(letter)}
             onMouseDown={(e) => e.preventDefault()}
           >

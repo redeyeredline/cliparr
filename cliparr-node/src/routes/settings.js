@@ -1,7 +1,14 @@
 // src/routes/settings.js - Settings API routes
 import express from 'express';
 const router = express.Router();
-import { getDb, getImportMode, setImportMode, getPollingInterval, setPollingInterval } from '../database/Db_Operations.js';
+import {
+  getDb,
+  getImportMode,
+  setImportMode,
+  getPollingInterval,
+  setPollingInterval,
+} from '../database/Db_Operations.js';
+import { logger } from '../services/logger.js';
 
 // GET current import mode
 router.get('/import-mode', (req, res) => {
@@ -42,9 +49,10 @@ router.get('/polling-interval', (req, res) => {
   const db = getDb();
   try {
     const interval = getPollingInterval(db);
+    logger.info({ interval }, 'GET polling interval');
     res.json({ interval });
   } catch (error) {
-    console.error('Failed to get polling interval:', error);
+    logger.error('Failed to get polling interval:', error);
     res.status(500).json({
       error: 'Failed to get polling interval',
       details: error && (error.stack || error.message || error),
@@ -56,6 +64,7 @@ router.get('/polling-interval', (req, res) => {
 router.post('/polling-interval', (req, res) => {
   const db = getDb();
   const { interval } = req.body;
+  logger.info({ interval }, 'POST polling interval');
   try {
     if (!interval || isNaN(interval) || interval < 60 || interval > 86400) {
       return res.status(400).json({
@@ -63,9 +72,11 @@ router.post('/polling-interval', (req, res) => {
       });
     }
     setPollingInterval(db, parseInt(interval, 10));
-    res.json({ status: 'ok', interval: parseInt(interval, 10) });
+    const savedInterval = getPollingInterval(db);
+    logger.info({ savedInterval }, 'Saved polling interval');
+    res.json({ status: 'ok', interval: savedInterval });
   } catch (error) {
-    console.error('Failed to set polling interval:', error);
+    logger.error('Failed to set polling interval:', error);
     res.status(500).json({
       error: 'Failed to set polling interval',
       details: error && (error.stack || error.message || error),

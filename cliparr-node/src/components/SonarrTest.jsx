@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../integration/api-client.js';
 import { logger } from '../services/logger.frontend.js';
 import { wsClient } from '../services/websocket.frontend.js';
-import { useToast } from './ToastContext';
 
 const SonarrTest = ({ backendReady }) => {
   const [shows, setShows] = useState([]);

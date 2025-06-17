@@ -56,7 +56,7 @@ function ImportModeTest() {
       <select
         id="import-mode-select"
         value={mode}
-        onChange={e => updateMode(e.target.value)}
+        onChange={(e) => updateMode(e.target.value)}
         disabled={saving || mode === 'loading...'}
         className="border rounded px-2 py-1"
       >

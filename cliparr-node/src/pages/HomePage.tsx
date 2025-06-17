@@ -107,13 +107,13 @@ function HomePage() {
           <div className="flex items-center">
             <div className={`w-3 h-3 rounded-full mr-3 ${
               health === 'healthy' ? 'bg-green-500' :
-              health === 'unhealthy' ? 'bg-red-500' :
-              'bg-yellow-500'
+                health === 'unhealthy' ? 'bg-red-500' :
+                  'bg-yellow-500'
             }`} />
             <span className="text-lg font-medium">
               {health === 'healthy' ? 'System Healthy' :
                 health === 'unhealthy' ? 'System Unhealthy' :
-                'Checking System Status...'}
+                  'Checking System Status...'}
             </span>
           </div>
           {error && (
@@ -129,23 +129,33 @@ function HomePage() {
                 <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
                   <h1 className="text-3xl font-bold text-center mb-8">Cliparr</h1>
                   <p className="text-center text-gray-600 mb-8">
-                    Welcome to Cliparr - a placeholder page to verify the server is running correctly.
+                    Welcome to Cliparr - a placeholder page to verify the server is running
+                    correctly.
                   </p>
                   {/* Health Check Button */}
                   <div className="flex flex-col items-center mb-4">
                     <button
                       onClick={checkHealth}
                       disabled={isLoading}
-                      className={`px-4 py-2 rounded-md text-white font-medium ${
-                        isLoading
+                      className={
+                        'px-4 py-2 rounded-md text-white font-medium ' +
+                        (isLoading
                           ? 'bg-gray-400 cursor-not-allowed'
-                          : 'bg-blue-500 hover:bg-blue-600'
-                      }`}
+                          : 'bg-blue-500 hover:bg-blue-600')
+                      }
                     >
                       {isLoading ? 'Checking...' : 'Check Server Health'}
                     </button>
                     {healthCheckMsg && (
-                      <div className={`mt-2 text-sm font-semibold ${healthCheckMsg.startsWith('✅') ? 'text-green-700' : 'text-red-700'}`}>{healthCheckMsg}</div>
+                      <div
+                        className={`mt-2 text-sm font-semibold ${
+                          healthCheckMsg.startsWith('✅')
+                            ? 'text-green-700'
+                            : 'text-red-700'
+                        }`}
+                      >
+                        {healthCheckMsg}
+                      </div>
                     )}
                   </div>
                   {/* Status blocks */}
