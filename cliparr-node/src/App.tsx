@@ -7,21 +7,25 @@ import ImportModalTest from './pages/ImportModalTest';
 import SettingsPage from './pages/SettingsPage';
 import { ToastProvider } from './components/ToastProvider';
 import MainLayout from './components/layout/MainLayout';
+import { ImportModalProvider, ImportModalRoot } from './components/ImportModalProvider';
 
 function App() {
   return (
     <Router>
       <ToastProvider>
-        <MainLayout>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/health" element={<HealthCheckPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/toast-test" element={<ToastTest />} />
-            <Route path="/alphabet-test" element={<AlphabetSidebarTest />} />
-            <Route path="/import-test" element={<ImportModalTest />} />
-          </Routes>
-        </MainLayout>
+        <ImportModalProvider>
+          <MainLayout>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/health" element={<HealthCheckPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/toast-test" element={<ToastTest />} />
+              <Route path="/alphabet-test" element={<AlphabetSidebarTest />} />
+              <Route path="/import-test" element={<ImportModalTest />} />
+            </Routes>
+            <ImportModalRoot />
+          </MainLayout>
+        </ImportModalProvider>
       </ToastProvider>
     </Router>
   );
