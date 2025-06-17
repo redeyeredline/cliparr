@@ -104,10 +104,10 @@ router.get('/unimported', async (req, res) => {
 
     // Filter out shows that are already imported
     const db = req.app.get('db');
-    const importedShows = db.prepare('SELECT sonarr_id FROM shows').all();
-    const importedIds = new Set(importedShows.map((show) => show.sonarr_id));
+    const importedShows = db.prepare('SELECT title, path FROM shows').all();
+    const importedSet = new Set(importedShows.map((show) => show.title + '|' + show.path));
 
-    const unimportedShows = shows.filter((show) => !importedIds.has(show.id));
+    const unimportedShows = shows.filter((show) => !importedSet.has(show.title + '|' + show.path));
 
     logger.info(`Found ${unimportedShows.length} unimported shows`);
     res.json(unimportedShows);
@@ -130,7 +130,7 @@ async function importShowById(showId, req, wss, db) {
       if (client.readyState === WebSocket.OPEN) {
         client.send(JSON.stringify({
           type: 'import_progress',
-          showId,
+          showId: null, // will be set after insert
           status: 'started',
           message: 'Starting import process...',
           timestamp: new Date().toISOString(),
@@ -142,19 +142,6 @@ async function importShowById(showId, req, wss, db) {
     const showResponse = await sonarrClient.get(`/api/v3/series/${showId}`);
     const show = showResponse.data;
     logger.info({ show }, 'Fetched show details from Sonarr');
-
-    // Send progress update
-    wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({
-          type: 'import_progress',
-          showId,
-          status: 'fetching_episodes',
-          message: 'Fetching episodes...',
-          timestamp: new Date().toISOString(),
-        }));
-      }
-    });
 
     // Get episodes for the show
     const episodeResponse = await sonarrClient.get(`/api/v3/episode?seriesId=${showId}`);
@@ -176,101 +163,54 @@ async function importShowById(showId, req, wss, db) {
       seasons[episode.seasonNumber].episodes.push(episode);
     });
 
-    logger.info({ seasonCount: Object.keys(seasons).length }, 'Prepared seasons grouping');
-
-    // Send progress update
-    wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({
-          type: 'import_progress',
-          showId,
-          status: 'importing',
-          message: `Importing ${Object.keys(seasons).length} seasons...`,
-          timestamp: new Date().toISOString(),
-        }));
-      }
-    });
-
     // Use a transaction for data consistency
+    let dbShowId = null;
     try {
       logger.info('Beginning database transaction for import');
       db.transaction(() => {
-        // Insert the show
-        logger.info(
-          {
-            showInsert: {
-              sonarr_id: show.id,
-              title: show.title,
-              overview: show.overview,
-              path: show.path,
-            },
-          },
-          'Inserting show',
-        );
+        // Insert the show (only title and path)
         const showResult = db.prepare(`
           INSERT OR REPLACE INTO shows (
-            sonarr_id, title, overview, path
-          ) VALUES (?, ?, ?, ?)
+            title, path
+          ) VALUES (?, ?)
         `).run(
-          show.id,
           show.title,
-          show.overview,
           show.path,
         );
+        dbShowId = showResult.lastInsertRowid;
 
         // Insert seasons and episodes
         Object.values(seasons).forEach((season) => {
-          logger.info(
-            {
-              seasonInsert: {
-                show_id: showResult.lastInsertRowid,
-                season_number: season.seasonNumber,
-              },
-            },
-            'Inserting season',
-          );
           const seasonResult = db.prepare(`
             INSERT OR IGNORE INTO seasons (
               show_id, season_number
             ) VALUES (?, ?)
           `).run(
-            showResult.lastInsertRowid,
+            dbShowId,
             season.seasonNumber,
           );
 
           season.episodes.forEach((episode) => {
-            logger.info(
-              {
-                episodeInsert: {
-                  season_id: seasonResult.lastInsertRowid,
-                  episode_number: episode.episodeNumber,
-                  title: episode.title,
-                  sonarr_episode_id: episode.id,
-                },
-              },
-              'Inserting episode',
-            );
             db.prepare(`
               INSERT OR REPLACE INTO episodes (
-                season_id, episode_number, title, sonarr_episode_id
-              ) VALUES (?, ?, ?, ?)
+                season_id, episode_number, title
+              ) VALUES (?, ?, ?)
             `).run(
               seasonResult.lastInsertRowid,
               episode.episodeNumber,
               episode.title,
-              episode.id,
             );
           });
         });
       })();
       logger.info('Database transaction for import completed successfully');
 
-      // Send completion update
+      // Send completion update with local DB show id
       wss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify({
             type: 'import_progress',
-            showId,
+            showId: dbShowId,
             status: 'completed',
             message: 'Import completed successfully',
             timestamp: new Date().toISOString(),
@@ -278,7 +218,7 @@ async function importShowById(showId, req, wss, db) {
         }
       });
 
-      return { success: true, showId };
+      return { success: true, showId: dbShowId };
     } catch (txError) {
       logger.error(
         { txError: txError.stack || txError },
@@ -290,7 +230,7 @@ async function importShowById(showId, req, wss, db) {
         if (client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify({
             type: 'import_progress',
-            showId,
+            showId: dbShowId,
             status: 'error',
             message: 'Import failed: ' + txError.message,
             timestamp: new Date().toISOString(),
@@ -298,12 +238,12 @@ async function importShowById(showId, req, wss, db) {
         }
       });
 
-      return { success: false, showId, error: txError.message };
+      return { success: false, showId: dbShowId, error: txError.message };
     }
   } catch (error) {
     logger.error({ error: error.message }, 'Failed to import show');
     // Don't throw, just return error object
-    return { success: false, showId, error: error.message };
+    return { success: false, showId: null, error: error.message };
   }
 }
 

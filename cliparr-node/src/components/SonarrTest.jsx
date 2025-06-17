@@ -116,7 +116,7 @@ const SonarrTest = ({ backendReady }) => {
         {shows.map((show) => (
           <div key={show.id} className="border rounded p-4">
             <h3 className="font-bold">{show.title}</h3>
-            <p className="text-sm text-gray-600 mb-2">{show.overview}</p>
+            <p className="text-sm text-gray-600 mb-2">{show.path}</p>
 
             {importStatus[show.id] ? (
               <div className="text-sm">

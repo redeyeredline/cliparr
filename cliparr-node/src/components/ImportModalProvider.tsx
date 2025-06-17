@@ -53,19 +53,13 @@ export const ImportModalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const handleImport = async (selectedIds: number[]) => {
     setImporting(true);
     setError(null);
+    closeImportModal();
+    toast({ type: 'info', message: `Importing ${selectedIds.length} shows...` });
     try {
       await apiClient.importShows(selectedIds);
-      toast({
-        type: 'success',
-        message: `Imported ${selectedIds.length} shows successfully!`,
-      });
-      closeImportModal();
+      toast({ type: 'success', message: `Imported ${selectedIds.length} shows successfully!` });
     } catch {
-      setError('Failed to import shows');
-      toast({
-        type: 'error',
-        message: 'Failed to import shows',
-      });
+      toast({ type: 'error', message: 'Failed to import shows' });
     } finally {
       setImporting(false);
     }

@@ -11,13 +11,13 @@ function upsertReturningId(db, insertSql, insertParams, selectSql, selectParams)
 }
 
 function insertShow(db, show) {
-  logger.info({ showId: show.id }, 'Insert show');
+  logger.info({ showTitle: show.title }, 'Insert show');
   return upsertReturningId(
     db,
-    'INSERT OR REPLACE INTO shows (sonarr_id, title, overview, path) VALUES (?, ?, ?, ?)',
-    [show.id, show.title || '', show.overview || '', show.path || ''],
-    'SELECT id FROM shows WHERE sonarr_id = ?',
-    [show.id],
+    'INSERT OR REPLACE INTO shows (title, path) VALUES (?, ?)',
+    [show.title || '', show.path || ''],
+    'SELECT id FROM shows WHERE title = ? AND path = ?',
+    [show.title || '', show.path || ''],
   );
 }
 
@@ -33,31 +33,29 @@ function insertSeason(db, showId, seasonNumber) {
 }
 
 function insertEpisode(db, seasonId, ep) {
-  logger.debug({ episodeId: ep.id }, 'Insert episode');
+  logger.debug({ episodeNumber: ep.episodeNumber }, 'Insert episode');
   return upsertReturningId(
     db,
-    'INSERT OR REPLACE INTO episodes (season_id, episode_number, title, sonarr_episode_id) ' +
-    'VALUES (?, ?, ?, ?)',
-    [seasonId, ep.episodeNumber || null, ep.title || '', ep.id],
-    'SELECT id FROM episodes WHERE sonarr_episode_id = ?',
-    [ep.id],
+    'INSERT OR REPLACE INTO episodes (season_id, episode_number, title) VALUES (?, ?, ?)',
+    [seasonId, ep.episodeNumber || null, ep.title || ''],
+    'SELECT id FROM episodes WHERE season_id = ? AND episode_number = ?',
+    [seasonId, ep.episodeNumber || null],
   );
 }
 
 function insertEpisodeFile(db, episodeId, file) {
   logger.debug({ episodeId, path: file.path }, 'Insert file');
   return db.prepare(
-    'INSERT INTO episode_files (episode_id, file_path, size, quality) VALUES (?, ?, ?, ?)',
+    'INSERT INTO episode_files (episode_id, file_path, size) VALUES (?, ?, ?)',
   ).run(
     episodeId,
     file.path || '',
     file.size || 0,
-    file.quality?.quality?.name || 'Unknown',
   ).lastInsertRowid;
 }
 
 function processShowData(db, show, episodes = [], files = []) {
-  logger.info({ showId: show.id, count: episodes.length }, 'Process show');
+  logger.info({ showTitle: show.title, count: episodes.length }, 'Process show');
   return db.transaction(() => {
     const showDbId = insertShow(db, show);
     const seasonMap = new Map(), epMap = new Map();
@@ -65,10 +63,10 @@ function processShowData(db, show, episodes = [], files = []) {
       const sid = seasonMap.get(ep.seasonNumber)
         || insertSeason(db, showDbId, ep.seasonNumber);
       seasonMap.set(ep.seasonNumber, sid);
-      epMap.set(ep.id, insertEpisode(db, sid, ep));
+      epMap.set(ep.episodeNumber, insertEpisode(db, sid, ep));
     });
     files.forEach((f) => {
-      const eid = epMap.get(f.episodeId);
+      const eid = epMap.get(f.episodeNumber);
       if (eid) {
         insertEpisodeFile(db, eid, f);
       }
@@ -80,14 +78,13 @@ function batchInsertShows(db, shows) {
   logger.info({ showCount: shows.length }, 'Batch insert shows');
   return db.transaction(() => {
     const stmt = db.prepare(
-      'INSERT OR IGNORE INTO shows (title, path, sonarr_id, overview, status) ' +
-      'VALUES (?, ?, ?, ?, ?)',
+      'INSERT OR IGNORE INTO shows (title, path) VALUES (?, ?)',
     );
     shows.forEach((s) => {
       try {
-        stmt.run(s.title || '', s.path || '', s.id, s.overview || '', s.status || '');
+        stmt.run(s.title || '', s.path || '');
       } catch {
-        logger.warn({ showId: s.id }, 'Batch insert error');
+        logger.warn({ showTitle: s.title }, 'Batch insert error');
       }
     });
   })();
@@ -97,12 +94,8 @@ function getImportedShows(db, page = 1, pageSize = 100) {
   const p = Math.max(1, +page), sz = Math.max(1, +pageSize), offset = (p - 1) * sz;
   logger.info({ page: p, pageSize: sz }, 'Fetch shows');
   const shows = db.prepare(
-    `SELECT s.id, s.title, s.path, s.sonarr_id, s.status, s.added_at,
-            COUNT(e.id) AS episode_count
+    `SELECT s.id, s.title, s.path
        FROM shows s
-  LEFT JOIN seasons se ON se.show_id = s.id
-  LEFT JOIN episodes e ON e.season_id = se.id
-      GROUP BY s.id
       ORDER BY s.title
       LIMIT ? OFFSET ?`,
   ).all(sz, offset);
@@ -117,22 +110,6 @@ function getSetting(db, key, defaultValue = null) {
 
 function setSetting(db, key, value) {
   db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value);
-}
-
-function getShowStats(db, sonarrId) {
-  const stats = db.prepare(
-    `SELECT s.id, s.title, s.sonarr_id, s.status,
-            COUNT(DISTINCT se.id) AS season_count,
-            COUNT(DISTINCT e.id) AS episode_count,
-            COUNT(DISTINCT ef.id) AS file_count
-       FROM shows s
-  LEFT JOIN seasons se ON se.show_id = s.id
-  LEFT JOIN episodes e ON e.season_id = se.id
-  LEFT JOIN episode_files ef ON ef.episode_id = e.id
-      WHERE s.sonarr_id = ?
-      GROUP BY s.id`,
-  ).get(sonarrId);
-  return stats || null;
 }
 
 function withPerformanceLogging(name, fn) {
@@ -210,7 +187,6 @@ export {
   getImportedShows,
   getSetting,
   setSetting,
-  getShowStats,
   withPerformanceLogging,
   getImportMode,
   setImportMode,

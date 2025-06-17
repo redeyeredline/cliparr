@@ -14,16 +14,8 @@ router.get('/', (req, res) => {
       SELECT 
         s.id, 
         s.title, 
-        s.path, 
-        s.sonarr_id,
-        s.status,
-        s.overview,
-        s.added_at,
-        COUNT(DISTINCT e.id) as episode_count
+        s.path
       FROM shows s
-      LEFT JOIN seasons se ON se.show_id = s.id
-      LEFT JOIN episodes e ON e.season_id = se.id
-      GROUP BY s.id, s.title, s.path, s.sonarr_id, s.status, s.overview, s.added_at
       ORDER BY s.title
     `;
 
@@ -51,16 +43,16 @@ router.post('/', (req, res) => {
   const logger = req.app.get('logger');
 
   try {
-    const { title, path: showPath, overview, sonarr_id, status } = req.body;
+    const { title, path: showPath } = req.body;
 
     logger.info(`Creating show: ${title}`);
 
     const insertStmt = db.prepare(`
-      INSERT INTO shows (title, path, overview, sonarr_id, status)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO shows (title, path)
+      VALUES (?, ?)
     `);
 
-    const result = insertStmt.run(title, showPath, overview, sonarr_id, status);
+    const result = insertStmt.run(title, showPath);
 
     logger.info(`Show created with ID: ${result.lastInsertRowid}`);
 
@@ -94,11 +86,7 @@ router.get('/:id', (req, res) => {
       SELECT 
         s.id, 
         s.title, 
-        s.path, 
-        s.sonarr_id,
-        s.status,
-        s.overview,
-        s.added_at
+        s.path
       FROM shows s
       WHERE s.id = ?
     `;
@@ -127,7 +115,7 @@ router.put('/:id', (req, res) => {
 
   try {
     const showId = parseInt(req.params.id);
-    const { title, path: showPath, overview, sonarr_id, status } = req.body;
+    const { title, path: showPath } = req.body;
 
     if (isNaN(showId)) {
       return res.status(400).json({ error: 'Invalid show ID' });
@@ -135,11 +123,11 @@ router.put('/:id', (req, res) => {
 
     const updateStmt = db.prepare(`
       UPDATE shows 
-      SET title = ?, path = ?, overview = ?, sonarr_id = ?, status = ?
+      SET title = ?, path = ?
       WHERE id = ?
     `);
 
-    const result = updateStmt.run(title, showPath, overview, sonarr_id, status, showId);
+    const result = updateStmt.run(title, showPath, showId);
 
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Show not found' });

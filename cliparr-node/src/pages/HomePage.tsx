@@ -9,15 +9,30 @@ import { FaTrash } from 'react-icons/fa';
 interface Show {
   id: number;
   title: string;
-  seasonCount: number;
-  episodeCount: number;
-  status: string;
+  path: string;
 }
 
 interface DbStatus {
   success: boolean;
   message: string;
   testValue?: string;
+}
+
+// Helper to sort shows according to sortConfig
+function sortShows(shows: Show[], sortConfig: { key: keyof Show; direction: 'asc' | 'desc' } | null): Show[] {
+  if (!sortConfig) {
+    return shows;
+  }
+  const { key, direction } = sortConfig;
+  return [...shows].sort((a, b) => {
+    if (a[key] < b[key]) {
+      return direction === 'asc' ? -1 : 1;
+    }
+    if (a[key] > b[key]) {
+      return direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
 }
 
 function HomePage() {
@@ -109,12 +124,31 @@ function HomePage() {
     wsClient.addEventListener('connection', handleConnection);
     wsClient.addEventListener('error', handleError);
 
+    // Add import_progress listener for real-time show updates
+    const handleImportProgress = async (data: any) => {
+      if (data.type === 'import_progress' && data.status === 'completed' && data.showId) {
+        try {
+          const newShow = await apiClient.getShow(data.showId);
+          setShows((prevShows) => {
+            // Replace or add the new show
+            const filtered = prevShows.filter((s) => s.id !== newShow.id);
+            const updated = [...filtered, newShow];
+            return sortShows(updated, sortConfig);
+          });
+        } catch (err) {
+          logger.error('Failed to fetch new show:', err);
+        }
+      }
+    };
+    wsClient.addEventListener('message', handleImportProgress);
+
     // Cleanup
     return () => {
       wsClient.removeEventListener('connection', handleConnection);
       wsClient.removeEventListener('error', handleError);
+      wsClient.removeEventListener('message', handleImportProgress);
     };
-  }, []);
+  }, [sortConfig]);
 
   const testDatabase = useCallback(async () => {
     try {
@@ -210,15 +244,9 @@ function HomePage() {
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('seasonCount')}
+                  onClick={() => handleSort('path')}
                 >
-                  Seasons {sortConfig?.key === 'seasonCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('episodeCount')}
-                >
-                  Episodes {sortConfig?.key === 'episodeCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  Path {sortConfig?.key === 'path' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                 </th>
               </tr>
             </thead>
@@ -240,8 +268,7 @@ function HomePage() {
                     />
                   </td>
                   <td className="px-6 py-2 whitespace-nowrap">{show.title}</td>
-                  <td className="px-6 py-2 whitespace-nowrap">{show.seasonCount}</td>
-                  <td className="px-6 py-2 whitespace-nowrap">{show.episodeCount}</td>
+                  <td className="px-6 py-2 whitespace-nowrap">{show.path}</td>
                 </tr>
               ))}
             </tbody>
