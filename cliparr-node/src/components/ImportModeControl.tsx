@@ -49,23 +49,20 @@ function ImportModeControl() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor="import-mode-select" className="font-medium">Import Mode:</label>
-      <div className="flex items-center gap-4">
-        <span className="text-gray-300">Current: <b>{mode}</b></span>
-        <select
-          id="import-mode-select"
-          value={mode}
-          onChange={(e) => updateMode(e.target.value)}
-          disabled={saving || mode === 'loading...'}
-          className="border border-gray-700 rounded px-2 py-1 bg-gray-800 text-gray-100"
-        >
-          <option value="none">None</option>
-          <option value="import">Import</option>
-          <option value="auto">Auto</option>
-        </select>
-        {saving && <span className="ml-2 text-sm text-gray-500">Saving...</span>}
-      </div>
+    <div className="flex flex-col items-center justify-center w-full">
+      <label htmlFor="import-mode-select" className="font-semibold mb-2 text-lg text-center">Import Mode</label>
+      <select
+        id="import-mode-select"
+        value={mode}
+        onChange={(e) => updateMode(e.target.value)}
+        disabled={saving || mode === 'loading...'}
+        className="border border-gray-700 rounded px-2 py-2 bg-gray-800 text-gray-100 w-48 focus:ring-2 focus:ring-blue-400 text-center"
+      >
+        <option value="none">None</option>
+        <option value="import">Import</option>
+        <option value="auto">Auto</option>
+      </select>
+      {saving && <span className="ml-2 text-sm text-gray-500">Saving...</span>}
       {error && <div className="text-red-400 text-sm">Error: {error}</div>}
     </div>
   );

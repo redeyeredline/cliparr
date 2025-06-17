@@ -54,16 +54,17 @@ const PollingIntervalControl = () => {
     }
   };
 
+  const currentLabel = INTERVAL_OPTIONS.find(opt => opt.value === currentInterval)?.label || '';
+
   return (
-    <div className="flex flex-col gap-2 w-full max-w-xs">
-      <label htmlFor="interval-select" className="font-medium">Import Refresh Interval:</label>
+    <div className="flex flex-col items-center justify-center w-full">
+      <label htmlFor="interval-select" className="font-semibold mb-2 text-lg text-center">Import Refresh Interval</label>
       <select
         id="interval-select"
         value={currentInterval}
         onChange={handleChange}
         disabled={loading}
-        className="text-sm px-3 py-2 rounded-md border border-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition w-full bg-gray-800 text-gray-100 placeholder-gray-400"
-        style={{ maxWidth: 240 }}
+        className="text-sm px-3 py-2 rounded-md border border-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition w-48 bg-gray-800 text-gray-100 placeholder-gray-400 text-center"
       >
         {INTERVAL_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
