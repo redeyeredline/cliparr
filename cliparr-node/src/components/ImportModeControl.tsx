@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 
-function ImportModeTest() {
+function ImportModeControl() {
   const [mode, setMode] = useState('loading...');
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Fetch current mode
@@ -16,7 +16,7 @@ function ImportModeTest() {
       } else {
         setError(data.error || data.details || 'Failed to fetch import mode');
       }
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message || 'Network error');
     }
   };
@@ -37,7 +37,7 @@ function ImportModeTest() {
       } else {
         setError(data.error || data.details || 'Failed to set import mode');
       }
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message || 'Network error');
     } finally {
       setSaving(false);
@@ -49,25 +49,26 @@ function ImportModeTest() {
   }, []);
 
   return (
-    <div>
-      <h2>Import Mode Test</h2>
-      <div className="mb-2">Current Mode: <b>{mode}</b></div>
-      <label htmlFor="import-mode-select" className="mr-2">Import Mode:</label>
-      <select
-        id="import-mode-select"
-        value={mode}
-        onChange={(e) => updateMode(e.target.value)}
-        disabled={saving || mode === 'loading...'}
-        className="border rounded px-2 py-1"
-      >
-        <option value="none">None</option>
-        <option value="import">Import</option>
-        <option value="auto">Auto</option>
-      </select>
-      {saving && <span className="ml-2 text-sm text-gray-500">Saving...</span>}
-      {error && <div style={{ color: 'red' }}>Error: {error}</div>}
+    <div className="flex flex-col gap-2">
+      <label htmlFor="import-mode-select" className="font-medium">Import Mode:</label>
+      <div className="flex items-center gap-4">
+        <span className="text-gray-300">Current: <b>{mode}</b></span>
+        <select
+          id="import-mode-select"
+          value={mode}
+          onChange={(e) => updateMode(e.target.value)}
+          disabled={saving || mode === 'loading...'}
+          className="border border-gray-700 rounded px-2 py-1 bg-gray-800 text-gray-100"
+        >
+          <option value="none">None</option>
+          <option value="import">Import</option>
+          <option value="auto">Auto</option>
+        </select>
+        {saving && <span className="ml-2 text-sm text-gray-500">Saving...</span>}
+      </div>
+      {error && <div className="text-red-400 text-sm">Error: {error}</div>}
     </div>
   );
 }
 
-export default ImportModeTest;
+export default ImportModeControl; 

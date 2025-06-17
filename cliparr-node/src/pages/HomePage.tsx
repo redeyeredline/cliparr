@@ -1,9 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../integration/api-client';
-import SonarrTest from '../components/SonarrTest';
-import ImportModeTest from '../components/ImportModeTest';
 import { logger } from '../services/logger.frontend.js';
 import { wsClient } from '../services/websocket.frontend.js';
+import AlphabetSidebar from '../components/AlphabetSidebar';
+
+interface Show {
+  id: number;
+  title: string;
+  seasonCount: number;
+  episodeCount: number;
+  status: string;
+}
 
 interface DbStatus {
   success: boolean;
@@ -18,6 +25,65 @@ function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [healthCheckMsg, setHealthCheckMsg] = useState<string | null>(null);
+  const [shows, setShows] = useState<Show[]>([]);
+  const [activeLetter, setActiveLetter] = useState<string | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Show; direction: 'asc' | 'desc' } | null>(null);
+
+  // Map to store refs for the first show of each letter
+  const letterRefs = useRef<{ [letter: string]: HTMLTableRowElement | null }>({});
+
+  // Get available letters from shows
+  const availableLetters = [...new Set(shows.map((show) => show.title.charAt(0).toUpperCase()))].sort();
+
+  // Sort shows based on current sort config
+  const sortedShows = [...shows].sort((a, b) => {
+    if (!sortConfig) {
+      return 0;
+    }
+    const { key, direction } = sortConfig;
+    if (a[key] < b[key]) {
+      return direction === 'asc' ? -1 : 1;
+    }
+    if (a[key] > b[key]) {
+      return direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
+  // Find the first index for each letter
+  const firstIndexForLetter: { [letter: string]: number } = {};
+  sortedShows.forEach((show, idx) => {
+    const letter = show.title.charAt(0).toUpperCase();
+    if (firstIndexForLetter[letter] === undefined) {
+      firstIndexForLetter[letter] = idx;
+    }
+  });
+
+  // Scroll to the first show with the selected letter
+  const handleLetterClick = (letter: string) => {
+    setActiveLetter(letter);
+    const ref = letterRefs.current[letter];
+    if (ref) {
+      ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  const handleSort = (key: keyof Show) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current?.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const fetchShows = useCallback(async () => {
+    try {
+      const data = await apiClient.getImportedShows();
+      setShows(data);
+    } catch (err) {
+      logger.error('Failed to fetch shows:', err);
+      setError('Failed to fetch shows');
+    }
+  }, []);
 
   useEffect(() => {
     // Set up WebSocket event listeners
@@ -89,134 +155,76 @@ function HomePage() {
     checkHealth();
   }, [checkHealth]);
 
+  useEffect(() => {
+    if (health === 'healthy') {
+      fetchShows();
+    }
+  }, [health, fetchShows]);
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* TEST: Tailwind color check */}
-      <div className="bg-pink-600 text-white text-center py-4 text-2xl font-bold">
-        If you see a pink bar, Tailwind is working!
-      </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Cliparr</h1>
-          <p className="text-xl text-gray-600 mb-8">
-            Media Management System
-          </p>
-        </div>
-        {/* System Status Card */}
-        <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="flex items-center">
-            <div className={`w-3 h-3 rounded-full mr-3 ${
-              health === 'healthy' ? 'bg-green-500' :
-                health === 'unhealthy' ? 'bg-red-500' :
-                  'bg-yellow-500'
-            }`} />
-            <span className="text-lg font-medium">
-              {health === 'healthy' ? 'System Healthy' :
-                health === 'unhealthy' ? 'System Unhealthy' :
-                  'Checking System Status...'}
-            </span>
-          </div>
-          {error && (
-            <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
-              {error}
-            </div>
-          )}
-        </div>
-        <div className="relative py-3 sm:max-w-xl sm:mx-auto">
-          <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">
-            <div className="max-w-md mx-auto">
-              <div className="divide-y divide-gray-200">
-                <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
-                  <h1 className="text-3xl font-bold text-center mb-8">Cliparr</h1>
-                  <p className="text-center text-gray-600 mb-8">
-                    Welcome to Cliparr - a placeholder page to verify the server is running
-                    correctly.
-                  </p>
-                  {/* Health Check Button */}
-                  <div className="flex flex-col items-center mb-4">
-                    <button
-                      onClick={checkHealth}
-                      disabled={isLoading}
-                      className={
-                        'px-4 py-2 rounded-md text-white font-medium ' +
-                        (isLoading
-                          ? 'bg-gray-400 cursor-not-allowed'
-                          : 'bg-blue-500 hover:bg-blue-600')
-                      }
-                    >
-                      {isLoading ? 'Checking...' : 'Check Server Health'}
-                    </button>
-                    {healthCheckMsg && (
-                      <div
-                        className={`mt-2 text-sm font-semibold ${
-                          healthCheckMsg.startsWith('✅')
-                            ? 'text-green-700'
-                            : 'text-red-700'
-                        }`}
-                      >
-                        {healthCheckMsg}
-                      </div>
-                    )}
-                  </div>
-                  {/* Status blocks */}
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold">Health Status:</span>
-                      <span
-                        className={`px-2 py-1 rounded ${
-                          health === 'healthy'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {health}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold">WebSocket Status:</span>
-                      <span
-                        className={`px-2 py-1 rounded ${
-                          wsStatus === 'connected'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {wsStatus}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold">Database Status:</span>
-                      <span
-                        className={`px-2 py-1 rounded ${
-                          dbStatus?.success
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {dbStatus ? (dbStatus.success ? 'Connected' : 'Error') : 'Checking...'}
-                      </span>
-                    </div>
-                    {dbStatus?.testValue && (
-                      <div className="mt-2 text-sm text-gray-600">
-                        Test Value: {dbStatus.testValue}
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-8 pt-6 border-t border-gray-200">
-                    <p className="text-sm text-gray-500 text-center">
-                      Server is running and ready to accept connections.
-                      <br />
-                      WebSocket connection will be established automatically.
-                    </p>
-                  </div>
-                  {/* Add Sonarr Test Component */}
-                  <SonarrTest backendReady={health === 'healthy'} />
-                  {/* Add Import Mode Test Component */}
-                  <ImportModeTest />
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="flex h-full">
+      {/* Alphabet Sidebar */}
+      <AlphabetSidebar
+        letters={availableLetters}
+        activeLetter={activeLetter}
+        onLetterClick={handleLetterClick}
+      />
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto p-6">
+        {/* Shows Table */}
+        <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-700">
+            <thead className="bg-gray-700">
+              <tr>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
+                  onClick={() => handleSort('title')}
+                >
+                  Title {sortConfig?.key === 'title' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
+                  onClick={() => handleSort('seasonCount')}
+                >
+                  Seasons {sortConfig?.key === 'seasonCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
+                  onClick={() => handleSort('episodeCount')}
+                >
+                  Episodes {sortConfig?.key === 'episodeCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-gray-800 divide-y divide-gray-700">
+              {sortedShows.map((show, idx) => {
+                const letter = show.title.charAt(0).toUpperCase();
+                // Attach ref only to the first show for each letter
+                const ref = firstIndexForLetter[letter] === idx
+                  ? (el: HTMLTableRowElement | null) => {
+                      letterRefs.current[letter] = el;
+                    }
+                  : undefined;
+                return (
+                  <tr
+                    key={show.id}
+                    ref={ref}
+                    className="hover:bg-gray-700"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      {show.title}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      {show.seasonCount}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      {show.episodeCount}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

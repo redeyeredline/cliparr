@@ -2,16 +2,13 @@
 import express from 'express';
 const router = express.Router();
 
-// Get shows with pagination
+// Get shows without pagination
 router.get('/', (req, res) => {
   const db = req.app.get('db');
   const logger = req.app.get('logger');
 
   try {
-    const page = parseInt(req.query.page) || 1;
-    const pageSize = parseInt(req.query.pageSize) || 10;
-
-    logger.info(`Fetching shows: page=${page}, pageSize=${pageSize}`);
+    logger.info('Fetching all shows (no pagination)');
 
     const query = `
       SELECT 
@@ -28,23 +25,16 @@ router.get('/', (req, res) => {
       LEFT JOIN episodes e ON e.season_id = se.id
       GROUP BY s.id, s.title, s.path, s.sonarr_id, s.status, s.overview, s.added_at
       ORDER BY s.title
-      LIMIT ? OFFSET ?
     `;
 
-    const offset = (page - 1) * pageSize;
-    const shows = db.prepare(query).all(pageSize, offset);
+    const shows = db.prepare(query).all();
+    const total = shows.length;
 
-    const totalQuery = 'SELECT COUNT(*) as total FROM shows';
-    const total = db.prepare(totalQuery).get().total;
-
-    logger.info(`Found ${shows.length} shows out of ${total} total`);
+    logger.info(`Found ${shows.length} shows in local database`);
 
     res.json({
       shows,
       total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
     });
   } catch (error) {
     logger.error('Failed to fetch shows:', error);

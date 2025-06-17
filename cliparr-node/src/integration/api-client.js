@@ -39,6 +39,11 @@ class ApiClient {
     return response.data;
   }
 
+  async getImportedShows() {
+    const response = await api.get('/shows');
+    return response.data.shows;
+  }
+
   async getShow(id) {
     const response = await api.get(`/shows/${id}`);
     return response.data;
