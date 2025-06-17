@@ -207,80 +207,84 @@ export default function ImportModal({
             {error}
           </div>
         )}
-        {loading ? (
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            {[...Array(5)].map((_, i) => (
-              <div key={i} style={loadingSkeletonStyle} />
-            ))}
-          </div>
-        ) : (
-          <>
-            <div style={{ flex: 1, overflow: 'auto' }}>
-              <table className="min-w-full divide-y divide-gray-700" style={tableStyle}>
-                <thead className="bg-gray-700">
-                  <tr>
-                    <th className="px-4 py-3 w-12 text-center align-middle">
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <table className="min-w-full divide-y divide-gray-700" style={tableStyle}>
+            <thead className="bg-gray-700">
+              <tr>
+                <th className="px-4 py-3 w-12 text-center align-middle">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleSelectAll}
+                    aria-label="Select all shows"
+                    className="align-middle"
+                    style={checkboxStyle}
+                  />
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Title</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Path</th>
+              </tr>
+            </thead>
+            <tbody className="bg-gray-800 divide-y divide-gray-700">
+              {loading
+                ? [...Array(5)].map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-2 w-12 text-center align-middle">
+                      <div className="bg-gray-700 rounded h-5 w-5 mx-auto animate-pulse" />
+                    </td>
+                    <td className="px-6 py-2">
+                      <div className="bg-gray-700 rounded h-5 w-3/4 animate-pulse" />
+                    </td>
+                    <td className="px-6 py-2">
+                      <div className="bg-gray-700 rounded h-5 w-2/3 animate-pulse" />
+                    </td>
+                  </tr>
+                ))
+                : shows.map((show) => (
+                  <tr key={show.id} className="fade-in">
+                    <td className="px-4 py-2 w-12 text-center align-middle">
                       <input
                         type="checkbox"
-                        checked={selectAll}
-                        onChange={handleSelectAll}
-                        aria-label="Select all shows"
+                        checked={selected.includes(show.id)}
+                        onChange={() => handleToggle(show.id)}
+                        aria-label={`Select show ${show.title}`}
                         className="align-middle"
                         style={checkboxStyle}
                       />
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Title</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Path</th>
+                    </td>
+                    <td className="px-6 py-2 whitespace-nowrap" style={tdStyle}>{show.title}</td>
+                    <td className="px-6 py-2 whitespace-nowrap" style={tdStyle}>{show.path}</td>
                   </tr>
-                </thead>
-                <tbody className="bg-gray-800 divide-y divide-gray-700">
-                  {shows.map((show) => (
-                    <tr key={show.id}>
-                      <td className="px-4 py-2 w-12 text-center align-middle">
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(show.id)}
-                          onChange={() => handleToggle(show.id)}
-                          aria-label={`Select show ${show.title}`}
-                          className="align-middle"
-                          style={checkboxStyle}
-                        />
-                      </td>
-                      <td className="px-6 py-2 whitespace-nowrap" style={tdStyle}>{show.title}</td>
-                      <td className="px-6 py-2 whitespace-nowrap" style={tdStyle}>{show.path}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '1rem',
-              marginTop: '1rem',
-              paddingTop: '1rem',
-              borderTop: '1px solid #333',
-            }}>
-              <button
-                onClick={handleOk}
-                disabled={selected.length === 0}
-                style={{
-                  ...primaryButtonStyle,
-                  opacity: selected.length === 0 ? 0.5 : 1,
-                  cursor: selected.length === 0 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Import Selected ({selected.length})
-              </button>
-              <button
-                onClick={onClose}
-                style={secondaryButtonStyle}
-              >
-                Cancel
-              </button>
-            </div>
-          </>
-        )}
+                ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: '1rem',
+          marginTop: '1rem',
+          paddingTop: '1rem',
+          borderTop: '1px solid #333',
+        }}>
+          <button
+            onClick={handleOk}
+            disabled={selected.length === 0}
+            style={{
+              ...primaryButtonStyle,
+              opacity: selected.length === 0 ? 0.5 : 1,
+              cursor: selected.length === 0 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Import Selected ({selected.length})
+          </button>
+          <button 
+            onClick={onClose}
+            style={secondaryButtonStyle}
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
