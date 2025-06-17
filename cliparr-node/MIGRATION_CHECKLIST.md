@@ -18,18 +18,16 @@
 - ✅ Database persistence (no longer wiped on start)
 
 ## 3. Import Modes & Background Tasks
-- ❌ Not yet implemented
-  - Need to implement:
-    ✅ Auto/import/none modes
-    - Background import task
-    - Manual import functionality (basic manual import via UI is working)
+- ✅ Auto/import/none modes
+- ✅ Background import task (with polling interval and UI)
+- ✅ Manual import functionality (basic manual import via UI is working)
 
 ## 4. API Endpoints
 - ✅ `/sonarr/unimported`
 - ✅ `/sonarr/import`
 - ✅ `/imported-shows`
 - ✅ `/series/{show_id}`
-- ❌ `/settings/import-mode`
+- ✅ `/settings/import-mode`
 - ❌ `/websocket-test`
 
 ## 5. WebSocket Events
@@ -87,4 +85,4 @@
 ---
 
 **Legend:**  
-✅ Complete  ⚠️ Needs verification or improvement  ❌ Not yet implemented 
+✅ Complete  ⚠️ Needs verification or improvement  ❌ Not yet implemented
