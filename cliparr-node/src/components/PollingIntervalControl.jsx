@@ -10,10 +10,11 @@ const INTERVAL_OPTIONS = [
   { label: '24 hours', value: 86400 },
 ];
 
-const PollingIntervalControl = () => {
+const PollingIntervalControl = ({ disabled = false }) => {
   const [currentInterval, setCurrentInterval] = useState(900);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showDisabledMsg, setShowDisabledMsg] = useState(false);
   const toast = useToast();
 
   // Fetch current interval on mount
@@ -54,24 +55,42 @@ const PollingIntervalControl = () => {
     }
   };
 
-  const currentLabel = INTERVAL_OPTIONS.find(opt => opt.value === currentInterval)?.label || '';
+  const handleDisabledClick = () => {
+    if (disabled) {
+      setShowDisabledMsg(true);
+      setTimeout(() => setShowDisabledMsg(false), 2000);
+    }
+  };
+
+  const currentLabel = INTERVAL_OPTIONS.find((opt) => opt.value === currentInterval)?.label || '';
 
   return (
-    <div className="flex flex-col items-center justify-center w-full">
+    <div className="flex flex-col items-center justify-center w-full relative">
       <label htmlFor="interval-select" className="font-semibold mb-2 text-lg text-center">Import Refresh Interval</label>
-      <select
-        id="interval-select"
-        value={currentInterval}
-        onChange={handleChange}
-        disabled={loading}
-        className="text-sm px-3 py-2 rounded-md border border-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition w-48 bg-gray-800 text-gray-100 placeholder-gray-400 text-center"
-      >
-        {INTERVAL_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      <p className={`text-sm mb-4 text-center ${disabled ? 'text-gray-600' : 'text-gray-400'}`} style={{ minHeight: 40 }}>
+        Defines how often Cliparr checks for new shows to import.
+      </p>
+      <div className="relative w-full flex justify-center">
+        <select
+          id="interval-select"
+          value={currentInterval}
+          onChange={handleChange}
+          disabled={loading || disabled}
+          className="text-sm px-3 py-2 rounded-md border border-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition w-48 bg-gray-800 text-gray-100 placeholder-gray-400 text-center"
+          onClick={handleDisabledClick}
+        >
+          {INTERVAL_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        {showDisabledMsg && (
+          <div className="absolute left-1/2 -translate-x-1/2 top-14 bg-gray-900 text-yellow-300 px-4 py-2 rounded shadow text-xs z-10 border border-yellow-400">
+            Disabled: Set Import Mode to Auto or Import to enable
+          </div>
+        )}
+      </div>
       {error && (
         <div className="mt-2 p-2 bg-red-100 text-red-800 rounded text-xs text-center w-full max-w-xs">
           {error}

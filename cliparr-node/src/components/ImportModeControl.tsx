@@ -1,71 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 
-function ImportModeControl() {
-  const [mode, setMode] = useState('loading...');
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+interface ImportModeControlProps {
+  value: string;
+  onValueChange: (mode: string) => void;
+  disabled?: boolean;
+}
 
-  // Fetch current mode
-  const fetchMode = async () => {
-    try {
-      const res = await fetch('http://localhost:8485/settings/import-mode');
-      const data = await res.json();
-      if (res.ok) {
-        setMode(data.mode);
-        setError(null);
-      } else {
-        setError(data.error || data.details || 'Failed to fetch import mode');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Network error');
-    }
-  };
-
-  // Set mode
-  const updateMode = async (newMode: string) => {
-    setSaving(true);
-    try {
-      const res = await fetch('http://localhost:8485/settings/import-mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: newMode }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMode(data.mode);
-        setError(null);
-      } else {
-        setError(data.error || data.details || 'Failed to set import mode');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Network error');
-    } finally {
-      setSaving(false);
-    }
+function ImportModeControl({ value, onValueChange, disabled = false }: ImportModeControlProps) {
+  // Descriptions for each mode
+  const modeDescriptions: Record<string, string> = {
+    auto: 'Automatically import all shows from Sonarr and schedule audio fingerprinting.',
+    import: 'Only schedule fingerprinting for shows you import manually.',
+    none: 'No automatic imports; you must import shows manually.',
   };
 
   useEffect(() => {
-    fetchMode();
-  }, []);
+    // No-op, just for consistency if you want to add effects later
+  }, [value]);
 
   return (
     <div className="flex flex-col items-center justify-center w-full">
       <label htmlFor="import-mode-select" className="font-semibold mb-2 text-lg text-center">Import Mode</label>
+      <p className="text-gray-400 text-sm mb-4 text-center" style={{ minHeight: 40 }}>
+        {modeDescriptions[value] || ''}
+      </p>
       <select
         id="import-mode-select"
-        value={mode}
-        onChange={(e) => updateMode(e.target.value)}
-        disabled={saving || mode === 'loading...'}
+        value={value}
+        onChange={(e) => onValueChange(e.target.value)}
+        disabled={disabled}
         className="border border-gray-700 rounded px-2 py-2 bg-gray-800 text-gray-100 w-48 focus:ring-2 focus:ring-blue-400 text-center"
       >
-        <option value="none">None</option>
-        <option value="import">Import</option>
         <option value="auto">Auto</option>
+        <option value="import">Import</option>
+        <option value="none">None</option>
       </select>
-      {saving && <span className="ml-2 text-sm text-gray-500">Saving...</span>}
-      {error && <div className="text-red-400 text-sm">Error: {error}</div>}
     </div>
   );
 }
 
-export default ImportModeControl; 
+export default ImportModeControl;
