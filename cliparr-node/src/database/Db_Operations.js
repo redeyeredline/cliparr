@@ -176,6 +176,28 @@ function setImportMode(db, mode) {
   }
 }
 
+function getPollingInterval(db) {
+  try {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('polling_interval');
+    return row ? parseInt(row.value, 10) : 300; // Default to 5 minutes (300 seconds)
+  } catch (error) {
+    logger.error('Failed to get polling interval:', error);
+    throw error;
+  }
+}
+
+function setPollingInterval(db, interval) {
+  try {
+    // Ensure interval is between 60 seconds (1 minute) and 3600 seconds (1 hour)
+    const validInterval = Math.max(60, Math.min(3600, interval));
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
+      .run('polling_interval', validInterval.toString());
+  } catch (error) {
+    logger.error('Failed to set polling interval:', error);
+    throw error;
+  }
+}
+
 export {
   getDb,
   insertShow,
@@ -191,5 +213,7 @@ export {
   withPerformanceLogging,
   getImportMode,
   setImportMode,
+  getPollingInterval,
+  setPollingInterval,
   logger,
 };

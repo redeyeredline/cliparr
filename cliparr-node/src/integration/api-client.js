@@ -84,6 +84,16 @@ class ApiClient {
     const response = await api.post('/sonarr/import', { showIds });
     return response.data;
   }
+
+  async getPollingInterval() {
+    const response = await api.get('/settings/polling-interval');
+    return response.data;
+  }
+
+  async setPollingInterval(interval) {
+    const response = await api.post('/settings/polling-interval', { interval });
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();
