@@ -3,6 +3,8 @@ import { apiClient } from '../integration/api-client';
 import { logger } from '../services/logger.frontend.js';
 import { wsClient } from '../services/websocket.frontend.js';
 import AlphabetSidebar from '../components/AlphabetSidebar';
+import { useToast } from '../components/ToastContext';
+import { FaTrash } from 'react-icons/fa';
 
 interface Show {
   id: number;
@@ -28,6 +30,8 @@ function HomePage() {
   const [shows, setShows] = useState<Show[]>([]);
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: keyof Show; direction: 'asc' | 'desc' } | null>(null);
+  const [selected, setSelected] = useState<number[]>([]);
+  const toast = useToast();
 
   // Map to store refs for the first show of each letter
   const letterRefs = useRef<{ [letter: string]: HTMLTableRowElement | null }>({});
@@ -161,14 +165,27 @@ function HomePage() {
     }
   }, [health, fetchShows]);
 
+  // Selection logic
+  const allSelected = selected.length === sortedShows.length && sortedShows.length > 0;
+  const handleSelectAll = () => {
+    setSelected(allSelected ? [] : sortedShows.map((show) => show.id));
+  };
+  const handleSelect = (id: number) => {
+    setSelected((prev) => prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]);
+  };
+  const handleDelete = async () => {
+    try {
+      const result = await apiClient.deleteShows(selected);
+      toast({ type: 'success', message: `${result.deleted} shows deleted` });
+      setSelected([]);
+      fetchShows();
+    } catch {
+      toast({ type: 'error', message: 'Failed to delete shows' });
+    }
+  };
+
   return (
     <div className="flex h-full">
-      {/* Alphabet Sidebar */}
-      <AlphabetSidebar
-        letters={availableLetters}
-        activeLetter={activeLetter}
-        onLetterClick={handleLetterClick}
-      />
       {/* Main Content */}
       <div className="flex-1 overflow-auto p-6">
         {/* Shows Table */}
@@ -176,6 +193,15 @@ function HomePage() {
           <table className="min-w-full divide-y divide-gray-700">
             <thead className="bg-gray-700">
               <tr>
+                <th className="px-4 py-3 w-12 text-center align-middle">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={handleSelectAll}
+                    aria-label="Select all shows"
+                    className="align-middle"
+                  />
+                </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort('title')}
@@ -197,36 +223,52 @@ function HomePage() {
               </tr>
             </thead>
             <tbody className="bg-gray-800 divide-y divide-gray-700">
-              {sortedShows.map((show, idx) => {
-                const letter = show.title.charAt(0).toUpperCase();
-                // Attach ref only to the first show for each letter
-                const ref = firstIndexForLetter[letter] === idx
-                  ? (el: HTMLTableRowElement | null) => {
-                      letterRefs.current[letter] = el;
-                    }
-                  : undefined;
-                return (
-                  <tr
-                    key={show.id}
-                    ref={ref}
-                    className="hover:bg-gray-700"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {show.title}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {show.seasonCount}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {show.episodeCount}
-                    </td>
-                  </tr>
-                );
-              })}
+              {sortedShows.map((show, idx) => (
+                <tr key={show.id} ref={(el) => {
+                  const letter = show.title.charAt(0).toUpperCase();
+                  if (firstIndexForLetter[letter] === idx) {
+                    letterRefs.current[letter] = el;
+                  }
+                }}>
+                  <td className="px-4 py-2 w-12 text-center align-middle">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(show.id)}
+                      onChange={() => handleSelect(show.id)}
+                      aria-label={`Select show ${show.title}`}
+                      className="align-middle"
+                    />
+                  </td>
+                  <td className="px-6 py-2 whitespace-nowrap">{show.title}</td>
+                  <td className="px-6 py-2 whitespace-nowrap">{show.seasonCount}</td>
+                  <td className="px-6 py-2 whitespace-nowrap">{show.episodeCount}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
+        {/* Fixed bottom bar for deletion */}
+        {selected.length > 0 && (
+          <div
+            className="fixed bottom-0 left-0 w-full bg-gray-900 border-t border-gray-700 flex justify-end items-center p-4 z-50"
+            style={{ boxShadow: '0 -2px 8px rgba(0,0,0,0.3)' }}
+          >
+            <span className="text-gray-300 mr-4">{selected.length} series selected</span>
+            <button
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-8 rounded shadow text-lg"
+            >
+              Delete
+            </button>
+          </div>
+        )}
       </div>
+      {/* Alphabet Sidebar on the right */}
+      <AlphabetSidebar
+        letters={availableLetters}
+        activeLetter={activeLetter}
+        onLetterClick={handleLetterClick}
+      />
     </div>
   );
 }

@@ -99,6 +99,11 @@ class ApiClient {
     const response = await api.post('/settings/polling-interval', { interval });
     return response.data;
   }
+
+  async deleteShows(ids) {
+    const response = await api.post('/shows/delete', { ids });
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();

@@ -28,7 +28,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               <button
                 key={item.label}
                 onClick={openImportModal}
-                className={`w-full flex items-center space-x-3 px-4 py-2 rounded-lg mb-2 transition-colors text-gray-300 hover:bg-gray-700 hover:text-white focus:bg-gray-700 focus:text-white`}
+                className="w-full flex items-center space-x-3 px-4 py-2 rounded-lg mb-2 transition-colors text-gray-300 hover:bg-gray-700 hover:text-white focus:bg-gray-700 focus:text-white"
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
