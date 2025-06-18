@@ -85,15 +85,17 @@
 
 
 currently broken
-  import modal ui works like shit 
-  radio buttons for import mode settings and proper saving and reading of import mode state
-    test auto import mode once the backed is fixed
+  ✅import modal ui works like shit 
+  ✅radio buttons for import mode settings and proper saving and reading of import mode state
+   ✅ test auto import mode once the backed is fixed
   Add hover/focus states
-    Make sure the dropdown and segmented controls have visible hover and focus outlines (e.g. a bright accent glow) so keyboard users and mouse users get clear feedback.
+    Make sure the  segmented controls have visible hover and focus outlines (e.g. a bright accent glow) so keyboard users and mouse users get clear feedback.
   Enhance affordance on the divider
     The thin line divides content, but you could add a subtle drop-shadow or slightly darker line to strengthen the separation, especially on very large screens.
   Responsive behavior
     On narrower viewports, you may want the two sections to stack vertically rather than squeeze horizontally. Ensuring both labels and controls wrap cleanly will maintain ease of use on tablet or phone.
   the alphabet bar should expand to fill all avail vertical space more gracefully
-  
+  when shows import for some reason they are not brough in alphabetically
+    likely due to how the api call sshows based on sonarr_id, should review if can switch to pulling by show name or cache the import and relist it by name before performing import. 
+  the home page randomly refrehses. repeatedly
   a previous chat was going to review tdarr to see its mongo db setup in the background to advise on more robust db solution

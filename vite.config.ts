@@ -29,7 +29,15 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 8484, // Frontend port
     watch: {
-      ignored: ['**/src/database/data/**'], // Ignore DB changes
+      ignored: ['**/src/database/data/**', '**/src/integration/**', '**/src/services/**'], // Ignore backend files
+    },
+    hmr: {
+      // Customize HMR behavior
+      timeout: 5000,
+      overlay: true,
+      // Don't reload the page for these files
+      path: '@vite/client',
+      clientPort: 8484,
     },
   },
   build: {

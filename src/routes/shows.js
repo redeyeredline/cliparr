@@ -17,7 +17,6 @@ router.get('/', (req, res) => {
         s.title, 
         s.path
       FROM shows s
-      ORDER BY s.title
     `;
 
     const shows = db.prepare(query).all();

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { apiClient } from '../integration/api-client';
 import { logger } from '../services/logger.frontend.js';
 import { wsClient } from '../services/websocket.frontend.js';
@@ -26,23 +26,6 @@ interface PaginatedResponse {
   totalPages: number;
 }
 
-// Helper to sort shows according to sortConfig
-function sortShows(shows: Show[], sortConfig: { key: keyof Show; direction: 'asc' | 'desc' } | null): Show[] {
-  if (!sortConfig) {
-    return shows;
-  }
-  const { key, direction } = sortConfig;
-  return [...shows].sort((a, b) => {
-    if (a[key] < b[key]) {
-      return direction === 'asc' ? -1 : 1;
-    }
-    if (a[key] > b[key]) {
-      return direction === 'asc' ? 1 : -1;
-    }
-    return 0;
-  });
-}
-
 function HomePage() {
   const [health, setHealth] = useState('checking...');
   const [wsStatus, setWsStatus] = useState('disconnected');
@@ -52,111 +35,86 @@ function HomePage() {
   const [healthCheckMsg, setHealthCheckMsg] = useState<string | null>(null);
   const [shows, setShows] = useState<Show[]>([]);
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Show; direction: 'asc' | 'desc' } | null>(null);
+  const [sortKey, setSortKey] = useState<keyof Show>('title');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selected, setSelected] = useState<number[]>([]);
   const toast = useToast();
 
   // Map to store refs for the first show of each letter
   const letterRefs = useRef<{ [letter: string]: HTMLTableRowElement | null }>({});
+  const healthCheckRef = useRef<boolean>(false);
 
   // Get available letters from shows
-  const availableLetters = [...new Set(shows.map((show) => show.title.charAt(0).toUpperCase()))].sort();
+  const availableLetters = useMemo(() => {
+    const letters = shows.map((show) => show.title.charAt(0).toUpperCase());
+    return [...new Set(letters)].sort();
+  }, [shows]);
 
-  // Sort shows based on current sort config
-  const sortedShows = [...shows].sort((a, b) => {
-    if (!sortConfig) {
-      return 0;
-    }
-    const { key, direction } = sortConfig;
-    if (a[key] < b[key]) {
-      return direction === 'asc' ? -1 : 1;
-    }
-    if (a[key] > b[key]) {
-      return direction === 'asc' ? 1 : -1;
-    }
-    return 0;
-  });
+  // Sort shows
+  const sortedShows = useMemo(() => {
+    // Create array of indices for stable sort
+    const indexed = shows.map((show, index) => ({ show, index }));
 
-  // Find the first index for each letter
-  const firstIndexForLetter: { [letter: string]: number } = {};
-  sortedShows.forEach((show, idx) => {
-    const letter = show.title.charAt(0).toUpperCase();
-    if (firstIndexForLetter[letter] === undefined) {
-      firstIndexForLetter[letter] = idx;
-    }
-  });
+    // Debug log the current shows and sort config
+    console.log('Current sort config:', { sortKey, sortDirection });
+    console.log('Shows before sort:', indexed.map(({ show }) => ({
+      id: show.id,
+      title: show.title,
+      path: show.path,
+    })));
 
-  // Scroll to the first show with the selected letter
-  const handleLetterClick = (letter: string) => {
-    setActiveLetter(letter);
-    const ref = letterRefs.current[letter];
-    if (ref) {
-      ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  };
+    // Sort with index as tiebreaker for stability
+    indexed.sort((a, b) => {
+      const aVal = String(a.show[sortKey]);
+      const bVal = String(b.show[sortKey]);
 
-  const handleSort = (key: keyof Show) => {
-    setSortConfig((current) => ({
-      key,
-      direction: current?.key === key && current.direction === 'asc' ? 'desc' : 'asc',
-    }));
-  };
-
-  const fetchShows = useCallback(async () => {
-    try {
-      const data = await apiClient.getShows();
-      setShows(data.shows);
-    } catch (err) {
-      logger.error('Failed to fetch shows:', err);
-      setError('Failed to fetch shows');
-    }
-  }, []);
-
-  useEffect(() => {
-    // Set up WebSocket event listeners
-    const handleConnection = (data: { status: string }) => {
-      setWsStatus(data.status);
-      if (data.status === 'error') {
-        setError('WebSocket connection failed');
-      } else {
-        setError(null);
+      // Debug log comparison values for Bill Burr shows
+      if (aVal.includes('Bill Burr') || bVal.includes('Bill Burr')) {
+        console.log('Comparing Bill Burr shows:', {
+          a: { id: a.show.id, title: a.show.title, path: a.show.path, index: a.index },
+          b: { id: b.show.id, title: b.show.title, path: b.show.path, index: b.index },
+          sortKey,
+          aVal,
+          bVal,
+        });
       }
-    };
 
-    const handleError = () => {
-      setWsStatus('error');
-      setError('WebSocket connection failed');
-    };
+      const compareResult = aVal.localeCompare(bVal, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
 
-    // Add event listeners
-    wsClient.addEventListener('connection', handleConnection);
-    wsClient.addEventListener('error', handleError);
-
-    // Add import_progress listener for real-time show updates
-    const handleImportProgress = async (data: any) => {
-      if (data.type === 'import_progress' && data.status === 'completed' && data.showId) {
-        try {
-          const newShow = await apiClient.getShow(data.showId);
-          setShows((prevShows) => {
-            // Replace or add the new show
-            const filtered = prevShows.filter((s) => s.id !== newShow.id);
-            const updated = [...filtered, newShow];
-            return sortShows(updated, sortConfig);
-          });
-        } catch (err) {
-          logger.error('Failed to fetch new show:', err);
-        }
+      // If values are equal, use original index for stable sort
+      if (compareResult === 0) {
+        return a.index - b.index;
       }
-    };
-    wsClient.addEventListener('message', handleImportProgress);
 
-    // Cleanup
-    return () => {
-      wsClient.removeEventListener('connection', handleConnection);
-      wsClient.removeEventListener('error', handleError);
-      wsClient.removeEventListener('message', handleImportProgress);
-    };
-  }, [sortConfig]);
+      return sortDirection === 'asc' ? compareResult : -compareResult;
+    });
+
+    const sorted = indexed.map(({ show }) => show);
+
+    // Debug log the final sorted result
+    console.log('Shows after sort:', sorted.map((show) => ({
+      id: show.id,
+      title: show.title,
+      path: show.path,
+    })));
+
+    return sorted;
+  }, [shows, sortKey, sortDirection]);
+
+  // Find the first index for each letter based on sorted shows for letter navigation
+  const firstIndexForLetter = useMemo(() => {
+    const indices: { [letter: string]: number } = {};
+    sortedShows.forEach((show, idx) => {
+      const letter = show.title.charAt(0).toUpperCase();
+      if (indices[letter] === undefined) {
+        indices[letter] = idx;
+      }
+    });
+    return indices;
+  }, [sortedShows]);
 
   const testDatabase = useCallback(async () => {
     try {
@@ -172,6 +130,11 @@ function HomePage() {
   }, []);
 
   const checkHealth = useCallback(async () => {
+    if (healthCheckRef.current) {
+      return;
+    }
+    healthCheckRef.current = true;
+
     setIsLoading(true);
     setError(null);
     setHealthCheckMsg(null);
@@ -180,7 +143,7 @@ function HomePage() {
       setHealth(data.status);
       if (data.status === 'healthy') {
         wsClient.connect();
-        testDatabase();
+        await testDatabase();
         setHealthCheckMsg('✅ Server health check successful!');
         logger.info('Health check result:', data);
       } else {
@@ -194,18 +157,105 @@ function HomePage() {
       setError('Failed to connect to server');
     } finally {
       setIsLoading(false);
+      healthCheckRef.current = false;
     }
   }, [testDatabase]);
 
+  const fetchShows = useCallback(async () => {
+    try {
+      const data = await apiClient.getShows();
+      setShows(data.shows);
+    } catch (err) {
+      logger.error('Failed to fetch shows:', err);
+      setError('Failed to fetch shows');
+    }
+  }, []);
+
+  // Combined useEffect for initialization and cleanup
   useEffect(() => {
+    let mounted = true;
+
+    // Set up WebSocket event listeners
+    const handleConnection = (data: { status: string }) => {
+      if (!mounted) {
+        return;
+      }
+      setWsStatus(data.status);
+      if (data.status === 'error') {
+        setError('WebSocket connection failed');
+      } else {
+        setError(null);
+      }
+    };
+
+    const handleError = () => {
+      if (!mounted) {
+        return;
+      }
+      setWsStatus('error');
+      setError('WebSocket connection failed');
+    };
+
+    // Add import_progress listener for real-time show updates
+    const handleImportProgress = async (data: any) => {
+      if (!mounted) {
+        return;
+      }
+      if (data.type === 'import_progress' && data.status === 'completed' && data.showId) {
+        try {
+          const newShow = await apiClient.getShow(data.showId);
+          setShows((prevShows) => {
+            const filtered = prevShows.filter((s) => s.id !== newShow.id);
+            return [...filtered, newShow];
+          });
+        } catch (err) {
+          logger.error('Failed to fetch new show:', err);
+        }
+      }
+    };
+
+    // Add event listeners
+    wsClient.addEventListener('connection', handleConnection);
+    wsClient.addEventListener('error', handleError);
+    wsClient.addEventListener('message', handleImportProgress);
+
+    // Initial setup
     checkHealth();
+
+    // Cleanup
+    return () => {
+      mounted = false;
+      wsClient.removeEventListener('connection', handleConnection);
+      wsClient.removeEventListener('error', handleError);
+      wsClient.removeEventListener('message', handleImportProgress);
+    };
   }, [checkHealth]);
 
+  // Fetch shows when health is good
   useEffect(() => {
     if (health === 'healthy') {
       fetchShows();
     }
   }, [health, fetchShows]);
+
+  // Scroll to the first show with the selected letter
+  const handleLetterClick = (letter: string) => {
+    setActiveLetter(letter);
+    const ref = letterRefs.current[letter];
+    if (ref) {
+      ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  const handleSort = (key: keyof Show) => {
+    setSortDirection((current) => {
+      if (key === sortKey) {
+        return current === 'asc' ? 'desc' : 'asc';
+      }
+      return 'asc';
+    });
+    setSortKey(key);
+  };
 
   // Selection logic
   const allSelected = selected.length === sortedShows.length && sortedShows.length > 0;
@@ -238,8 +288,8 @@ function HomePage() {
                 <th className="px-4 py-3 w-12 text-center align-middle">
                   <input
                     type="checkbox"
-                    checked={allSelected}
-                    onChange={handleSelectAll}
+                    checked={selected.length === sortedShows.length && sortedShows.length > 0}
+                    onChange={() => setSelected(selected.length === sortedShows.length ? [] : sortedShows.map((s) => s.id))}
                     aria-label="Select all shows"
                     className="align-middle"
                   />
@@ -248,13 +298,13 @@ function HomePage() {
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort('title')}
                 >
-                  Title {sortConfig?.key === 'title' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  Title {sortKey === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort('path')}
                 >
-                  Path {sortConfig?.key === 'path' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  Path {sortKey === 'path' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
               </tr>
             </thead>

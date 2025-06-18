@@ -7,13 +7,17 @@ class WebSocketClient {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 5000;
+    this.isConnecting = false;
+    this.lastConnectionState = null;
   }
 
   connect() {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      logger.debug('WebSocket already connected');
+    if (this.ws?.readyState === WebSocket.OPEN || this.isConnecting) {
+      logger.debug('WebSocket already connected or connecting');
       return;
     }
+
+    this.isConnecting = true;
 
     try {
       this.ws = new WebSocket('ws://localhost:8485/ws');
@@ -21,7 +25,11 @@ class WebSocketClient {
       this.ws.onopen = () => {
         logger.info('WebSocket connected');
         this.reconnectAttempts = 0;
-        this.notifyListeners('connection', { status: 'connected' });
+        this.isConnecting = false;
+        if (this.lastConnectionState !== 'connected') {
+          this.lastConnectionState = 'connected';
+          this.notifyListeners('connection', { status: 'connected' });
+        }
       };
 
       this.ws.onmessage = (event) => {
@@ -40,7 +48,11 @@ class WebSocketClient {
 
       this.ws.onclose = () => {
         logger.info('WebSocket disconnected');
-        this.notifyListeners('connection', { status: 'disconnected' });
+        this.isConnecting = false;
+        if (this.lastConnectionState !== 'disconnected') {
+          this.lastConnectionState = 'disconnected';
+          this.notifyListeners('connection', { status: 'disconnected' });
+        }
 
         // Attempt to reconnect if not at max attempts
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -50,6 +62,7 @@ class WebSocketClient {
       };
     } catch (error) {
       logger.error('Failed to create WebSocket connection:', error);
+      this.isConnecting = false;
       this.notifyListeners('error', error);
     }
   }
@@ -58,6 +71,8 @@ class WebSocketClient {
     if (this.ws) {
       this.ws.close();
       this.ws = null;
+      this.isConnecting = false;
+      this.lastConnectionState = null;
     }
   }
 

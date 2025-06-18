@@ -96,7 +96,6 @@ function getImportedShows(db, page = 1, pageSize = 100) {
   const shows = db.prepare(
     `SELECT s.id, s.title, s.path
        FROM shows s
-      ORDER BY s.title
       LIMIT ? OFFSET ?`,
   ).all(sz, offset);
   const total = db.prepare('SELECT COUNT(*) AS count FROM shows').get().count;

@@ -6,6 +6,7 @@ export class ImportTaskManager {
     this.wss = wss;
     this.taskInterval = null;
     this.isRunning = false;
+    this.shutdownRequested = false;
   }
 
   start() {
@@ -26,13 +27,25 @@ export class ImportTaskManager {
     this.isRunning = true;
   }
 
-  stop() {
+  async stop() {
+    logger.info('Stopping import task...');
+    this.shutdownRequested = true;
+
+    // Clear the interval immediately
     if (this.taskInterval) {
       clearInterval(this.taskInterval);
       this.taskInterval = null;
-      this.isRunning = false;
-      logger.info('Import task stopped');
     }
+
+    // Wait for any running task to complete
+    while (this.isRunning) {
+      logger.info('Waiting for running import task to complete...');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    this.isRunning = false;
+    this.shutdownRequested = false;
+    logger.info('Import task stopped');
   }
 
   updateInterval() {
@@ -145,10 +158,10 @@ export class ImportTaskManager {
       return;
     }
 
-    this.isRunning = true;
-    const db = getDb();
-
     try {
+      this.isRunning = true;
+      const db = getDb();
+
       const mode = getImportMode(db);
       logger.info(`Running import task in ${mode} mode (${isInitialRun ? 'initial run' : 'refresh'})`);
 
@@ -158,6 +171,11 @@ export class ImportTaskManager {
         isInitialRun,
         timestamp: new Date().toISOString(),
       });
+
+      if (this.shutdownRequested) {
+        logger.info('Shutdown requested, skipping import task');
+        return;
+      }
 
       if (mode === 'auto' || (mode === 'import' && isInitialRun)) {
         // Get all shows from Sonarr
@@ -259,7 +277,7 @@ export class ImportTaskManager {
       });
 
     } catch (error) {
-      logger.error('Import task failed:', error);
+      logger.error('Error in import task:', error);
       this.broadcastStatus({
         status: 'error',
         error: error.message,
