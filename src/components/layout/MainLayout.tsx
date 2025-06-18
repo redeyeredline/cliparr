@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useImportModal } from '../ImportModalProvider';
 import { useKeyboardNavigation, useFocusRestoration } from '../../utils/keyboardNavigation';
@@ -14,6 +14,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const mainContentRef = useRef<HTMLDivElement>(null);
   const { useKeyboardShortcuts, useSkipToContent } = useKeyboardNavigation();
   const { saveFocus, restoreFocus } = useFocusRestoration();
+  const [activeItem, setActiveItem] = useState('/');
 
   const navItems = [
     { path: '/', label: 'Home', icon: '🏠', shortcut: 'h' },
@@ -21,14 +22,29 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     { path: '/settings', label: 'Settings', icon: '⚙️', shortcut: 's' },
   ];
 
+  // Update active item when location changes
+  useEffect(() => {
+    setActiveItem(location.pathname);
+  }, [location]);
+
   // Keyboard shortcuts for navigation
   const shortcuts = {
-    'h': () => navigate('/'),
-    's': () => navigate('/settings'),
-    'i': () => openImportModal(),
+    'h': () => {
+      setActiveItem('/');
+      navigate('/');
+    },
+    's': () => {
+      setActiveItem('/settings');
+      navigate('/settings');
+    },
+    'i': () => {
+      setActiveItem('import-modal');
+      openImportModal();
+    },
     'Escape': () => {
       // Close any open modals or return to previous page
       if (location.pathname !== '/') {
+        setActiveItem('/');
         navigate('/');
       }
     },
@@ -44,6 +60,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const handleNavClick = (item: typeof navItems[0]) => {
     saveFocus();
+    setActiveItem(item.path);
     if (item.isImport) {
       openImportModal();
     } else {
@@ -80,10 +97,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               onClick={() => handleNavClick(item)}
               onKeyDown={(e) => handleKeyPress(e, item)}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 transition-all duration-200 text-gray-300 hover:bg-gray-700 hover:text-white focus:bg-gray-700 focus:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 ${
-                location.pathname === item.path ? ' bg-gray-700 text-white' : ''
+                activeItem === item.path ? ' bg-blue-900/50 text-white' : ''
               }`}
               aria-label={`${item.label}${item.shortcut ? ` (Press ${item.shortcut.toUpperCase()})` : ''}`}
-              aria-current={location.pathname === item.path ? 'page' : undefined}
+              aria-current={activeItem === item.path ? 'page' : undefined}
             >
               <span aria-hidden="true">{item.icon}</span>
               <span>{item.label}</span>
