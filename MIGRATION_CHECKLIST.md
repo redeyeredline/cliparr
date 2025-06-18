@@ -100,7 +100,7 @@ currently broken
         Rather than full pagination/search, you can chunk your virtualized list by first‐letter headers—i.e. one sticky “A” row, then all “A…” shows, then “B,” etc. Scanning a thousand items becomes way more navigable, and it only adds a tiny bit of markup in your render loop.
   Loading / empty states
     Show a subtle skeleton row animation while data is loading.
-    If no shows are present, display a friendly illustration + “Click Import to get started” call-to-action.
+    ✅ If no shows are present, display a friendly illustration + “Click Import to get started” call-to-action.
   Shift‐click range-select
     Right now you’ve got individual checkboxes—allow holding Shift to select a contiguous block. It maps exactly to desktop expectations and only adds a handful of lines to your click-handler logic
   Overall remove some extra spacing and padding in the nav bar and the main table to tighten things up
