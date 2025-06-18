@@ -88,10 +88,21 @@ currently broken
   ✅import modal ui works like shit 
   ✅radio buttons for import mode settings and proper saving and reading of import mode state
    ✅ test auto import mode once the backed is fixed
-  Add hover/focus states
-    Make sure the  segmented controls have visible hover and focus outlines (e.g. a bright accent glow) so keyboard users and mouse users get clear feedback.
+  ✅ Add hover/focus states
+   ✅ Make sure the  segmented controls have visible hover and focus outlines (e.g. a bright accent glow) so keyboard users and mouse users get clear feedback.
   Enhance affordance on the divider
     The thin line divides content, but you could add a subtle drop-shadow or slightly darker line to strengthen the separation, especially on very large screens.
+  need a hamburger nav or transform the table into a card list on mobile.
+  Virtual scrolling
+        Even if you don’t paginate, windowed rendering (only mounting rows in view) will keep scroll performance rock-solid once you hit thousands of entries.
+    Alphabetical grouping (A → Z)
+        Rather than full pagination/search, you can chunk your virtualized list by first‐letter headers—i.e. one sticky “A” row, then all “A…” shows, then “B,” etc. Scanning a thousand items becomes way more navigable, and it only adds a tiny bit of markup in your render loop.
+  Loading / empty states
+    Show a subtle skeleton row animation while data is loading.
+    If no shows are present, display a friendly illustration + “Click Import to get started” call-to-action.
+  Shift‐click range-select
+    Right now you’ve got individual checkboxes—allow holding Shift to select a contiguous block. It maps exactly to desktop expectations and only adds a handful of lines to your click-handler logic
+  Overall remove some extra spacing and padding in the nav bar and the main table to tighten things up
   Responsive behavior
     On narrower viewports, you may want the two sections to stack vertically rather than squeeze horizontally. Ensuring both labels and controls wrap cleanly will maintain ease of use on tablet or phone.
   the alphabet bar should expand to fill all avail vertical space more gracefully
