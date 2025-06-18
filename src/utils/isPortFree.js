@@ -1,18 +1,24 @@
-// src/utils/isPortFree.js
-import http from 'http';
+import net from 'net';
 
 /**
- * Returns true if the given port is already in use.
- * @param {number} port
- * @returns {Promise<boolean>}
+ * Check if a port is in use
+ * @param {number} port - The port to check
+ * @returns {Promise<boolean>} - True if port is in use, false otherwise
  */
 export function isPortInUse(port) {
   return new Promise((resolve) => {
-    const tester = http.createServer();
-    tester.once('error', () => resolve(true));
-    tester.once('listening', () =>
-      tester.close(() => resolve(false)),
-    );
-    tester.listen(port);
+    const server = net.createServer()
+      .once('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          resolve(true);
+        } else {
+          resolve(false);
+        }
+      })
+      .once('listening', () => {
+        server.close();
+        resolve(false);
+      })
+      .listen(port);
   });
-}
+} 

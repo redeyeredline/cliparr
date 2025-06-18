@@ -40,11 +40,14 @@
 - ✅ Health check endpoint
 - ✅ Database connection status indicator on frontend
 - ❌ Performance logging/diagnostics endpoint
+- ❌ database health endpoint
+- ❌ database health check/status/report warnings/errors/thresholds if db having perf issues
 
 ## 8. Error Handling & Logging
 - ✅ Basic error handling and logging in backend
 - ✅ Logging for Sonarr API, DB, and WebSocket
 - ⚠️ Comprehensive error handling for all endpoints (incomplete)
+- ❌ log file handling page similar to sonarr or better
 
 ## 9. Frontend Features & UI
 - ❌ Alphabet Sidebar
