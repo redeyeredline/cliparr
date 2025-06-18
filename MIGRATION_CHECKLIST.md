@@ -103,7 +103,7 @@
       Show a subtle skeleton row animation while data is loading
 - ❌ Shift‐click range-select
       Right now you've got individual checkboxes—allow holding Shift to select a contiguous block. It maps exactly to desktop expectations and only adds a handful of lines to your click-handler logic
-- ❌ Overall remove some extra spacing and padding in the nav bar and the main table to tighten things up
+- ✅ Overall remove some extra spacing and padding in the nav bar and the main table to tighten things up
       remove excess spacing from all tables 1 px at a time and see changes to find one i like
 
 ## 13. Mobile & Responsive Tasks
@@ -111,12 +111,19 @@
 - ❌ Responsive behavior
       On narrower viewports, you may want the two sections to stack vertically rather than squeeze horizontally. Ensuring both labels and controls wrap cleanly will maintain ease of use on tablet or phone
 - ❌ the alphabet bar should expand to fill all avail vertical space more gracefully
-- ❌ properly add an alphabet bar to the import modal 
-- ❌ fix scroll bars site wide to remove the up and down arrows
+- ✅ properly add an alphabet bar to the import modal 
+- ✅ fix scroll bars site wide to remove the up and down arrows
 
 ## 14. Bug Fixes & Issues
 - ❌ the home page randomly refrehses. repeatedly
 - ✅ we lost the tooltip on why the import refresh is grayed out
+- ❌ CRITICAL: Test and verify ALL UI elements work correctly across browsers (Firefox, Chrome, Safari, Edge)
+      - Scrollbars display and function properly
+      - Tooltips position correctly
+      - Modals and overlays render properly
+      - CSS animations and transitions work
+      - Form elements are consistent
+      - No browser-specific styling bugs
 
 ## 15. Infrastructure Investigation
 - ❌ a previous chat was going to review tdarr to see its mongo db setup in the background to advise on more robust db solution

@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { useShiftSelect } from '../utils/selectionUtils';
 
 interface Season {
   seasonNumber: number;
@@ -137,13 +138,20 @@ export default function ImportModal({
   loading = false,
   error = null,
 }: ImportModalProps) {
-  const [selected, setSelected] = useState<number[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
+  const {
+    selected,
+    handleToggle,
+    selectAll: selectAllItems,
+    deselectAll,
+    isSelected,
+  } = useShiftSelect({
+    items: shows,
+    getId: (show) => show.id,
+  });
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setSelected([]);
-    setSelectAll(false);
+    deselectAll();
   }, [shows, open]);
 
   useEffect(() => {
@@ -169,24 +177,16 @@ export default function ImportModal({
     }
   };
 
-  const handleToggle = (id: number) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id],
-    );
-  };
-
   const handleSelectAll = () => {
-    if (selectAll) {
-      setSelected([]);
-      setSelectAll(false);
+    if (selected.length === shows.length) {
+      deselectAll();
     } else {
-      setSelected(shows.map((show) => show.id));
-      setSelectAll(true);
+      selectAllItems();
     }
   };
 
   const handleOk = () => {
-    onImport(selected);
+    onImport(selected as number[]);
   };
 
   return (
@@ -219,14 +219,13 @@ export default function ImportModal({
         >
           {loading && (
             <div
+              className="skeleton-loading"
               style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
                 bottom: 0,
-                background: '#2a2a2a',
-                animation: 'pulse 1.5s infinite',
                 borderRadius: '4px',
                 zIndex: 1,
               }}
@@ -238,7 +237,7 @@ export default function ImportModal({
                 <th style={thStyle}>
                   <input
                     type="checkbox"
-                    checked={selectAll}
+                    checked={shows.length > 0 && selected.length === shows.length}
                     onChange={handleSelectAll}
                     style={checkboxStyle}
                   />
@@ -253,8 +252,8 @@ export default function ImportModal({
                   <td style={tdStyle}>
                     <input
                       type="checkbox"
-                      checked={selected.includes(show.id)}
-                      onChange={() => handleToggle(show.id)}
+                      checked={isSelected(show.id)}
+                      onChange={(e) => handleToggle(show.id, e.nativeEvent as unknown as React.MouseEvent)}
                       style={checkboxStyle}
                     />
                   </td>

@@ -6,6 +6,7 @@ import AlphabetSidebar from '../components/AlphabetSidebar';
 import { useToast } from '../components/ToastContext';
 import { FaTrash, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import EmptyState from '../components/EmptyState';
+import { useShiftSelect } from '../utils/selectionUtils';
 
 interface Show {
   id: number;
@@ -48,6 +49,7 @@ const getDisplayLetter = (title: string): string => {
 };
 
 function HomePage() {
+  // State hooks
   const [health, setHealth] = useState('checking...');
   const [wsStatus, setWsStatus] = useState('disconnected');
   const [dbStatus, setDbStatus] = useState<DbStatus | null>(null);
@@ -58,10 +60,9 @@ function HomePage() {
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<keyof Show>('title');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selected, setSelected] = useState<number[]>([]);
   const toast = useToast();
 
-  // Map to store refs for the first show of each letter
+  // Refs
   const letterRefs = useRef<{ [letter: string]: HTMLTableRowElement | null }>({});
   const healthCheckRef = useRef<boolean>(false);
   const tableRef = useRef<HTMLTableElement>(null);
@@ -74,20 +75,15 @@ function HomePage() {
 
   // Sort shows
   const sortedShows = useMemo(() => {
-    // Create array of indices for stable sort
     const indexed = shows.map((show, index) => ({ show, index }));
-
-    // Sort with index as tiebreaker for stability
     indexed.sort((a, b) => {
       let aVal: string;
       let bVal: string;
 
       if (sortKey === 'title') {
-        // Use sortable title for title sorting
         aVal = getSortableTitle(a.show.title);
         bVal = getSortableTitle(b.show.title);
       } else {
-        // Use original value for other fields
         aVal = String(a.show[sortKey]);
         bVal = String(b.show[sortKey]);
       }
@@ -97,7 +93,6 @@ function HomePage() {
         sensitivity: 'base',
       });
 
-      // If values are equal, use original index for stable sort
       if (compareResult === 0) {
         return a.index - b.index;
       }
@@ -105,12 +100,10 @@ function HomePage() {
       return sortDirection === 'asc' ? compareResult : -compareResult;
     });
 
-    const sorted = indexed.map(({ show }) => show);
-
-    return sorted;
+    return indexed.map(({ show }) => show);
   }, [shows, sortKey, sortDirection]);
 
-  // Find the first index for each letter based on sorted shows for letter navigation
+  // Find the first index for each letter based on sorted shows
   const firstIndexForLetter = useMemo(() => {
     const indices: { [letter: string]: number } = {};
     sortedShows.forEach((show, idx) => {
@@ -121,6 +114,26 @@ function HomePage() {
     });
     return indices;
   }, [sortedShows]);
+
+  // Initialize shift-select
+  const shiftSelect = useShiftSelect({
+    items: sortedShows,
+    getId: (show) => show.id,
+  });
+
+  const { selected, handleToggle, selectAll, deselectAll, isSelected } = shiftSelect;
+
+  // Event handlers
+  const handleSelect = (showId: number, event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>) => {
+    const isNativeEvent = event instanceof MouseEvent;
+    const shiftKey = isNativeEvent ? event.shiftKey : (event.nativeEvent as MouseEvent).shiftKey;
+    handleToggle(showId, {
+      shiftKey,
+      preventDefault: () => {},
+      stopPropagation: () => {},
+      nativeEvent: isNativeEvent ? event : event.nativeEvent,
+    } as React.MouseEvent);
+  };
 
   const testDatabase = useCallback(async () => {
     try {
@@ -244,14 +257,12 @@ function HomePage() {
     }
   }, [health, fetchShows]);
 
-  const handleSelect = (showId: number) => {
-    setSelected((prev) =>
-      prev.includes(showId) ? prev.filter((id) => id !== showId) : [...prev, showId],
-    );
-  };
-
   const handleSelectAll = () => {
-    setSelected(selected.length === sortedShows.length ? [] : sortedShows.map((s) => s.id));
+    if (selected.length === sortedShows.length) {
+      deselectAll();
+    } else {
+      selectAll();
+    }
   };
 
   const handleSort = (key: keyof Show) => {
@@ -277,7 +288,7 @@ function HomePage() {
       case 'Enter':
       case ' ': {
         e.preventDefault();
-        handleSelect(showId);
+        handleSelect(showId, e.nativeEvent as unknown as React.MouseEvent);
         break;
       }
       case 'ArrowDown': {
@@ -326,7 +337,7 @@ function HomePage() {
     try {
       const result = await apiClient.deleteShows(selected);
       toast({ type: 'success', message: `${result.deleted} shows deleted` });
-      setSelected([]);
+      handleSelectAll();
       fetchShows();
     } catch {
       toast({ type: 'error', message: 'Failed to delete shows' });
@@ -335,7 +346,6 @@ function HomePage() {
 
   return (
     <div className="flex h-full">
-      {/* Main Content */}
       <div className="flex-1 overflow-auto p-6">
         {shows.length === 0 ? (
           <EmptyState />
@@ -352,17 +362,17 @@ function HomePage() {
               >
                 <thead className="bg-gray-700">
                   <tr>
-                    <th className="px-4 py-3 w-12 text-center align-middle">
+                    <th className="px-3 py-2 w-12 text-center align-middle">
                       <input
                         type="checkbox"
-                        checked={selected.length === sortedShows.length && sortedShows.length > 0}
+                        checked={selected.length === sortedShows.length}
                         onChange={handleSelectAll}
                         aria-label="Select all shows"
                         className="align-middle focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
                       />
                     </th>
                     <th
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 focus:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
+                      className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 focus:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
                       onClick={() => handleSort('title')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -377,7 +387,7 @@ function HomePage() {
                       Title {sortKey === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 focus:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
+                      className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 focus:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
                       onClick={() => handleSort('path')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -404,25 +414,37 @@ function HomePage() {
                         }
                       }}
                       data-index={idx}
-                      className="hover:bg-gray-700 focus-within:bg-gray-700 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                      className="hover:bg-gray-700 focus-within:bg-gray-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
                       tabIndex={0}
                       role="row"
                       aria-selected={selected.includes(show.id)}
                       onKeyDown={(e) => handleKeyDown(e, show.id, idx)}
-                      onClick={() => handleSelect(show.id)}
                     >
-                      <td className="px-4 py-2 w-12 text-center align-middle">
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(show.id)}
-                          onChange={() => handleSelect(show.id)}
-                          aria-label={`Select show ${show.title}`}
-                          className="align-middle focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
-                          onClick={(e) => e.stopPropagation()}
-                        />
+                      <td className="w-12 text-center">
+                        <div className="px-3 py-1.5 flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected(show.id)}
+                            onChange={(e) => handleSelect(show.id, e)}
+                            onKeyDown={(e) => handleKeyDown(e, show.id, idx)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                          />
+                        </div>
                       </td>
-                      <td className="px-6 py-2 whitespace-nowrap" role="cell">{show.title}</td>
-                      <td className="px-6 py-2 whitespace-nowrap" role="cell">{show.path}</td>
+                      <td
+                        className="px-4 py-1.5 whitespace-nowrap cursor-pointer"
+                        role="cell"
+                        onClick={(e) => handleSelect(show.id, e as React.MouseEvent)}
+                      >
+                        {show.title}
+                      </td>
+                      <td
+                        className="px-4 py-1.5 whitespace-nowrap cursor-pointer"
+                        role="cell"
+                        onClick={(e) => handleSelect(show.id, e as React.MouseEvent)}
+                      >
+                        {show.path}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -450,7 +472,6 @@ function HomePage() {
           </>
         )}
       </div>
-      {/* Alphabet Sidebar on the right */}
       {shows.length > 0 && (
         <AlphabetSidebar
           letters={availableLetters}

@@ -4,32 +4,52 @@
 * {
   scrollbar-width: thin; /* For Firefox */
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent; /* For Firefox */
+  /* Ensure no arrows in Firefox */
+  scrollbar-width: auto;
 }
 
 /* For Webkit browsers (Chrome, Safari, etc) */
 ::-webkit-scrollbar {
   width: 8px; /* Thin scrollbar */
   height: 8px; /* For horizontal scrollbars */
+  background-color: transparent;
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
   border-radius: 10px;
+  margin: 3px 0;
 }
 
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 10px;
   transition: background 0.2s ease;
+  min-height: 50px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* Hide scrollbar arrows */
+/* Remove all scrollbar buttons */
 ::-webkit-scrollbar-button {
+  height: 0;
+  width: 0;
+  background: none;
   display: none;
+}
+
+/* Specifically target single and double button variants */
+::-webkit-scrollbar-button:single-button,
+::-webkit-scrollbar-button:double-button {
+  display: none;
+  background-color: transparent;
+  height: 0;
+  width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
 }
 
 /* Increase scroll speed */
@@ -285,4 +305,15 @@ tr:focus-visible {
   background-color: #3b82f6 !important;
   color: white !important;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+.skeleton-loading {
+  background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear;
 } 
