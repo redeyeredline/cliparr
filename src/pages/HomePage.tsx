@@ -26,6 +26,26 @@ interface PaginatedResponse {
   totalPages: number;
 }
 
+// Helper function to get the sortable title (removes leading articles)
+const getSortableTitle = (title: string): string => {
+  const articles = ['the ', 'a ', 'an '];
+  const lowerTitle = title.toLowerCase();
+
+  for (const article of articles) {
+    if (lowerTitle.startsWith(article)) {
+      return title.substring(article.length).trim();
+    }
+  }
+
+  return title;
+};
+
+// Helper function to get the display letter for alphabet navigation
+const getDisplayLetter = (title: string): string => {
+  const sortableTitle = getSortableTitle(title);
+  return sortableTitle.charAt(0).toUpperCase();
+};
+
 function HomePage() {
   const [health, setHealth] = useState('checking...');
   const [wsStatus, setWsStatus] = useState('disconnected');
@@ -43,10 +63,11 @@ function HomePage() {
   // Map to store refs for the first show of each letter
   const letterRefs = useRef<{ [letter: string]: HTMLTableRowElement | null }>({});
   const healthCheckRef = useRef<boolean>(false);
+  const tableRef = useRef<HTMLTableElement>(null);
 
-  // Get available letters from shows
+  // Get available letters from shows (using sortable titles)
   const availableLetters = useMemo(() => {
-    const letters = shows.map((show) => show.title.charAt(0).toUpperCase());
+    const letters = shows.map((show) => getDisplayLetter(show.title));
     return [...new Set(letters)].sort();
   }, [shows]);
 
@@ -55,28 +76,19 @@ function HomePage() {
     // Create array of indices for stable sort
     const indexed = shows.map((show, index) => ({ show, index }));
 
-    // Debug log the current shows and sort config
-    console.log('Current sort config:', { sortKey, sortDirection });
-    console.log('Shows before sort:', indexed.map(({ show }) => ({
-      id: show.id,
-      title: show.title,
-      path: show.path,
-    })));
-
     // Sort with index as tiebreaker for stability
     indexed.sort((a, b) => {
-      const aVal = String(a.show[sortKey]);
-      const bVal = String(b.show[sortKey]);
+      let aVal: string;
+      let bVal: string;
 
-      // Debug log comparison values for Bill Burr shows
-      if (aVal.includes('Bill Burr') || bVal.includes('Bill Burr')) {
-        console.log('Comparing Bill Burr shows:', {
-          a: { id: a.show.id, title: a.show.title, path: a.show.path, index: a.index },
-          b: { id: b.show.id, title: b.show.title, path: b.show.path, index: b.index },
-          sortKey,
-          aVal,
-          bVal,
-        });
+      if (sortKey === 'title') {
+        // Use sortable title for title sorting
+        aVal = getSortableTitle(a.show.title);
+        bVal = getSortableTitle(b.show.title);
+      } else {
+        // Use original value for other fields
+        aVal = String(a.show[sortKey]);
+        bVal = String(b.show[sortKey]);
       }
 
       const compareResult = aVal.localeCompare(bVal, undefined, {
@@ -94,13 +106,6 @@ function HomePage() {
 
     const sorted = indexed.map(({ show }) => show);
 
-    // Debug log the final sorted result
-    console.log('Shows after sort:', sorted.map((show) => ({
-      id: show.id,
-      title: show.title,
-      path: show.path,
-    })));
-
     return sorted;
   }, [shows, sortKey, sortDirection]);
 
@@ -108,7 +113,7 @@ function HomePage() {
   const firstIndexForLetter = useMemo(() => {
     const indices: { [letter: string]: number } = {};
     sortedShows.forEach((show, idx) => {
-      const letter = show.title.charAt(0).toUpperCase();
+      const letter = getDisplayLetter(show.title);
       if (indices[letter] === undefined) {
         indices[letter] = idx;
       }
@@ -238,33 +243,84 @@ function HomePage() {
     }
   }, [health, fetchShows]);
 
-  // Scroll to the first show with the selected letter
+  const handleSelect = (showId: number) => {
+    setSelected((prev) =>
+      prev.includes(showId) ? prev.filter((id) => id !== showId) : [...prev, showId],
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelected(selected.length === sortedShows.length ? [] : sortedShows.map((s) => s.id));
+  };
+
+  const handleSort = (key: keyof Show) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
+
   const handleLetterClick = (letter: string) => {
     setActiveLetter(letter);
     const ref = letterRefs.current[letter];
     if (ref) {
+      ref.focus();
       ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };
 
-  const handleSort = (key: keyof Show) => {
-    setSortDirection((current) => {
-      if (key === sortKey) {
-        return current === 'asc' ? 'desc' : 'asc';
+  const handleKeyDown = (e: React.KeyboardEvent, showId: number, index: number) => {
+    switch (e.key) {
+      case 'Enter':
+      case ' ': {
+        e.preventDefault();
+        handleSelect(showId);
+        break;
       }
-      return 'asc';
-    });
-    setSortKey(key);
+      case 'ArrowDown': {
+        e.preventDefault();
+        const nextRow = tableRef.current?.querySelector(`tr[data-index="${index + 1}"]`) as HTMLTableRowElement;
+        if (nextRow) {
+          nextRow.focus();
+        }
+        break;
+      }
+      case 'ArrowUp': {
+        e.preventDefault();
+        const prevRow = tableRef.current?.querySelector(`tr[data-index="${index - 1}"]`) as HTMLTableRowElement;
+        if (prevRow) {
+          prevRow.focus();
+        }
+        break;
+      }
+      case 'Home': {
+        e.preventDefault();
+        const firstRow = tableRef.current?.querySelector('tr[data-index="0"]') as HTMLTableRowElement;
+        if (firstRow) {
+          firstRow.focus();
+        }
+        break;
+      }
+      case 'End': {
+        e.preventDefault();
+        const lastRow = tableRef.current?.querySelector(`tr[data-index="${sortedShows.length - 1}"]`) as HTMLTableRowElement;
+        if (lastRow) {
+          lastRow.focus();
+        }
+        break;
+      }
+    }
   };
 
-  // Selection logic
-  const allSelected = selected.length === sortedShows.length && sortedShows.length > 0;
-  const handleSelectAll = () => {
-    setSelected(allSelected ? [] : sortedShows.map((show) => show.id));
+  const handleTableKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSelectAll();
+    }
   };
-  const handleSelect = (id: number) => {
-    setSelected((prev) => prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]);
-  };
+
   const handleDelete = async () => {
     try {
       const result = await apiClient.deleteShows(selected);
@@ -282,27 +338,51 @@ function HomePage() {
       <div className="flex-1 overflow-auto p-6">
         {/* Shows Table */}
         <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-700">
+          <table
+            ref={tableRef}
+            className="min-w-full divide-y divide-gray-700"
+            onKeyDown={handleTableKeyDown}
+            role="grid"
+            aria-label="Shows list"
+          >
             <thead className="bg-gray-700">
               <tr>
                 <th className="px-4 py-3 w-12 text-center align-middle">
                   <input
                     type="checkbox"
                     checked={selected.length === sortedShows.length && sortedShows.length > 0}
-                    onChange={() => setSelected(selected.length === sortedShows.length ? [] : sortedShows.map((s) => s.id))}
+                    onChange={handleSelectAll}
                     aria-label="Select all shows"
-                    className="align-middle"
+                    className="align-middle focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
                   />
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 focus:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
                   onClick={() => handleSort('title')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSort('title');
+                    }
+                  }}
+                  tabIndex={0}
+                  role="columnheader"
+                  aria-sort={sortKey === 'title' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                 >
                   Title {sortKey === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 focus:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
                   onClick={() => handleSort('path')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSort('path');
+                    }
+                  }}
+                  tabIndex={0}
+                  role="columnheader"
+                  aria-sort={sortKey === 'path' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                 >
                   Path {sortKey === 'path' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
@@ -310,23 +390,34 @@ function HomePage() {
             </thead>
             <tbody className="bg-gray-800 divide-y divide-gray-700">
               {sortedShows.map((show, idx) => (
-                <tr key={show.id} ref={(el) => {
-                  const letter = show.title.charAt(0).toUpperCase();
-                  if (firstIndexForLetter[letter] === idx) {
-                    letterRefs.current[letter] = el;
-                  }
-                }}>
+                <tr
+                  key={show.id}
+                  ref={(el) => {
+                    const letter = getDisplayLetter(show.title);
+                    if (firstIndexForLetter[letter] === idx) {
+                      letterRefs.current[letter] = el;
+                    }
+                  }}
+                  data-index={idx}
+                  className="hover:bg-gray-700 focus-within:bg-gray-700 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                  tabIndex={0}
+                  role="row"
+                  aria-selected={selected.includes(show.id)}
+                  onKeyDown={(e) => handleKeyDown(e, show.id, idx)}
+                  onClick={() => handleSelect(show.id)}
+                >
                   <td className="px-4 py-2 w-12 text-center align-middle">
                     <input
                       type="checkbox"
                       checked={selected.includes(show.id)}
                       onChange={() => handleSelect(show.id)}
                       aria-label={`Select show ${show.title}`}
-                      className="align-middle"
+                      className="align-middle focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                      onClick={(e) => e.stopPropagation()}
                     />
                   </td>
-                  <td className="px-6 py-2 whitespace-nowrap">{show.title}</td>
-                  <td className="px-6 py-2 whitespace-nowrap">{show.path}</td>
+                  <td className="px-6 py-2 whitespace-nowrap" role="cell">{show.title}</td>
+                  <td className="px-6 py-2 whitespace-nowrap" role="cell">{show.path}</td>
                 </tr>
               ))}
             </tbody>
@@ -338,11 +429,14 @@ function HomePage() {
           <div
             className="fixed bottom-0 left-0 w-full bg-gray-900 border-t border-gray-700 flex justify-end items-center p-4 z-50"
             style={{ boxShadow: '0 -2px 8px rgba(0,0,0,0.3)' }}
+            role="status"
+            aria-live="polite"
           >
             <span className="text-gray-300 mr-4">{selected.length} series selected</span>
             <button
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-8 rounded shadow text-lg"
+              className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-8 rounded shadow text-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+              aria-label={`Delete ${selected.length} selected shows`}
             >
               Delete
             </button>
