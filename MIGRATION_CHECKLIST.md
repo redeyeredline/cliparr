@@ -116,7 +116,7 @@
 
 ## 14. Bug Fixes & Issues
 - ❌ the home page randomly refrehses. repeatedly
-- ❌ we lost the tooltip on why the import refresh is grayed out
+- ✅ we lost the tooltip on why the import refresh is grayed out
 
 ## 15. Infrastructure Investigation
 - ❌ a previous chat was going to review tdarr to see its mongo db setup in the background to advise on more robust db solution
