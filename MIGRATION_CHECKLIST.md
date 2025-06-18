@@ -90,7 +90,7 @@ currently broken
    ✅ test auto import mode once the backed is fixed
   ✅ Add hover/focus states
    ✅ Make sure the  segmented controls have visible hover and focus outlines (e.g. a bright accent glow) so keyboard users and mouse users get clear feedback.
-    Need a hamburger nav or transform the table into a card list on mobile.
+  Need a hamburger nav or transform the table into a card list on mobile.
   Virtual scrolling
         Even if you don’t paginate, windowed rendering (only mounting rows in view) will keep scroll performance rock-solid once you hit thousands of entries.
     Alphabetical grouping (A → Z)
@@ -108,4 +108,5 @@ currently broken
   the home page randomly refrehses. repeatedly
   fix scroll bars site wide to remove the up and down arrows
   properly add an alphabet bar to the import modal 
+  we lost the tooltip on why the import refresh is grayed out
   a previous chat was going to review tdarr to see its mongo db setup in the background to advise on more robust db solution
