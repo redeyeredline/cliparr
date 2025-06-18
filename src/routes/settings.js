@@ -30,13 +30,22 @@ router.post('/import-mode', (req, res) => {
   const db = getDb();
   const { mode } = req.body;
   try {
-    if (!mode || !['auto', 'import', 'none'].includes(mode)) {
-      return res.status(400).json({ error: 'Invalid import mode.' });
+    if (!['auto', 'import', 'none'].includes(mode)) {
+      return res.status(400).json({ error: 'Invalid import mode' });
     }
+
     setImportMode(db, mode);
+    
+    // Get the import task manager instance from the app
+    const importTaskManager = req.app.get('importTaskManager');
+    if (importTaskManager) {
+      // This will handle stopping/starting the task based on the new mode
+      importTaskManager.updateInterval();
+    }
+
     res.json({ status: 'ok', mode });
   } catch (error) {
-    console.error('Failed to set import mode:', error);
+    logger.error('Failed to set import mode:', error);
     res.status(500).json({
       error: 'Failed to set import mode',
       details: error && (error.stack || error.message || error),
@@ -72,6 +81,14 @@ router.post('/polling-interval', (req, res) => {
       });
     }
     setPollingInterval(db, parseInt(interval, 10));
+    
+    // Get the import task manager instance from the app
+    const importTaskManager = req.app.get('importTaskManager');
+    if (importTaskManager) {
+      // This will handle updating the interval or stopping if mode is 'none'
+      importTaskManager.updateInterval();
+    }
+
     const savedInterval = getPollingInterval(db);
     logger.info({ savedInterval }, 'Saved polling interval');
     res.json({ status: 'ok', interval: savedInterval });

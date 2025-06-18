@@ -48,6 +48,7 @@ export async function startServer() {
 
     // Initialize and start the import task manager
     importTaskManager = new ImportTaskManager(wss);
+    app.set('importTaskManager', importTaskManager);
     importTaskManager.start();
 
     serverInstance.listen(config.port, config.host, () =>

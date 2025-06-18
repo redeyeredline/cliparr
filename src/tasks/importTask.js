@@ -16,6 +16,14 @@ export class ImportTaskManager {
     }
 
     const db = getDb();
+    const mode = getImportMode(db);
+    
+    // Don't start the task if mode is 'none'
+    if (mode === 'none') {
+      logger.info('Import mode is set to none, not starting import task');
+      return;
+    }
+
     const interval = getPollingInterval(db);
     logger.info(`Starting import task with ${interval}s interval`);
 
@@ -50,12 +58,27 @@ export class ImportTaskManager {
 
   updateInterval() {
     const db = getDb();
+    const mode = getImportMode(db);
     const newInterval = getPollingInterval(db);
 
+    // If mode is 'none', stop the task
+    if (mode === 'none') {
+      if (this.taskInterval) {
+        clearInterval(this.taskInterval);
+        this.taskInterval = null;
+        logger.info('Import task stopped due to none mode');
+      }
+      return;
+    }
+
+    // Otherwise update the interval
     if (this.taskInterval) {
       clearInterval(this.taskInterval);
       this.taskInterval = setInterval(() => this.runTask(false), newInterval * 1000);
       logger.info(`Updated import task interval to ${newInterval}s`);
+    } else {
+      // If task was stopped (e.g. due to none mode), restart it
+      this.start();
     }
   }
 

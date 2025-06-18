@@ -34,9 +34,10 @@ const SettingsPage = () => {
   // Handler to update pending mode from ImportModeControl
   const handlePendingMode = (mode) => {
     setPendingMode(mode);
-    // If switching to 'none', clear the pending interval
+    // If switching to 'none', keep the current interval but disable the control
+    // The interval will be ignored when mode is 'none' anyway
     if (mode === 'none') {
-      setPendingInterval(null);
+      setPendingInterval(currentInterval);
     }
   };
 
@@ -60,32 +61,23 @@ const SettingsPage = () => {
 
       if (pendingMode !== importMode) {
         promises.push(
-          fetch('http://localhost:8485/settings/import-mode', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode: pendingMode }),
-          }),
+          apiClient.setImportMode(pendingMode),
         );
       }
 
       if (pendingInterval !== currentInterval) {
         promises.push(
-          fetch('http://localhost:8485/settings/polling-interval', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ interval: pendingInterval }),
-          }),
+          apiClient.setPollingInterval(pendingInterval),
         );
       }
 
-      const results = await Promise.all(promises);
-      const errors = results.filter((res) => !res.ok);
-
-      if (errors.length === 0) {
+      try {
+        await Promise.all(promises);
         setImportMode(pendingMode);
         setCurrentInterval(pendingInterval);
         toast({ type: 'success', message: 'Settings saved successfully' });
-      } else {
+      } catch (error) {
+        console.error('Failed to save settings:', error);
         toast({ type: 'error', message: 'Failed to save some settings' });
       }
     } catch (err) {
@@ -99,42 +91,46 @@ const SettingsPage = () => {
                     (pendingInterval !== currentInterval);
 
   return (
-    <div className="py-8 px-4 bg-gray-900 min-h-full text-gray-100">
-      <h1 className="text-3xl font-bold mb-8">Settings</h1>
-      <div className="flex justify-center">
-        <div className="bg-gray-800 rounded-2xl shadow-xl border border-gray-700 p-12 w-full max-w-4xl relative">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold tracking-tight">Import Settings</h2>
-            {hasChanges && (
-              <button
-                className="px-4 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-            )}
-          </div>
-          <div className="flex flex-col md:flex-row md:space-x-12 gap-4 md:gap-0 items-stretch">
-            {/* Import Mode Control */}
-            <div className="flex-1 flex flex-col items-center justify-center h-full">
+    <div className="py-8 px-8 bg-gray-900 min-h-full text-gray-100 flex">
+      <div className="w-full max-w-2xl ml-0">
+        <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 p-6 w-full">
+          <h2 className="text-xl font-semibold mb-4">Import Settings</h2>
+          <div className="space-y-8">
+            <div>
+              <div className="flex items-baseline justify-between mb-3">
+                <label className="block font-medium">Import Mode</label>
+                <span className="text-sm text-gray-400">Choose how Cliparr handles show imports from Sonarr.</span>
+              </div>
               <ImportModeControl
                 value={pendingMode !== null ? pendingMode : importMode}
                 onValueChange={handlePendingMode}
                 disabled={saving}
               />
             </div>
-            {/* Divider */}
-            <div className="hidden md:block w-px bg-gray-700 mx-2" />
-            {/* Polling Interval Control */}
-            <div className="flex-1 flex flex-col items-center justify-center h-full">
+            <div>
+              <div className="flex items-baseline justify-between mb-3">
+                <label className="block font-medium">Import Refresh Interval</label>
+                <span className="text-sm text-gray-400">Defines how often Cliparr checks for new shows to import.</span>
+              </div>
               <PollingIntervalControl
                 value={pendingInterval}
                 disabled={pendingMode === 'none'}
                 onValueChange={handlePendingInterval}
+                hideHeader={true}
               />
             </div>
           </div>
+          {hasChanges && (
+            <div className="flex justify-end mt-6">
+              <button
+                className="px-4 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50 text-sm"
+                onClick={handleSave}
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
