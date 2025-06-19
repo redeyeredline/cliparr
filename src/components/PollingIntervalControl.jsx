@@ -10,7 +10,7 @@ const INTERVAL_OPTIONS = [
   { label: '24 hours', value: 86400 },
 ];
 
-const PollingIntervalControl = ({ disabled = false, onValueChange, hideHeader = false }) => {
+const PollingIntervalControl = ({ disabled = false, onValueChange }) => {
   const [currentInterval, setCurrentInterval] = useState(900);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

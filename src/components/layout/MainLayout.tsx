@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useImportModal } from '../ImportModalProvider';
 import { useKeyboardNavigation, useFocusRestoration } from '../../utils/keyboardNavigation';
@@ -13,7 +13,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const { openImportModal } = useImportModal();
   const mainContentRef = useRef<HTMLDivElement>(null);
   const { useKeyboardShortcuts, useSkipToContent } = useKeyboardNavigation();
-  const { saveFocus, restoreFocus } = useFocusRestoration();
+  const { saveFocus } = useFocusRestoration();
 
   const navItems = [
     { path: '/', label: 'Home', icon: '🏠', shortcut: 'h' },

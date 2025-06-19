@@ -113,7 +113,8 @@
 - ❌ the alphabet bar should expand to fill all avail vertical space more gracefully
 - ❌ properly add an alphabet bar to the import modal 
 - ❌ fix scroll bars site wide to remove the up and down arrows
-
+- ❌ enter onkeybnoard in import modal should click on import
+- ❌ keyboard shortcuts should begin in intellegently
 ## 14. Bug Fixes & Issues
 - 💭 the home page randomly refrehses. repeatedly
 - ❌ review all logging and remove things that are no longer needed
