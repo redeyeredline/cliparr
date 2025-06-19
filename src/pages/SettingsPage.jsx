@@ -58,31 +58,32 @@ const SettingsPage = () => {
 
     setSaving(true);
     try {
-      const promises = [];
-
+      let autoScanTriggered = false;
+      
+      // Handle import mode change separately to check for auto scan
       if (pendingMode !== importMode) {
-        promises.push(
-          apiClient.setImportMode(pendingMode),
-        );
+        const modeResult = await apiClient.setImportMode(pendingMode);
+        if (modeResult && modeResult.autoScanTriggered) {
+          autoScanTriggered = true;
+        }
       }
-
+      
+      // Handle polling interval change
       if (pendingInterval !== currentInterval) {
-        promises.push(
-          apiClient.setPollingInterval(pendingInterval),
-        );
+        await apiClient.setPollingInterval(pendingInterval);
       }
-
-      try {
-        await Promise.all(promises);
-        setImportMode(pendingMode);
-        setCurrentInterval(pendingInterval);
+      
+      setImportMode(pendingMode);
+      setCurrentInterval(pendingInterval);
+      
+      if (autoScanTriggered) {
+        toast({ type: 'success', message: 'Auto import mode enabled! Scanning for shows to import...' });
+      } else {
         toast({ type: 'success', message: 'Settings saved successfully' });
-      } catch (error) {
-        console.error('Failed to save settings:', error);
-        toast({ type: 'error', message: 'Failed to save some settings' });
       }
-    } catch (err) {
-      toast({ type: 'error', message: err.message || 'Network error' });
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      toast({ type: 'error', message: 'Failed to save some settings' });
     } finally {
       setSaving(false);
     }

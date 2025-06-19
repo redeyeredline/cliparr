@@ -41,6 +41,13 @@ router.post('/import-mode', (req, res) => {
     if (importTaskManager) {
       // This will handle stopping/starting the task based on the new mode
       importTaskManager.updateInterval();
+
+      // Trigger immediate scan when switching to auto mode
+      if (mode === 'auto') {
+        importTaskManager.runTask(true);
+        res.json({ status: 'ok', mode, autoScanTriggered: true });
+        return;
+      }
     }
 
     res.json({ status: 'ok', mode });
