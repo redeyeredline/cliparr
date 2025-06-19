@@ -4,7 +4,6 @@ import { logger } from '../services/logger.frontend.js';
 import { wsClient } from '../services/websocket.frontend.js';
 import AlphabetSidebar from '../components/AlphabetSidebar';
 import { useToast } from '../components/ToastContext';
-import { FaTrash, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import EmptyState from '../components/EmptyState';
 import { useShiftSelect } from '../utils/selectionUtils';
 
@@ -18,14 +17,6 @@ interface DbStatus {
   success: boolean;
   message: string;
   testValue?: string;
-}
-
-interface PaginatedResponse {
-  shows: Show[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
 }
 
 // Helper function to get the sortable title (removes leading articles)

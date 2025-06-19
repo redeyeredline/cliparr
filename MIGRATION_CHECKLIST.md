@@ -105,7 +105,7 @@
       Right now you've got individual checkboxes—allow holding Shift to select a contiguous block. It maps exactly to desktop expectations and only adds a handful of lines to your click-handler logic
 - ✅ Overall remove some extra spacing and padding in the nav bar and the main table to tighten things up
       remove excess spacing from all tables 1 px at a time and see changes to find one i like
-
+- ❌ When using keyboard shortcuts and you get into the table the space bar should allow you to select the row you are ons tick box currently it only allows you to select the select all tick box.
 ## 13. Mobile & Responsive Tasks
 - ❌ Need a hamburger nav or transform the table into a card list on mobile
 - ❌ Responsive behavior
