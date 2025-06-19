@@ -80,12 +80,6 @@
 - ✅ Database initializes and status is shown on frontend
 - ✅ Test endpoint and UI confirmation
 
----
-
-**Legend:**  
-✅ Complete  ⚠️ Needs verification or improvement  ❌ Not yet implemented  💭 May not be needed
-
-
 ## 11. Recently Completed UI Improvements
 - ✅ import modal ui works like shit 
 - ✅ radio buttons for import mode settings and proper saving and reading of import mode state
@@ -114,7 +108,7 @@
 - ❌ properly add an alphabet bar to the import modal 
 - ❌ fix scroll bars site wide to remove the up and down arrows
 - ❌ enter onkeybnoard in import modal should click on import
-- ❌ keyboard shortcuts should begin in intellegently
+- ❌ keyboard shortcuts should begin in intellegently useful points on the page
 ## 14. Bug Fixes & Issues
 - 💭 the home page randomly refrehses. repeatedly
 - ❌ review all logging and remove things that are no longer needed
@@ -123,13 +117,24 @@
 ## 15. Infrastructure Investigation
 - ❌ a previous chat was going to review tdarr to see its mongo db setup in the background to advise on more robust db solution
 
-MIGHT BE FIXED - app is suddenly duplicating imports on start/app refreshes
+## 16. Import System Issues
+- ❌ MIGHT BE FIXED - app is suddenly duplicating imports on start/app refreshes
   something with the way the import mode setting change triggers an import without using the check existing shows in localdb function and duplicates the shows. fix it you fuck
-✅ reconsider a search function to find specific shows
-✅ feed current nav bar to bolt to get similiar styling to new home page
-fix excess spacing on new home page
- ✅ repipe everything to new home page
-add alphabet bar to import modal
-ASK BOLT can you cleanly/easily include the alphabet bar from the homepage to the import modal?
-create trigger when setting import mode changes to auto to trigger a scan upon saving to import all shows automatically
 
+## 17. Search & Navigation Features
+- ✅ reconsider a search function to find specific shows
+- ✅ feed current nav bar to bolt to get similiar styling to new home page
+
+## 18. UI/UX Improvements
+- ❌ fix excess spacing on new home page
+- ✅ repipe everything to new home page
+- ❌ add alphabet bar to import modal
+- ❌ ASK BOLT can you cleanly/easily include the alphabet bar from the homepage to the import modal?
+
+## 19. Import Mode Automation
+- ❌ create trigger when setting import mode changes to auto to trigger a scan upon saving to import all shows automatically
+
+---
+
+**Legend:**  
+✅ Complete  ⚠️ Needs verification or improvement  ❌ Not yet implemented  💭 May not be needed
