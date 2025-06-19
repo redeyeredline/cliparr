@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../integration/api-client';
-import { useToast } from './ToastContext';
 
 const INTERVAL_OPTIONS = [
   { label: '15 minutes', value: 900 },
@@ -12,10 +11,8 @@ const INTERVAL_OPTIONS = [
 
 const PollingIntervalControl = ({ disabled = false, onValueChange }) => {
   const [currentInterval, setCurrentInterval] = useState(900);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0 });
-  const toast = useToast();
 
   // Fetch current interval on mount
   useEffect(() => {

@@ -131,3 +131,5 @@ fix excess spacing on new home page
  ✅ repipe everything to new home page
 add alphabet bar to import modal
 ASK BOLT can you cleanly/easily include the alphabet bar from the homepage to the import modal?
+create trigger when setting import mode changes to auto to trigger a scan upon saving to import all shows automatically
+
