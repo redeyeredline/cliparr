@@ -168,16 +168,28 @@ async function importShowById(showId, req, wss, db) {
     try {
       logger.info('Beginning database transaction for import');
       db.transaction(() => {
-        // Insert the show (only title and path)
-        const showResult = db.prepare(`
-          INSERT OR REPLACE INTO shows (
-            title, path
-          ) VALUES (?, ?)
-        `).run(
-          show.title,
-          show.path,
-        );
-        dbShowId = showResult.lastInsertRowid;
+        // Check if show already exists
+        const existingShow = db.prepare(`
+          SELECT id FROM shows WHERE title = ? AND path = ?
+        `).get(show.title, show.path);
+
+        if (existingShow) {
+          // Show already exists, use existing ID
+          dbShowId = existingShow.id;
+          logger.info(`Show already exists with ID: ${dbShowId}`);
+        } else {
+          // Insert new show
+          const showResult = db.prepare(`
+            INSERT INTO shows (
+              title, path
+            ) VALUES (?, ?)
+          `).run(
+            show.title,
+            show.path,
+          );
+          dbShowId = showResult.lastInsertRowid;
+          logger.info(`Inserted new show with ID: ${dbShowId}`);
+        }
 
         // Insert seasons and episodes
         Object.values(seasons).forEach((season) => {

@@ -131,16 +131,29 @@ export class ImportTaskManager {
 
       // Use a transaction for data consistency
       db.transaction(() => {
-        // Insert or update the show
-        const showResult = db.prepare(`
-          INSERT OR REPLACE INTO shows (
-            title, path
-          ) VALUES (?, ?)
-        `).run(
-          showDetails.title,
-          showDetails.path,
-        );
-        const dbShowId = showResult.lastInsertRowid;
+        // Check if show already exists
+        const existingShow = db.prepare(`
+          SELECT id FROM shows WHERE title = ? AND path = ?
+        `).get(showDetails.title, showDetails.path);
+
+        let dbShowId;
+        if (existingShow) {
+          // Show already exists, use existing ID
+          dbShowId = existingShow.id;
+          logger.info(`Show already exists with ID: ${dbShowId}`);
+        } else {
+          // Insert new show
+          const showResult = db.prepare(`
+            INSERT INTO shows (
+              title, path
+            ) VALUES (?, ?)
+          `).run(
+            showDetails.title,
+            showDetails.path,
+          );
+          dbShowId = showResult.lastInsertRowid;
+          logger.info(`Inserted new show with ID: ${dbShowId}`);
+        }
 
         // Insert or update seasons and episodes
         Object.values(seasons).forEach((season) => {

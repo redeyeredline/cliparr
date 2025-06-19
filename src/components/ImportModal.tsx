@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useShiftSelect } from '../utils/selectionUtils';
+import { X, Download, Check, ChevronUp, ChevronDown } from 'lucide-react';
 
 export interface Show {
   id: number;
@@ -15,94 +16,6 @@ interface ImportModalProps {
   loading?: boolean;
   error?: string | null;
 }
-
-const modalOverlayStyle = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  width: '100vw',
-  height: '100vh',
-  background: 'rgba(0, 0, 0, 0.75)',
-  zIndex: 1000,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-} as const;
-
-const modalStyle = {
-  background: '#1a1a1a',
-  borderRadius: '12px',
-  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.5)',
-  padding: '2rem',
-  width: '90%',
-  maxWidth: '1200px',
-  height: '80vh',
-  position: 'relative',
-  display: 'flex',
-  flexDirection: 'column',
-  color: '#ffffff',
-} as const;
-
-const closeButtonStyle = {
-  position: 'absolute',
-  top: '16px',
-  right: '16px',
-  fontSize: '1.5rem',
-  color: '#ffffff',
-  background: 'none',
-  border: 'none',
-  cursor: 'pointer',
-  padding: '4px 8px',
-  borderRadius: '4px',
-  transition: 'background-color 0.2s',
-} as const;
-
-const tableStyle = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  marginTop: '1rem',
-} as const;
-
-const thStyle = {
-  textAlign: 'left',
-  padding: '12px',
-  borderBottom: '2px solid #333',
-  color: '#ffffff',
-  fontWeight: '600',
-} as const;
-
-const tdStyle = {
-  padding: '12px',
-  borderBottom: '1px solid #333',
-  color: '#ffffff',
-} as const;
-
-const checkboxStyle = {
-  width: '18px',
-  height: '18px',
-  cursor: 'pointer',
-} as const;
-
-const buttonStyle = {
-  padding: '8px 16px',
-  borderRadius: '6px',
-  border: 'none',
-  cursor: 'pointer',
-  fontWeight: '600',
-  transition: 'all 0.2s',
-} as const;
-
-const primaryButtonStyle = {
-  ...buttonStyle,
-  background: '#2563eb',
-  color: 'white',
-} as const;
-
-const secondaryButtonStyle = {
-  ...buttonStyle,
-  background: '#374151',
-  color: 'white',
-} as const;
 
 export default function ImportModal({
   open,
@@ -164,106 +77,153 @@ export default function ImportModal({
   };
 
   return (
-    <div style={modalOverlayStyle} onMouseDown={handleOverlayClick}>
-      <div ref={modalRef} style={modalStyle}>
-        <button
-          style={closeButtonStyle}
-          onClick={onClose}
-          aria-label="Close"
-          onMouseOver={(e) => (e.currentTarget.style.background = '#333')}
-          onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
-        >
-          ×
-        </button>
-        <h2 style={{ marginTop: 0, color: '#ffffff', fontSize: '1.5rem' }}>Import Shows</h2>
+    <div
+      className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onMouseDown={handleOverlayClick}
+    >
+      <div
+        ref={modalRef}
+        className="bg-gray-800/95 backdrop-blur-lg border border-gray-700/50 rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col relative overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-700/50 bg-gray-800/50">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+              <Download className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Import Shows</h2>
+              <p className="text-sm text-gray-400">Select shows to import from Sonarr</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 bg-gray-700/50 hover:bg-gray-600/50 rounded-xl flex items-center justify-center transition-all duration-200 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 ml-4"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Error Message */}
         {error && (
-          <div style={{ color: '#f87171', marginBottom: '1rem', padding: '8px', background: '#7f1d1d', borderRadius: '4px' }}>
+          <div className="mx-6 mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
             {error}
           </div>
         )}
-        <div
-          style={{
-            position: 'relative', // for the overlay
-            flex: 1,
-            overflowY: 'auto', // always show gutter
-            scrollbarGutter: 'stable', // prevent width jump
-            minHeight: 300, // reserve height up-front
-            maxHeight: '60vh', // optional cap
-          }}
-        >
-          {loading && (
-            <div
-              className="skeleton-loading"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                borderRadius: '4px',
-                zIndex: 1,
-              }}
-            />
-          )}
-          <table className="min-w-full divide-y divide-gray-700" style={tableStyle}>
-            <thead className="bg-gray-700">
-              <tr>
-                <th style={thStyle}>
-                  <input
-                    type="checkbox"
-                    checked={shows.length > 0 && selected.length === shows.length}
-                    onChange={handleSelectAll}
-                    style={checkboxStyle}
-                  />
-                </th>
-                <th style={thStyle}>Title</th>
-                <th style={thStyle}>Path</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-700">
-              {shows.map((show) => (
-                <tr key={show.id} className="hover:bg-gray-700">
-                  <td style={tdStyle}>
-                    <input
-                      type="checkbox"
-                      checked={isSelected(show.id)}
-                      onChange={(e) => handleToggle(show.id, e.nativeEvent as unknown as React.MouseEvent)}
-                      style={checkboxStyle}
-                    />
-                  </td>
-                  <td style={tdStyle}>{show.title}</td>
-                  <td style={tdStyle}>{show.path}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {/* Table Container */}
+        <div className="flex-1 overflow-hidden">
+          <div className="h-full bg-gray-800/30 backdrop-blur-sm overflow-hidden">
+            <div className="h-full overflow-auto">
+              {loading && (
+                <div className="absolute inset-0 bg-gray-800/50 backdrop-blur-sm z-10 flex items-center justify-center">
+                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+              <table className="w-full" role="grid" aria-label="Shows list">
+                <thead className="sticky top-0 bg-gray-800/80 backdrop-blur-sm border-b border-gray-700/50">
+                  <tr>
+                    <th className="w-16 px-6 py-4 text-center">
+                      <div className="flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={shows.length > 0 && selected.length === shows.length}
+                          onChange={handleSelectAll}
+                          className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
+                          aria-label="Select all shows"
+                        />
+                      </div>
+                    </th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300 uppercase tracking-wider">
+                      <div className="flex items-center space-x-2">
+                        <span>Title</span>
+                        <div className="flex flex-col">
+                          <ChevronUp className="w-3 h-3 text-gray-500" />
+                          <ChevronDown className="w-3 h-3 -mt-1 text-gray-500" />
+                        </div>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700/30">
+                  {shows.map((show) => (
+                    <tr
+                      key={show.id}
+                      className={`group transition-all duration-200 hover:bg-gray-700/20 ${
+                        isSelected(show.id)
+                          ? 'bg-blue-500/10 border-l-4 border-blue-500'
+                          : ''
+                      }`}
+                      role="row"
+                      aria-selected={isSelected(show.id)}
+                    >
+                      <td className="w-16 px-6 py-4 text-center">
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected(show.id)}
+                            onChange={(e) => handleToggle(show.id, e.nativeEvent as unknown as React.MouseEvent)}
+                            className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                          <div className="text-white font-medium text-lg">{show.title}</div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {/* Empty State */}
+              {shows.length === 0 && !loading && (
+                <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                  <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mb-4">
+                    <Download className="w-8 h-8" />
+                  </div>
+                  <p className="text-lg font-medium">No shows available</p>
+                  <p className="text-sm">Check your Sonarr connection</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '1rem',
-          marginTop: '1rem',
-          paddingTop: '1rem',
-          borderTop: '1px solid #333',
-        }}>
-          <button
-            onClick={handleOk}
-            disabled={selected.length === 0}
-            style={{
-              ...primaryButtonStyle,
-              opacity: selected.length === 0 ? 0.5 : 1,
-              cursor: selected.length === 0 ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Import Selected ({selected.length})
-          </button>
-          <button
-            onClick={onClose}
-            style={secondaryButtonStyle}
-          >
-            Cancel
-          </button>
+        {/* Footer */}
+        <div className="flex items-center justify-between p-6 border-t border-gray-700/50 bg-gray-800/50">
+          <div className="text-sm text-gray-400">
+            {selected.length > 0 && (
+              <span className="flex items-center space-x-2">
+                <Check className="w-4 h-4 text-blue-400" />
+                <span>{selected.length} shows selected</span>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={onClose}
+              className="px-6 py-2.5 bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500/50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleOk}
+              disabled={selected.length === 0}
+              className={`px-6 py-2.5 font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                selected.length === 0
+                  ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105'
+              }`}
+            >
+              <span className="flex items-center space-x-2">
+                <Download className="w-4 h-4" />
+                <span>Import Selected ({selected.length})</span>
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

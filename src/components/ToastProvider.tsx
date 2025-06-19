@@ -1,5 +1,6 @@
 import { useState, useCallback, ReactNode } from 'react';
 import { ToastContext } from './ToastContext';
+import { CheckCircle, XCircle, Info, X } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -9,29 +10,31 @@ interface Toast {
   message: string;
 }
 
-const toastStyles = {
-  position: 'fixed',
-  top: 24,
-  right: 24,
-  zIndex: 2000,
-  minWidth: 240,
-  maxWidth: 400,
-  background: '#23272b',
-  color: '#fff',
-  borderRadius: 8,
-  boxShadow: '0 2px 16px rgba(0,0,0,0.3)',
-  padding: '1rem 1.5rem',
-  marginBottom: 12,
-  fontSize: 16,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
-} as const;
-
-const typeColors: Record<ToastType, string> = {
-  success: '#52c41a',
-  error: '#ff4d4f',
-  info: '#1890ff',
+const typeConfig: Record<ToastType, { icon: React.ComponentType<any>; colors: { bg: string; border: string; icon: string } }> = {
+  success: {
+    icon: CheckCircle,
+    colors: {
+      bg: 'from-green-500/10 to-emerald-500/10',
+      border: 'border-green-500/30',
+      icon: 'text-green-400',
+    },
+  },
+  error: {
+    icon: XCircle,
+    colors: {
+      bg: 'from-red-500/10 to-rose-500/10',
+      border: 'border-red-500/30',
+      icon: 'text-red-400',
+    },
+  },
+  info: {
+    icon: Info,
+    colors: {
+      bg: 'from-blue-500/10 to-cyan-500/10',
+      border: 'border-blue-500/30',
+      icon: 'text-blue-400',
+    },
+  },
 };
 
 interface ToastProviderProps {
@@ -41,9 +44,10 @@ interface ToastProviderProps {
 export function ToastProvider({ children }: ToastProviderProps) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const toast = useCallback(({ type = 'info', message, duration = 3500 }) => {
+  const toast = useCallback(({ type = 'info', message, duration = 3500 }: { type?: ToastType; message: string; duration?: number }) => {
     const id = Math.random().toString(36).slice(2);
     setToasts((prev) => [...prev, { id, type, message }]);
+
     if (type !== 'error') {
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -58,32 +62,108 @@ export function ToastProvider({ children }: ToastProviderProps) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 2000 }}>
-        {toasts.map(({ id, type, message }) => (
-          <div key={id} style={{ ...toastStyles, borderLeft: `6px solid ${typeColors[type]}` }}>
-            <span style={{ fontWeight: 700, color: typeColors[type] }}>
-              {type === 'success' ? '✔' : type === 'error' ? '✖' : 'ℹ'}
-            </span>
-            <span style={{ flex: 1 }}>{message}</span>
-            {type === 'error' && (
-              <button
-                onClick={() => closeToast(id)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#fff',
-                  fontSize: 18,
-                  cursor: 'pointer',
-                  marginLeft: 8,
-                }}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
+
+      {/* Toast Container */}
+      <div className="fixed top-6 right-6 z-[2000] space-y-3 pointer-events-none">
+        {toasts.map(({ id, type, message }) => {
+          const config = typeConfig[type];
+          const IconComponent = config.icon;
+
+          return (
+            <div
+              key={id}
+              className={`
+                pointer-events-auto transform transition-all duration-300 ease-out
+                animate-in slide-in-from-right-full
+                bg-gradient-to-r ${config.colors.bg}
+                backdrop-blur-lg border ${config.colors.border}
+                rounded-xl shadow-2xl shadow-black/20
+                min-w-[320px] max-w-[420px] p-4
+                flex items-start space-x-3
+                group hover:scale-105 hover:shadow-2xl hover:shadow-black/30
+              `}
+              style={{
+                animation: 'slideInRight 0.3s ease-out',
+              }}
+            >
+              {/* Icon */}
+              <div className="flex-shrink-0 mt-0.5">
+                <div className="w-8 h-8 rounded-lg bg-gray-800/50 flex items-center justify-center">
+                  <IconComponent className={`w-4 h-4 ${config.colors.icon}`} />
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-white capitalize mb-1">
+                      {type}
+                    </p>
+                    <p className="text-sm text-gray-300 leading-relaxed">
+                      {message}
+                    </p>
+                  </div>
+
+                  {/* Close button for error toasts */}
+                  {type === 'error' && (
+                    <button
+                      onClick={() => closeToast(id)}
+                      className="flex-shrink-0 ml-3 w-6 h-6 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 flex items-center justify-center transition-all duration-200 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                      aria-label="Close notification"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Progress bar for auto-dismiss toasts */}
+              {type !== 'error' && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800/30 rounded-b-xl overflow-hidden">
+                  <div
+                    className={`h-full bg-gradient-to-r ${config.colors.icon === 'text-green-400' ? 'from-green-500 to-emerald-500' : config.colors.icon === 'text-blue-400' ? 'from-blue-500 to-cyan-500' : 'from-gray-500 to-gray-400'} animate-pulse`}
+                    style={{
+                      animation: 'shrink 3.5s linear forwards',
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Custom animations */}
+      <style>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes shrink {
+          from {
+            width: 100%;
+          }
+          to {
+            width: 0%;
+          }
+        }
+        
+        .animate-in {
+          animation-fill-mode: both;
+        }
+        
+        .slide-in-from-right-full {
+          animation: slideInRight 0.3s ease-out;
+        }
+      `}</style>
     </ToastContext.Provider>
   );
 }

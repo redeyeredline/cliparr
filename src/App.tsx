@@ -1,22 +1,22 @@
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import SettingsPage from './pages/SettingsPage';
+import NavigationBar from './components/layout/NavigationBar';
 import { ToastProvider } from './components/ToastProvider';
-import MainLayout from './components/layout/MainLayout';
-import { ImportModalProvider, ImportModalRoot } from './components/ImportModalProvider';
+import { ImportModalProvider } from './components/ImportModalProvider';
 
 function App() {
   return (
     <Router>
       <ToastProvider>
         <ImportModalProvider>
-          <MainLayout>
+          <NavigationBar>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
-            <ImportModalRoot />
-          </MainLayout>
+          </NavigationBar>
         </ImportModalProvider>
       </ToastProvider>
     </Router>

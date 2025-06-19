@@ -6,6 +6,7 @@ import { useToast } from './ToastContext';
 interface ImportModalContextType {
   openImportModal: () => void;
   closeImportModal: () => void;
+  isOpen: boolean;
 }
 
 const ImportModalContext = createContext<ImportModalContextType | undefined>(undefined);
@@ -67,7 +68,7 @@ export const ImportModalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   return (
-    <ImportModalContext.Provider value={{ openImportModal, closeImportModal }}>
+    <ImportModalContext.Provider value={{ openImportModal, closeImportModal, isOpen: open }}>
       {children}
       <ImportModal
         open={open}
