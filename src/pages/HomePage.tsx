@@ -42,9 +42,6 @@ const getDisplayLetter = (title: string): string => {
 function HomePage() {
   // State hooks
   const [health, setHealth] = useState('checking...');
-  const [wsStatus, setWsStatus] = useState('disconnected');
-  const [dbStatus, setDbStatus] = useState<DbStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [healthCheckMsg, setHealthCheckMsg] = useState<string | null>(null);
   const [shows, setShows] = useState<Show[]>([]);
@@ -129,13 +126,12 @@ function HomePage() {
   const testDatabase = useCallback(async () => {
     try {
       const data = await apiClient.testDatabase();
-      setDbStatus(data);
       if (!data.success) {
-        setError('Database test failed');
+        setHealthCheckMsg('❌ Database test failed.');
+        logger.error('Health check failed:', data);
       }
     } catch {
-      setDbStatus({ success: false, message: 'Database test failed' });
-      setError('Failed to check database status');
+      setHealthCheckMsg('❌ Failed to check database status');
     }
   }, []);
 
@@ -146,7 +142,6 @@ function HomePage() {
     healthCheckRef.current = true;
 
     setIsLoading(true);
-    setError(null);
     setHealthCheckMsg(null);
     try {
       const data = await apiClient.checkHealth();
@@ -164,7 +159,6 @@ function HomePage() {
       setHealth('error');
       setHealthCheckMsg('❌ Failed to connect to server.');
       logger.error('Health check error:', err);
-      setError('Failed to connect to server');
     } finally {
       setIsLoading(false);
       healthCheckRef.current = false;
@@ -177,7 +171,6 @@ function HomePage() {
       setShows(data.shows);
     } catch (err) {
       logger.error('Failed to fetch shows:', err);
-      setError('Failed to fetch shows');
     }
   }, []);
 
@@ -190,11 +183,10 @@ function HomePage() {
       if (!mounted) {
         return;
       }
-      setWsStatus(data.status);
       if (data.status === 'error') {
-        setError('WebSocket connection failed');
+        setHealthCheckMsg('❌ WebSocket connection failed');
       } else {
-        setError(null);
+        setHealthCheckMsg(null);
       }
     };
 
@@ -202,8 +194,7 @@ function HomePage() {
       if (!mounted) {
         return;
       }
-      setWsStatus('error');
-      setError('WebSocket connection failed');
+      setHealthCheckMsg('❌ WebSocket connection failed');
     };
 
     // Add import_progress listener for real-time show updates
