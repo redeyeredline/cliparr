@@ -60,14 +60,15 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
   };
 
   const getButtonClasses = (item: typeof navItems[0]) => {
-    const baseClasses = 'group relative w-full flex items-center space-x-3 px-4 py-3 rounded-xl mb-2 transition-all duration-300 font-medium';
+    const baseClasses = 'group relative w-full flex items-center space-x-3 px-4 py-3 rounded-xl mb-2 transition-all duration-300 font-medium border shadow-lg';
     const isActive = location.pathname === item.path && !item.isImport;
 
     if (isActive) {
-      return `${baseClasses} bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-white border border-blue-500/30 shadow-lg shadow-blue-500/10`;
+      return `${baseClasses} bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-white border-blue-500/30 shadow-blue-500/10`;
     }
 
-    return `${baseClasses} text-gray-300 hover:text-white hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 focus:ring-offset-gray-900`;
+    // Inactive: transparent border and shadow to reserve space
+    return `${baseClasses} text-gray-300 hover:text-white hover:bg-gray-700/50 border-transparent shadow-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 focus:ring-offset-gray-900`;
   };
 
   return (
@@ -120,11 +121,6 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
                     )}
                   </div>
                   <span className="flex-1 text-left">{item.label}</span>
-                  {item.shortcut && (
-                    <span className="text-xs text-gray-500 bg-gray-700/50 px-2 py-1 rounded-md font-mono">
-                      {item.shortcut.toUpperCase()}
-                    </span>
-                  )}
 
                   {/* Active indicator */}
                   {isActive && (
