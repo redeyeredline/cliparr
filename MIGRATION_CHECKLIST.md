@@ -50,14 +50,14 @@
 - ❌ log file handling page similar to sonarr or better
 
 ## 9. Frontend Features & UI
-- ❌ Alphabet Sidebar
+- ✅ Alphabet Sidebar
   ✅ Letter-based navigation
   ✅ Dynamic letter availability based on shows
-   -Smooth scrolling to sections
+  ✅ Smooth scrolling to sections
 - ❌ Table Features
   - Sortable columns
   💭 Pagination
-  - Row selection
+  ✅ Row selection
   - Custom styling (dark theme)
 - ❌ Show Details Page
   - Season-based collapsible tables
@@ -115,7 +115,7 @@
 - ❌ fix scroll bars site wide to remove the up and down arrows
 
 ## 14. Bug Fixes & Issues
-- ❌ the home page randomly refrehses. repeatedly
+- 💭 the home page randomly refrehses. repeatedly
 - ✅ we lost the tooltip on why the import refresh is grayed out
 
 ## 15. Infrastructure Investigation
