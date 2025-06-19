@@ -1,6 +1,5 @@
 // src/integration/routes/shows.js - Shows API routes
 import express from 'express';
-import { getImportedShows } from '../database/Db_Operations.js';
 const router = express.Router();
 
 // Get all shows

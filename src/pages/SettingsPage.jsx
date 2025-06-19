@@ -25,6 +25,7 @@ const SettingsPage = () => {
         setCurrentInterval(intervalData.interval);
         setPendingInterval(intervalData.interval);
       } catch (err) {
+        console.error('Failed to load settings:', err);
         toast({ type: 'error', message: 'Failed to load settings' });
       }
     };
