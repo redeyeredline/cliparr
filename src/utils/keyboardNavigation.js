@@ -5,8 +5,6 @@ import { useEffect, useRef, useCallback, useState } from 'react';
  * Provides utilities for focus management, keyboard shortcuts, and accessibility
  */
 export const useKeyboardNavigation = () => {
-  const currentFocusIndex = useRef(0);
-
   // Get all focusable elements within a container
   const getFocusableElements = useCallback((container) => {
     if (!container) {
