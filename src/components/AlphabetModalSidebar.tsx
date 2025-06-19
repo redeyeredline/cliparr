@@ -86,11 +86,7 @@ const AlphabetModalSidebar: React.FC<AlphabetModalSidebarProps> = ({
             onClick={() => onLetterClick(letter)}
             style={{ height: `${buttonHeight}px`, minHeight: `${MIN_BUTTON_HEIGHT}px` }}
             className={`w-full text-xs font-medium transition-colors duration-150 
-              flex items-center justify-center border-none outline-none border-b border-gray-700 ${
-          activeLetter === letter
-            ? 'bg-blue-600 text-white'
-            : 'text-gray-400 hover:bg-blue-900 hover:text-gray-100'
-          }`}
+              flex items-center justify-center border-none outline-none border-b border-gray-700 text-gray-400 hover:bg-blue-900 hover:text-gray-100`}
             aria-pressed={activeLetter === letter}
           >
             {letter}

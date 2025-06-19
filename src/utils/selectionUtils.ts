@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 /**
  * Hook for managing shift-click range selection in tables and lists
@@ -11,7 +11,7 @@ export function useShiftSelect<T>({ items, getId }: {
   const [selected, setSelected] = useState<(number | string)[]>([]);
   const [lastSelectedId, setLastSelectedId] = useState<number | string | null>(null);
 
-  const handleToggle = (id: number | string, event: React.MouseEvent) => {
+  const handleToggle = useCallback((id: number | string, event: React.MouseEvent) => {
     if (event.shiftKey && lastSelectedId !== null) {
       const currentIndex = items.findIndex((item) => getId(item) === id);
       const lastIndex = items.findIndex((item) => getId(item) === lastSelectedId);
@@ -30,19 +30,19 @@ export function useShiftSelect<T>({ items, getId }: {
       );
     }
     setLastSelectedId(id);
-  };
+  }, [items, getId, lastSelectedId]);
 
-  const selectAll = () => {
+  const selectAll = useCallback(() => {
     const allIds = items.map((item) => getId(item));
     setSelected(allIds);
-  };
+  }, [items, getId]);
 
-  const deselectAll = () => {
+  const deselectAll = useCallback(() => {
     setSelected([]);
     setLastSelectedId(null);
-  };
+  }, []);
 
-  const isSelected = (id: number | string) => selected.includes(id);
+  const isSelected = useCallback((id: number | string) => selected.includes(id), [selected]);
 
   return {
     selected,

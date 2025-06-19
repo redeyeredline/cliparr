@@ -30,18 +30,18 @@ interface LetterStyleProps {
   padding: number;
 }
 
-function getLetterStyle({ active, fontSize, padding }: LetterStyleProps) {
+function getLetterStyle({ active: _active, fontSize, padding }: LetterStyleProps) {
   return {
     fontSize,
     fontWeight: 700,
     margin: `${padding / 2}px 0`,
     padding: `${padding}px 0`,
-    opacity: active ? 1 : 0.7,
-    color: active ? '#fff' : '#b0b8c1',
+    opacity: 0.7,
+    color: '#b0b8c1',
     cursor: 'pointer',
     borderRadius: 6,
-    background: active ? 'linear-gradient(90deg, #00bfff 0%, #23272b 100%)' : 'none',
-    boxShadow: active ? '0 0 6px #00bfff33' : 'none',
+    background: 'none',
+    boxShadow: 'none',
     transition: 'background 0.2s, color 0.2s, opacity 0.2s',
     width: 32,
     textAlign: 'center',

@@ -1,14 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useShiftSelect } from '../utils/selectionUtils';
 
-interface Season {
-  seasonNumber: number;
-}
-
-interface ShowStatistics {
-  episodeFileCount: number;
-}
-
 export interface Show {
   id: number;
   title: string;
@@ -112,24 +104,6 @@ const secondaryButtonStyle = {
   color: 'white',
 } as const;
 
-const loadingSkeletonStyle = {
-  background: '#2a2a2a',
-  borderRadius: '4px',
-  height: '24px',
-  margin: '8px 0',
-  animation: 'pulse 1.5s infinite',
-} as const;
-
-const selectAllContainerStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  marginBottom: '1rem',
-  padding: '8px',
-  background: '#2a2a2a',
-  borderRadius: '6px',
-} as const;
-
 export default function ImportModal({
   open,
   onClose,
@@ -152,7 +126,7 @@ export default function ImportModal({
 
   useEffect(() => {
     deselectAll();
-  }, [shows, open]);
+  }, [shows, open, deselectAll]);
 
   useEffect(() => {
     if (!open) {

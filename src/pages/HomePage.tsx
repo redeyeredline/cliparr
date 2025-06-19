@@ -231,6 +231,11 @@ function HomePage() {
     }
   }, [health, fetchShows]);
 
+  // Reset selection when shows change (e.g., after import)
+  useEffect(() => {
+    deselectAll();
+  }, [shows, deselectAll]);
+
   const handleSelectAll = () => {
     if (selected.length === sortedShows.length) {
       deselectAll();
