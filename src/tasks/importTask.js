@@ -17,7 +17,7 @@ export class ImportTaskManager {
 
     const db = getDb();
     const mode = getImportMode(db);
-    
+
     // Don't start the task if mode is 'none'
     if (mode === 'none') {
       logger.info('Import mode is set to none, not starting import task');

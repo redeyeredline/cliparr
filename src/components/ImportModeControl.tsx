@@ -59,10 +59,10 @@ function ImportModeControl({ value, onValueChange, disabled = false }: ImportMod
           tabIndex={disabled ? -1 : 0}
         >
           <div className="flex items-center w-[100px]">
-            <div 
+            <div
               className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all duration-200 ${
-                value === mode.key 
-                  ? 'border-blue-400 bg-blue-400 ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800' 
+                value === mode.key
+                  ? 'border-blue-400 bg-blue-400 ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800'
                   : 'border-gray-500 hover:border-gray-400'
               }`}
               aria-hidden="true"

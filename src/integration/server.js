@@ -58,7 +58,7 @@ export async function startServer() {
     // Register graceful shutdown handler
     registerGracefulShutdown(async () => {
       logger.info('Starting graceful shutdown...');
-      
+
       // Stop the import task first
       if (importTaskManager) {
         await importTaskManager.stop();

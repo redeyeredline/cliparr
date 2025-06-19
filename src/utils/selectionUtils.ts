@@ -17,10 +17,10 @@ export function useShiftSelect<T>({ items, getId }: {
       const lastIndex = items.findIndex((item) => getId(item) === lastSelectedId);
       const [start, end] = [Math.min(currentIndex, lastIndex), Math.max(currentIndex, lastIndex)];
       const rangeIds = items.slice(start, end + 1).map((item) => getId(item));
-      
+
       setSelected((prev) => {
         const isAdding = !prev.includes(id);
-        return isAdding 
+        return isAdding
           ? [...new Set([...prev, ...rangeIds])]
           : prev.filter((sid) => !rangeIds.includes(sid));
       });
@@ -51,4 +51,4 @@ export function useShiftSelect<T>({ items, getId }: {
     deselectAll,
     isSelected,
   };
-} 
+}

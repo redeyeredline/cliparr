@@ -35,7 +35,7 @@ router.post('/import-mode', (req, res) => {
     }
 
     setImportMode(db, mode);
-    
+
     // Get the import task manager instance from the app
     const importTaskManager = req.app.get('importTaskManager');
     if (importTaskManager) {
@@ -81,7 +81,7 @@ router.post('/polling-interval', (req, res) => {
       });
     }
     setPollingInterval(db, parseInt(interval, 10));
-    
+
     // Get the import task manager instance from the app
     const importTaskManager = req.app.get('importTaskManager');
     if (importTaskManager) {
