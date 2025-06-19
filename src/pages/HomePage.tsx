@@ -44,8 +44,17 @@ function HomePage() {
   const [health, setHealth] = useState('checking...');
   const [shows, setShows] = useState<Show[]>([]);
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<keyof Show>('title');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Load sort state from localStorage or use defaults
+  const [sortKey, setSortKey] = useState<keyof Show>(() => {
+    const saved = localStorage.getItem('cliparr-table-sort-key');
+    return (saved as keyof Show) || 'title';
+  });
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(() => {
+    const saved = localStorage.getItem('cliparr-table-sort-direction');
+    return (saved as 'asc' | 'desc') || 'asc';
+  });
+
   const toast = useToast();
 
   // Refs
@@ -246,10 +255,14 @@ function HomePage() {
 
   const handleSort = (key: keyof Show) => {
     if (sortKey === key) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+      setSortDirection(newDirection);
+      localStorage.setItem('cliparr-table-sort-direction', newDirection);
     } else {
       setSortKey(key);
       setSortDirection('asc');
+      localStorage.setItem('cliparr-table-sort-key', key);
+      localStorage.setItem('cliparr-table-sort-direction', 'asc');
     }
   };
 
