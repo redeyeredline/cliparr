@@ -48,11 +48,13 @@ export default function ImportModal({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
+      } else if (e.key === 'Enter' && selected.length > 0) {
+        handleOk();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, selected.length]);
 
   if (!open) {
     return null;

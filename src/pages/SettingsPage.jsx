@@ -59,7 +59,7 @@ const SettingsPage = () => {
     setSaving(true);
     try {
       let autoScanTriggered = false;
-      
+
       // Handle import mode change separately to check for auto scan
       if (pendingMode !== importMode) {
         const modeResult = await apiClient.setImportMode(pendingMode);
@@ -67,15 +67,15 @@ const SettingsPage = () => {
           autoScanTriggered = true;
         }
       }
-      
+
       // Handle polling interval change
       if (pendingInterval !== currentInterval) {
         await apiClient.setPollingInterval(pendingInterval);
       }
-      
+
       setImportMode(pendingMode);
       setCurrentInterval(pendingInterval);
-      
+
       if (autoScanTriggered) {
         toast({ type: 'success', message: 'Auto import mode enabled! Scanning for shows to import...' });
       } else {
@@ -91,6 +91,19 @@ const SettingsPage = () => {
 
   const hasChanges = (pendingMode !== importMode) ||
                     (pendingInterval !== currentInterval);
+
+  // Add keyboard event handler for Enter key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter' && hasChanges && !saving) {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [hasChanges, saving, handleSave]);
 
   return (
     <div className="py-8 px-8 bg-gray-900 min-h-full text-gray-100 flex">

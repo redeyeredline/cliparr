@@ -107,7 +107,7 @@
 - ❌ the alphabet bar should expand to fill all avail vertical space more gracefully
 - ❌ properly add an alphabet bar to the import modal 
 - ❌ fix scroll bars site wide to remove the up and down arrows
-- ❌ enter onkeybnoard in import modal should click on import
+- ✅ enter onkeybnoard in import modal should click on import
 - ❌ keyboard shortcuts should begin in intellegently useful points on the page
 ## 14. Bug Fixes & Issues
 - 💭 the home page randomly refrehses. repeatedly
@@ -118,7 +118,7 @@
 - ❌ a previous chat was going to review tdarr to see its mongo db setup in the background to advise on more robust db solution
 
 ## 16. Import System Issues
-- ❌ MIGHT BE FIXED - app is suddenly duplicating imports on start/app refreshes
+- ✅ MIGHT BE FIXED - app is suddenly duplicating imports on start/app refreshes
   something with the way the import mode setting change triggers an import without using the check existing shows in localdb function and duplicates the shows. fix it you fuck
 
 ## 17. Search & Navigation Features
@@ -132,7 +132,13 @@
 - ❌ ASK BOLT can you cleanly/easily include the alphabet bar from the homepage to the import modal?
 
 ## 19. Import Mode Automation
-- ❌ create trigger when setting import mode changes to auto to trigger a scan upon saving to import all shows automatically
+- ✅ create trigger when setting import mode changes to auto to trigger a scan upon saving to import all shows automatically
+
+## 20. Toast System Review
+- ✅ All toasts use the new modern UI system (ToastProvider)
+- ✅ No old toast systems or alert() calls found
+- ✅ WebSocket events appropriately use console logging for debugging
+- ✅ User-facing notifications properly use the modern toast system
 
 ---
 
