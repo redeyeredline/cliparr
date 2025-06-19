@@ -416,10 +416,11 @@ function HomePage() {
                         }
                       }}
                       data-index={idx}
-                      className="hover:bg-gray-700 focus-within:bg-gray-700 \
-                        transition-all duration-200 focus:outline-none \
-                        focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 \
-                        focus:ring-offset-gray-800"
+                      className={`transition-all duration-200 ${
+                        isSelected(show.id)
+                          ? 'bg-gray-700/40'
+                          : ''
+                      }`}
                       tabIndex={0}
                       role="row"
                       aria-selected={selected.includes(show.id)}
@@ -439,16 +440,14 @@ function HomePage() {
                         </div>
                       </td>
                       <td
-                        className="px-4 py-1.5 whitespace-nowrap cursor-pointer"
+                        className="px-4 py-1.5 whitespace-nowrap"
                         role="cell"
-                        onClick={(e) => handleSelect(show.id, e as React.MouseEvent)}
                       >
                         {show.title}
                       </td>
                       <td
-                        className="px-4 py-1.5 whitespace-nowrap cursor-pointer"
+                        className="px-4 py-1.5 whitespace-nowrap"
                         role="cell"
-                        onClick={(e) => handleSelect(show.id, e as React.MouseEvent)}
                       >
                         {show.path}
                       </td>
