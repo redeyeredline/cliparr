@@ -13,10 +13,10 @@ interface Show {
   path: string;
 }
 
-interface DbStatus {
-  success: boolean;
-  message: string;
-  testValue?: string;
+interface ImportProgressEvent {
+  type: string;
+  status: string;
+  showId?: number;
 }
 
 // Helper function to get the sortable title (removes leading articles)
@@ -42,8 +42,6 @@ const getDisplayLetter = (title: string): string => {
 function HomePage() {
   // State hooks
   const [health, setHealth] = useState('checking...');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [healthCheckMsg, setHealthCheckMsg] = useState<string | null>(null);
   const [shows, setShows] = useState<Show[]>([]);
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<keyof Show>('title');
@@ -112,13 +110,16 @@ function HomePage() {
   const { selected, handleToggle, selectAll, deselectAll, isSelected } = shiftSelect;
 
   // Event handlers
-  const handleSelect = (showId: number, event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelect = (
+    showId: number,
+    event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const isNativeEvent = event instanceof MouseEvent;
     const shiftKey = isNativeEvent ? event.shiftKey : (event.nativeEvent as MouseEvent).shiftKey;
     handleToggle(showId, {
       shiftKey,
-      preventDefault: () => {},
-      stopPropagation: () => {},
+      preventDefault: () => event.preventDefault(),
+      stopPropagation: () => event.stopPropagation(),
       nativeEvent: isNativeEvent ? event : event.nativeEvent,
     } as React.MouseEvent);
   };
@@ -127,11 +128,10 @@ function HomePage() {
     try {
       const data = await apiClient.testDatabase();
       if (!data.success) {
-        setHealthCheckMsg('❌ Database test failed.');
         logger.error('Health check failed:', data);
       }
     } catch {
-      setHealthCheckMsg('❌ Failed to check database status');
+      logger.error('Failed to check database status');
     }
   }, []);
 
@@ -141,26 +141,20 @@ function HomePage() {
     }
     healthCheckRef.current = true;
 
-    setIsLoading(true);
-    setHealthCheckMsg(null);
     try {
       const data = await apiClient.checkHealth();
       setHealth(data.status);
       if (data.status === 'healthy') {
         wsClient.connect();
         await testDatabase();
-        setHealthCheckMsg('✅ Server health check successful!');
         logger.info('Health check result:', data);
       } else {
-        setHealthCheckMsg('❌ Server health check failed.');
         logger.error('Health check failed:', data);
       }
     } catch (err) {
       setHealth('error');
-      setHealthCheckMsg('❌ Failed to connect to server.');
       logger.error('Health check error:', err);
     } finally {
-      setIsLoading(false);
       healthCheckRef.current = false;
     }
   }, [testDatabase]);
@@ -184,9 +178,7 @@ function HomePage() {
         return;
       }
       if (data.status === 'error') {
-        setHealthCheckMsg('❌ WebSocket connection failed');
-      } else {
-        setHealthCheckMsg(null);
+        logger.error('WebSocket connection failed');
       }
     };
 
@@ -194,11 +186,11 @@ function HomePage() {
       if (!mounted) {
         return;
       }
-      setHealthCheckMsg('❌ WebSocket connection failed');
+      logger.error('WebSocket connection failed');
     };
 
     // Add import_progress listener for real-time show updates
-    const handleImportProgress = async (data: any) => {
+    const handleImportProgress = async (data: ImportProgressEvent) => {
       if (!mounted) {
         return;
       }
@@ -275,7 +267,9 @@ function HomePage() {
       }
       case 'ArrowDown': {
         e.preventDefault();
-        const nextRow = tableRef.current?.querySelector(`tr[data-index="${index + 1}"]`) as HTMLTableRowElement;
+        const nextRow = tableRef.current?.querySelector(
+          `tr[data-index="${index + 1}"]`,
+        ) as HTMLTableRowElement;
         if (nextRow) {
           nextRow.focus();
         }
@@ -283,7 +277,9 @@ function HomePage() {
       }
       case 'ArrowUp': {
         e.preventDefault();
-        const prevRow = tableRef.current?.querySelector(`tr[data-index="${index - 1}"]`) as HTMLTableRowElement;
+        const prevRow = tableRef.current?.querySelector(
+          `tr[data-index="${index - 1}"]`,
+        ) as HTMLTableRowElement;
         if (prevRow) {
           prevRow.focus();
         }
@@ -291,7 +287,9 @@ function HomePage() {
       }
       case 'Home': {
         e.preventDefault();
-        const firstRow = tableRef.current?.querySelector('tr[data-index="0"]') as HTMLTableRowElement;
+        const firstRow = tableRef.current?.querySelector(
+          'tr[data-index="0"]',
+        ) as HTMLTableRowElement;
         if (firstRow) {
           firstRow.focus();
         }
@@ -299,7 +297,9 @@ function HomePage() {
       }
       case 'End': {
         e.preventDefault();
-        const lastRow = tableRef.current?.querySelector(`tr[data-index="${sortedShows.length - 1}"]`) as HTMLTableRowElement;
+        const lastRow = tableRef.current?.querySelector(
+          `tr[data-index="${sortedShows.length - 1}"]`,
+        ) as HTMLTableRowElement;
         if (lastRow) {
           lastRow.focus();
         }
@@ -350,11 +350,15 @@ function HomePage() {
                         checked={selected.length === sortedShows.length}
                         onChange={handleSelectAll}
                         aria-label="Select all shows"
-                        className="align-middle focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
+                        className="align-middle focus:ring-2 focus:ring-blue-500 \
+                          focus:ring-offset-2 focus:ring-offset-gray-700"
                       />
                     </th>
                     <th
-                      className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 focus:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
+                      className="px-4 py-2 text-left text-xs font-medium text-gray-300 \
+                        uppercase tracking-wider cursor-pointer hover:bg-gray-600 \
+                        focus:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 \
+                        focus:ring-offset-2 focus:ring-offset-gray-700"
                       onClick={() => handleSort('title')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -364,12 +368,19 @@ function HomePage() {
                       }}
                       tabIndex={0}
                       role="columnheader"
-                      aria-sort={sortKey === 'title' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-sort={
+                        sortKey === 'title'
+                          ? (sortDirection === 'asc' ? 'ascending' : 'descending')
+                          : 'none'
+                      }
                     >
                       Title {sortKey === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 focus:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
+                      className="px-4 py-2 text-left text-xs font-medium text-gray-300 \
+                        uppercase tracking-wider cursor-pointer hover:bg-gray-600 \
+                        focus:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 \
+                        focus:ring-offset-2 focus:ring-offset-gray-700"
                       onClick={() => handleSort('path')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -379,7 +390,11 @@ function HomePage() {
                       }}
                       tabIndex={0}
                       role="columnheader"
-                      aria-sort={sortKey === 'path' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-sort={
+                        sortKey === 'path'
+                          ? (sortDirection === 'asc' ? 'ascending' : 'descending')
+                          : 'none'
+                      }
                     >
                       Path {sortKey === 'path' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
@@ -396,7 +411,10 @@ function HomePage() {
                         }
                       }}
                       data-index={idx}
-                      className="hover:bg-gray-700 focus-within:bg-gray-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                      className="hover:bg-gray-700 focus-within:bg-gray-700 \
+                        transition-all duration-200 focus:outline-none \
+                        focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 \
+                        focus:ring-offset-gray-800"
                       tabIndex={0}
                       role="row"
                       aria-selected={selected.includes(show.id)}
@@ -409,7 +427,9 @@ function HomePage() {
                             checked={isSelected(show.id)}
                             onChange={(e) => handleSelect(show.id, e)}
                             onKeyDown={(e) => handleKeyDown(e, show.id, idx)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                            className="rounded border-gray-300 text-blue-600 \
+                              focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 \
+                              focus:ring-offset-gray-800"
                           />
                         </div>
                       </td>
@@ -436,7 +456,8 @@ function HomePage() {
             {/* Fixed bottom bar for deletion */}
             {selected.length > 0 && (
               <div
-                className="fixed bottom-0 left-0 w-full bg-gray-900 border-t border-gray-700 flex justify-end items-center p-4 z-50"
+                className="fixed bottom-0 left-0 w-full bg-gray-900 border-t \
+                  border-gray-700 flex justify-end items-center p-4 z-50"
                 style={{ boxShadow: '0 -2px 8px rgba(0,0,0,0.3)' }}
                 role="status"
                 aria-live="polite"
@@ -444,7 +465,10 @@ function HomePage() {
                 <span className="text-gray-300 mr-4">{selected.length} series selected</span>
                 <button
                   onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-8 rounded shadow text-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-8 \
+                    rounded shadow text-lg transition-all duration-200 \
+                    focus:outline-none focus:ring-2 focus:ring-red-500 \
+                    focus:ring-offset-2 focus:ring-offset-gray-900"
                   aria-label={`Delete ${selected.length} selected shows`}
                 >
                   Delete

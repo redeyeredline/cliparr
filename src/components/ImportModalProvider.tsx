@@ -56,7 +56,6 @@ export const ImportModalProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setImporting(true);
     setError(null);
     closeImportModal();
-    toast({ type: 'info', message: `Importing ${selectedIds.length} shows...` });
     try {
       await apiClient.importShows(selectedIds);
       toast({ type: 'success', message: `Imported ${selectedIds.length} shows successfully!` });

@@ -116,6 +116,7 @@
 
 ## 14. Bug Fixes & Issues
 - 💭 the home page randomly refrehses. repeatedly
+- ❌ review all logging and remove things that are no longer needed
 - ✅ we lost the tooltip on why the import refresh is grayed out
 
 ## 15. Infrastructure Investigation
