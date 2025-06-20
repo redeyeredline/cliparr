@@ -378,8 +378,9 @@ function HomePage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`
                   w-full pl-12 pr-4 py-3 bg-gray-800/50 border border-gray-700/50 rounded-xl
-                  text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50
-                  focus:border-transparent transition-all duration-200 backdrop-blur-sm
+                  text-white placeholder-gray-400 focus:outline-none focus:ring-2 
+                  focus:ring-blue-500/50 focus:border-transparent transition-all duration-200 
+                  backdrop-blur-sm
                 `}
               />
             </div>
@@ -409,7 +410,12 @@ function HomePage() {
             {shows.length === 0 ? (
               <EmptyState />
             ) : (
-              <div className="h-full bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/30 shadow-2xl overflow-hidden">
+              <div
+                className={`
+                  h-full bg-gray-800/30 backdrop-blur-sm rounded-2xl 
+                  border border-gray-700/30 shadow-2xl overflow-hidden
+                `}
+              >
                 <div className="h-full overflow-auto">
                   <table
                     ref={tableRef}
@@ -418,21 +424,36 @@ function HomePage() {
                     aria-label="Shows list"
                     onKeyDown={handleTableKeyDown}
                   >
-                    <thead className="sticky top-0 bg-gray-800/80 backdrop-blur-sm border-b border-gray-700/50">
+                    <thead
+                      className={`
+                        sticky top-0 bg-gray-800/80 backdrop-blur-sm 
+                        border-b border-gray-700/50
+                      `}
+                    >
                       <tr>
                         <th className="w-16 px-6 py-4 text-center">
                           <div className="flex items-center justify-center">
                             <input
                               type="checkbox"
-                              checked={selected.length === sortedShows.length && sortedShows.length > 0}
+                              checked={
+                                selected.length === sortedShows.length &&
+                                sortedShows.length > 0
+                              }
                               onChange={handleSelectAll}
-                              className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
+                              className={`
+                                w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded
+                                focus:ring-blue-500 focus:ring-2 transition-all duration-200
+                              `}
                               aria-label="Select all shows"
                             />
                           </div>
                         </th>
                         <th
-                          className="px-6 py-4 text-left text-sm font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700/30 transition-all duration-200 group"
+                          className={`
+                            px-6 py-4 text-left text-sm font-semibold text-gray-300 uppercase 
+                            tracking-wider cursor-pointer hover:bg-gray-700/30 
+                            transition-all duration-200 group
+                          `}
                           onClick={() => handleSort('title')}
                           role="columnheader"
                           aria-sort={
@@ -445,11 +466,12 @@ function HomePage() {
                             <span>Title</span>
                             <div className="flex flex-col">
                               <ChevronUp
-                                className={`w-3 h-3 transition-colors duration-200 ${
-                                  sortKey === 'title' && sortDirection === 'asc'
-                                    ? 'text-blue-400'
-                                    : 'text-gray-500 group-hover:text-gray-400'
-                                }`}
+                                className={`
+                                  w-3 h-3 transition-colors duration-200 
+                                  ${sortKey === 'title' && sortDirection === 'asc'
+                ? 'text-blue-400'
+                : 'text-gray-500 group-hover:text-gray-400'}
+                                `}
                               />
                               <ChevronDown
                                 className={`w-3 h-3 -mt-1 transition-colors duration-200 ${
@@ -462,7 +484,11 @@ function HomePage() {
                           </div>
                         </th>
                         <th
-                          className="px-6 py-4 text-left text-sm font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700/30 transition-all duration-200 group"
+                          className={`
+                            px-6 py-4 text-left text-sm font-semibold text-gray-300 uppercase 
+                            tracking-wider cursor-pointer hover:bg-gray-700/30 
+                            transition-all duration-200 group
+                          `}
                           onClick={() => handleSort('path')}
                           role="columnheader"
                           aria-sort={
@@ -520,18 +546,32 @@ function HomePage() {
                                 type="checkbox"
                                 checked={isSelected(show.id)}
                                 onChange={(e) => handleSelect(show.id, e)}
-                                className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
+                                className={`
+                                  w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded
+                                  focus:ring-blue-500 focus:ring-2 transition-all duration-200
+                                `}
                               />
                             </div>
                           </td>
                           <td className="px-1 py-1 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                              <div
+                                className={`
+                                  w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 
+                                  rounded-full mr-4 opacity-0 group-hover:opacity-100 
+                                  transition-opacity duration-200
+                                `}
+                              ></div>
                               <div className="text-white font-medium text-lg">{show.title}</div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-gray-300 font-mono text-sm bg-gray-800/50 px-3 py-1 rounded-lg inline-block">
+                            <div
+                              className={`
+                                text-gray-300 font-mono text-sm bg-gray-800/50 
+                                px-3 py-1 rounded-lg inline-block
+                              `}
+                            >
                               {show.path}
                             </div>
                           </td>
@@ -543,7 +583,10 @@ function HomePage() {
                   {/* Empty State */}
                   {sortedShows.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                      <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mb-4">
+                      <div className={`
+                        w-16 h-16 bg-gray-700/50 rounded-full flex items-center 
+                        justify-center mb-4
+                      `}>
                         <Search className="w-8 h-8" />
                       </div>
                       <p className="text-lg font-medium">No shows found</p>
@@ -568,15 +611,28 @@ function HomePage() {
 
       {/* Fixed bottom bar for deletion */}
       {selected.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <div className="bg-gray-800/90 backdrop-blur-lg border border-gray-700/50 rounded-2xl shadow-2xl p-4 flex items-center space-x-4">
+        <div
+          className={`
+            fixed bottom-6 right-6 z-50
+          `}
+        >
+          <div
+            className={`
+              bg-gray-800/90 backdrop-blur-lg border border-gray-700/50 
+              rounded-2xl shadow-2xl p-4 flex items-center space-x-4
+            `}
+          >
             <div className="flex items-center space-x-2 text-gray-300">
               <Check className="w-5 h-5 text-blue-400" />
               <span className="font-medium">{selected.length} selected</span>
             </div>
             <button
               onClick={handleDelete}
-              className="bg-red-500/90 hover:bg-red-500 text-white font-semibold py-2 px-6 rounded-xl shadow-lg shadow-red-500/25 transition-all duration-200 hover:shadow-red-500/40 hover:scale-105 flex items-center space-x-2"
+              className={`
+                bg-red-500/90 hover:bg-red-500 text-white font-semibold py-2 px-6 rounded-xl
+                shadow-lg shadow-red-500/25 transition-all duration-200 hover:shadow-red-500/40
+                hover:scale-105 flex items-center space-x-2
+              `}
               aria-label={`Delete ${selected.length} selected shows`}
             >
               <Trash2 className="w-4 h-4" />

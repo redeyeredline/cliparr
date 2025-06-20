@@ -12,7 +12,10 @@ export function getDatabaseSingleton(dbPath) {
   }
 
   try {
-    logger.info({ dbPath }, 'Initializing database');
+    logger.info(
+      { dbPath },
+      'Initializing database',
+    );
 
     // Ensure absolute path
     const absoluteDbPath = path.isAbsolute(dbPath) ? dbPath : path.resolve(process.cwd(), dbPath);
@@ -39,7 +42,9 @@ export function getDatabaseSingleton(dbPath) {
       }
 
       // Check if settings table is empty
-      const settingsCount = dbInstance.prepare('SELECT COUNT(*) as count FROM settings').get().count;
+      const settingsCount = dbInstance
+        .prepare('SELECT COUNT(*) as count FROM settings')
+        .get().count;
 
       // Only set defaults if settings table is empty
       if (settingsCount === 0) {
@@ -58,7 +63,9 @@ export function getDatabaseSingleton(dbPath) {
         }
 
         // Verify settings were set
-        const verifyStmt = dbInstance.prepare('SELECT key, value FROM settings WHERE key IN (?, ?)');
+        const verifyStmt = dbInstance.prepare(
+          'SELECT key, value FROM settings WHERE key IN (?, ?)',
+        );
         const results = verifyStmt.all('import_mode', 'polling_interval');
 
         logger.info({ settings: results }, 'Default settings initialized');

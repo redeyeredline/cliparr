@@ -19,7 +19,11 @@ const EmptyState: React.FC = () => {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
       {/* Animated Icon Container */}
       <div className="relative mb-8">
-        <div className="w-32 h-32 bg-gradient-to-br from-gray-700/30 to-gray-800/30 rounded-3xl flex items-center justify-center backdrop-blur-sm border border-gray-700/20 shadow-2xl">
+        <div className={`
+          w-32 h-32 bg-gradient-to-br from-gray-700/30 to-gray-800/30 rounded-3xl 
+          flex items-center justify-center backdrop-blur-sm border border-gray-700/20 
+          shadow-2xl
+        `}>
           <Database className="w-16 h-16 text-gray-400" />
         </div>
         {/* Floating accent as a button, no focus border */}
@@ -44,7 +48,10 @@ const EmptyState: React.FC = () => {
 
       {/* Content */}
       <div className="text-center max-w-md">
-        <h3 className="text-2xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+        <h3 className={`
+          text-2xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 
+          bg-clip-text text-transparent
+        `}>
           No shows imported yet
         </h3>
         <p className="text-gray-400 mb-8 leading-relaxed">
@@ -55,7 +62,13 @@ const EmptyState: React.FC = () => {
         {/* CTA Button */}
         <button
           onClick={openImportModal}
-          className="group relative bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold py-4 px-8 rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-300 hover:shadow-blue-500/40 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 focus:ring-offset-gray-900"
+          className={`
+            group relative bg-gradient-to-r from-blue-600 to-purple-600 
+            hover:from-blue-500 hover:to-purple-500 text-white font-semibold py-4 px-8 
+            rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-300 
+            hover:shadow-blue-500/40 hover:scale-105 focus:outline-none focus:ring-2 
+            focus:ring-blue-500/50 focus:ring-offset-2 focus:ring-offset-gray-900
+          `}
         >
           <span className="flex items-center space-x-2">
             <Database className="w-5 h-5" />
@@ -63,14 +76,24 @@ const EmptyState: React.FC = () => {
           </span>
 
           {/* Button shine effect */}
-          <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform -skew-x-12"></div>
+          <div className={`
+            absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-white/10 
+            to-transparent opacity-0 group-hover:opacity-100 transition-opacity 
+            duration-300 transform -skew-x-12
+          `}></div>
         </button>
       </div>
 
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl"></div>
+        <div className={`
+          absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/5 
+          rounded-full blur-3xl
+        `}></div>
+        <div className={`
+          absolute bottom-1/4 right-1/4 w-64 h-64 bg-purple-500/5 
+          rounded-full blur-3xl
+        `}></div>
       </div>
     </div>
   );

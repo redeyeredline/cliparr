@@ -68,7 +68,10 @@ const PollingIntervalControl = ({ disabled = false, onValueChange }) => {
     <div className="flex flex-col w-full relative">
       {tooltip.show && (
         <div
-          className="fixed max-w-[200px] bg-black border border-yellow-500 text-yellow-500 px-2 py-1.5 rounded text-xs shadow-lg z-50"
+          className={`
+            fixed max-w-[200px] bg-black border border-yellow-500 text-yellow-500 
+            px-2 py-1.5 rounded text-xs shadow-lg z-50
+          `}
           style={{
             left: `${tooltip.x}px`,
             top: `${tooltip.y}px`,
@@ -78,7 +81,11 @@ const PollingIntervalControl = ({ disabled = false, onValueChange }) => {
           This is not available unless import mode is Auto or Import
         </div>
       )}
-      <div className="w-full flex flex-col gap-2" role="radiogroup" aria-label="Import refresh interval options">
+      <div
+        className="w-full flex flex-col gap-2"
+        role="radiogroup"
+        aria-label="Import refresh interval options"
+      >
         {INTERVAL_OPTIONS.map((opt) => (
           <div
             key={opt.value}
@@ -93,14 +100,19 @@ const PollingIntervalControl = ({ disabled = false, onValueChange }) => {
             aria-checked={currentInterval === opt.value}
             aria-disabled={disabled}
             tabIndex={disabled ? -1 : 0}
-            aria-label={`${opt.label} refresh interval${disabled ? ' (disabled when import mode is set to None)' : ''}`}
+            aria-label={
+              `${opt.label} refresh interval` +
+              (disabled ? ' (disabled when import mode is set to None)' : '')
+            }
           >
             <div
-              className={`w-4 h-4 rounded-full border-2 mr-3 flex-shrink-0 transition-all duration-200 ${
-                currentInterval === opt.value
-                  ? 'border-blue-400 bg-blue-400 ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800'
-                  : 'border-gray-500 hover:border-gray-400'
-              }`}
+              className={`
+                w-4 h-4 rounded-full border-2 mr-3 flex-shrink-0 transition-all duration-200 ${
+          currentInterval === opt.value
+            ? 'border-blue-400 bg-blue-400 ring-2 ring-blue-400 ring-offset-2 ' +
+                      'ring-offset-gray-800'
+            : 'border-gray-500 hover:border-gray-400'
+          }`}
               aria-hidden="true"
             >
               {currentInterval === opt.value && (
