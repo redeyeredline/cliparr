@@ -152,7 +152,7 @@ export class ImportTaskManager {
 
       if (mode === 'auto' || (mode === 'import' && isInitialRun)) {
         const sonarrShows = await this.fetchFromSonarr('series');
-        
+
         // Use the centralized DB function
         const { shows: importedShows } = getImportedShows(db, 1, 10000);
         const importedSet = new Set(importedShows.map((show) => show.title + '|' + show.path));
@@ -160,7 +160,9 @@ export class ImportTaskManager {
         const showsToProcess = sonarrShows.filter((show) => !importedSet.has(show.title + '|' + show.path));
 
         for (const show of showsToProcess) {
-          if (this.shutdownRequested) break;
+          if (this.shutdownRequested) {
+            break;
+          }
           await this.importShow(show, db);
         }
       } else if (mode === 'import' && !isInitialRun) {

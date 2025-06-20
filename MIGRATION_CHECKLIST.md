@@ -39,7 +39,7 @@
 ## 7. Health & Diagnostics
 - ✅ Health check endpoint
 - ✅ Database connection status indicator on frontend
-- ❌ Performance logging/diagnostics endpoint
+- ✅ Performance logging/diagnostics endpoint
 - ❌ database health endpoint
 - ❌ database health check/status/report warnings/errors/thresholds if db having perf issues
 

@@ -1,5 +1,3 @@
-import { logger } from '../services/logger.js';
-
 // Development configuration
 const devConfig = {
   cors: {

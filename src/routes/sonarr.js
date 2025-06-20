@@ -85,7 +85,7 @@ sonarrClient.interceptors.response.use(
 const testSonarrConnection = async () => {
   try {
     logger.info(`Testing connection to Sonarr at ${SONARR_URL}`);
-    const response = await sonarrClient.get('/api/v3/system/status');
+    await sonarrClient.get('/api/v3/system/status');
     logger.info('Successfully connected to Sonarr API');
   } catch (error) {
     logger.error('Failed to connect to Sonarr API:', error.message);
@@ -101,13 +101,12 @@ testSonarrConnection().catch((error) => {
 // Get unimported shows from Sonarr
 router.get('/unimported', async (req, res) => {
   try {
-    const response = await sonarrClient.get('/api/v3/series');
-    const allSonarrShows = response.data;
+    const { data: allSonarrShows } = await sonarrClient.get('/api/v3/series');
 
     // Filter out shows that are already imported
     const db = req.app.get('db');
     // Fetch a large number to simulate getting all shows for the uniqueness check
-    const { shows: importedShows } = getImportedShows(db, 1, 10000); 
+    const { shows: importedShows } = getImportedShows(db, 1, 10000);
     const importedSet = new Set(importedShows.map((show) => show.title + '|' + show.path));
 
     const unimportedShows = allSonarrShows.filter((show) => !importedSet.has(show.title + '|' + show.path));
