@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ImportModeControl from '../components/ImportModeControl';
 import PollingIntervalControl from '../components/PollingIntervalControl';
 import { useToast } from '../components/ToastContext';
@@ -48,7 +48,7 @@ const SettingsPage = () => {
   };
 
   // Handler to save all settings
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     const hasChanges = (pendingMode !== importMode) ||
                       (pendingInterval !== currentInterval);
 
@@ -87,23 +87,27 @@ const SettingsPage = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [pendingMode, importMode, pendingInterval, currentInterval, toast]);
 
   const hasChanges = (pendingMode !== importMode) ||
                     (pendingInterval !== currentInterval);
+
+  // Use ref to store the current handleSave function
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
 
   // Add keyboard event handler for Enter key
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Enter' && hasChanges && !saving) {
         e.preventDefault();
-        handleSave();
+        handleSaveRef.current();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [hasChanges, saving, handleSave]);
+  }, [hasChanges, saving]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
