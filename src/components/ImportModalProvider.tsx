@@ -1,23 +1,8 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import ImportModal, { Show } from './ImportModal';
 import { apiClient } from '../integration/api-client';
 import { useToast } from './ToastContext';
-
-interface ImportModalContextType {
-  openImportModal: () => void;
-  closeImportModal: () => void;
-  isOpen: boolean;
-}
-
-const ImportModalContext = createContext<ImportModalContextType | undefined>(undefined);
-
-export function useImportModal() {
-  const ctx = useContext(ImportModalContext);
-  if (!ctx) {
-    throw new Error('useImportModal must be used within ImportModalProvider');
-  }
-  return ctx;
-}
+import { ImportModalContext } from '../contexts/ImportModalContext';
 
 export const ImportModalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [open, setOpen] = useState(false);
@@ -81,6 +66,3 @@ export const ImportModalProvider: React.FC<{ children: React.ReactNode }> = ({ c
     </ImportModalContext.Provider>
   );
 };
-
-// For clarity, export a root component for modal placement
-export const ImportModalRoot = () => null;

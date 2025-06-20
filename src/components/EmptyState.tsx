@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { useImportModal } from './ImportModalProvider';
+import { useImportModal } from '../hooks/useImportModal';
 import { Database, Plus } from 'lucide-react';
 
 const EmptyState: React.FC = () => {

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useImportModal } from '../ImportModalProvider';
+import { useImportModal } from '../../hooks/useImportModal';
 import { useKeyboardNavigation, useFocusRestoration } from '../../utils/keyboardNavigation';
 import { Home, Download, Settings, Zap } from 'lucide-react';
 
