@@ -5,6 +5,11 @@ import { logger } from '../services/logger.js';
 import dotenv from 'dotenv';
 import process from 'process';
 import WebSocket from 'ws';
+import {
+  getImportedShows,
+  findShowByTitleAndPath,
+  processShowData,
+} from '../database/Db_Operations.js';
 
 // Load environment variables
 dotenv.config();
@@ -97,27 +102,26 @@ testSonarrConnection().catch((error) => {
 router.get('/unimported', async (req, res) => {
   try {
     const response = await sonarrClient.get('/api/v3/series');
-    const shows = response.data;
+    const allSonarrShows = response.data;
 
     // Filter out shows that are already imported
     const db = req.app.get('db');
-    const importedShows = db.prepare('SELECT title, path FROM shows').all();
+    // Fetch a large number to simulate getting all shows for the uniqueness check
+    const { shows: importedShows } = getImportedShows(db, 1, 10000); 
     const importedSet = new Set(importedShows.map((show) => show.title + '|' + show.path));
 
-    const unimportedShows = shows.filter((show) => !importedSet.has(show.title + '|' + show.path));
+    const unimportedShows = allSonarrShows.filter((show) => !importedSet.has(show.title + '|' + show.path));
 
     res.json(unimportedShows);
   } catch (error) {
     logger.error({ error: error.message }, 'Failed to fetch unimported shows');
-    res.status(500).json({
-      error: 'Failed to fetch unimported shows',
-      details: error.message,
-    });
+    res.status(500).json({ error: 'Failed to fetch unimported shows', details: error.message });
   }
 });
 
 // --- REFACTOR: Extract import logic to a function ---
 async function importShowById(showId, req, wss, db) {
+  let dbShowId = null;
   try {
     // Send initial progress
     wss.clients.forEach((client) => {
@@ -132,115 +136,48 @@ async function importShowById(showId, req, wss, db) {
       }
     });
 
-    // Get show details from Sonarr
     const showResponse = await sonarrClient.get(`/api/v3/series/${showId}`);
     const show = showResponse.data;
 
-    // Get episodes for the show
     const episodeResponse = await sonarrClient.get(`/api/v3/episode?seriesId=${showId}`);
     const episodes = episodeResponse.data;
 
-    // Group episodes by season
-    const seasons = {};
-    episodes.forEach((episode) => {
-      if (!seasons[episode.seasonNumber]) {
-        seasons[episode.seasonNumber] = {
-          seasonNumber: episode.seasonNumber,
-          episodes: [],
-        };
+    // All DB logic is now in one performance-logged function call
+    processShowData(db, show, episodes, []);
+
+    // Get the ID of the show we just processed for websocket reporting
+    const newShow = findShowByTitleAndPath(db, show.title, show.path);
+    dbShowId = newShow ? newShow.id : null;
+
+    // Send completion update with local DB show id
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'import_progress',
+          showId: dbShowId,
+          status: 'completed',
+          message: 'Import completed successfully',
+          timestamp: new Date().toISOString(),
+        }));
       }
-      seasons[episode.seasonNumber].episodes.push(episode);
     });
 
-    // Use a transaction for data consistency
-    let dbShowId = null;
-    try {
-      db.transaction(() => {
-        // Check if show already exists
-        const existingShow = db.prepare(`
-          SELECT id FROM shows WHERE title = ? AND path = ?
-        `).get(show.title, show.path);
-
-        if (existingShow) {
-          // Show already exists, use existing ID
-          dbShowId = existingShow.id;
-        } else {
-          // Insert new show
-          const showResult = db.prepare(`
-            INSERT INTO shows (
-              title, path
-            ) VALUES (?, ?)
-          `).run(
-            show.title,
-            show.path,
-          );
-          dbShowId = showResult.lastInsertRowid;
-        }
-
-        // Insert seasons and episodes
-        Object.values(seasons).forEach((season) => {
-          const seasonResult = db.prepare(`
-            INSERT OR IGNORE INTO seasons (
-              show_id, season_number
-            ) VALUES (?, ?)
-          `).run(
-            dbShowId,
-            season.seasonNumber,
-          );
-
-          season.episodes.forEach((episode) => {
-            db.prepare(`
-              INSERT OR REPLACE INTO episodes (
-                season_id, episode_number, title
-              ) VALUES (?, ?, ?)
-            `).run(
-              seasonResult.lastInsertRowid,
-              episode.episodeNumber,
-              episode.title,
-            );
-          });
-        });
-      })();
-
-      // Send completion update with local DB show id
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({
-            type: 'import_progress',
-            showId: dbShowId,
-            status: 'completed',
-            message: 'Import completed successfully',
-            timestamp: new Date().toISOString(),
-          }));
-        }
-      });
-
-      return { success: true, showId: dbShowId };
-    } catch (txError) {
-      logger.error(
-        { txError: txError.stack || txError },
-        'Database transaction failed during import',
-      );
-
-      // Send error update
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({
-            type: 'import_progress',
-            showId: dbShowId,
-            status: 'error',
-            message: 'Import failed: ' + txError.message,
-            timestamp: new Date().toISOString(),
-          }));
-        }
-      });
-
-      return { success: false, showId: dbShowId, error: txError.message };
-    }
+    return { success: true, showId: dbShowId };
   } catch (error) {
-    logger.error({ error: error.message }, 'Failed to import show');
-    // Don't throw, just return error object
-    return { success: false, showId: null, error: error.message };
+    logger.error({ error: error.message, stack: error.stack }, 'Failed to import show');
+    // Send error update
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'import_progress',
+          showId: dbShowId,
+          status: 'error',
+          message: 'Import failed: ' + error.message,
+          timestamp: new Date().toISOString(),
+        }));
+      }
+    });
+    return { success: false, showId: dbShowId, error: error.message };
   }
 }
 

@@ -389,7 +389,7 @@ function HomePage() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <div className="flex-1 overflow-hidden p-6">
+      <div className="flex-1 overflow-auto p-6">
         <div className="h-full flex flex-col">
 
           {/* Search Bar */}

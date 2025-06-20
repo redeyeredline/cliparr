@@ -6,8 +6,9 @@ function getDb(dbPath = 'data/cliparr.db') {
 }
 
 function upsertReturningId(db, insertSql, insertParams, selectSql, selectParams) {
-  const r = db.prepare(insertSql).run(...insertParams);
-  return r.lastInsertRowid || db.prepare(selectSql).get(...selectParams).id;
+  timedQuery(db, insertSql, insertParams, 'run');
+  const row = timedQuery(db, selectSql, selectParams, 'get');
+  return row.lastInsertRowid || row.id;
 }
 
 function insertShow(db, show) {
@@ -41,12 +42,11 @@ function insertEpisode(db, seasonId, ep) {
 }
 
 function insertEpisodeFile(db, episodeId, file) {
-  return db.prepare(
+  return timedQuery(
+    db,
     'INSERT INTO episode_files (episode_id, file_path, size) VALUES (?, ?, ?)',
-  ).run(
-    episodeId,
-    file.path || '',
-    file.size || 0,
+    [episodeId, file.path || '', file.size || 0],
+    'run',
   ).lastInsertRowid;
 }
 
@@ -71,12 +71,9 @@ function processShowData(db, show, episodes = [], files = []) {
 
 function batchInsertShows(db, shows) {
   return db.transaction(() => {
-    const stmt = db.prepare(
-      'INSERT OR IGNORE INTO shows (title, path) VALUES (?, ?)',
-    );
     shows.forEach((s) => {
       try {
-        stmt.run(s.title || '', s.path || '');
+        timedQuery(db, 'INSERT OR IGNORE INTO shows (title, path) VALUES (?, ?)', [s.title || '', s.path || ''], 'run');
       } catch {
         logger.warn({ showTitle: s.title }, 'Batch insert error');
       }
@@ -86,22 +83,25 @@ function batchInsertShows(db, shows) {
 
 function getImportedShows(db, page = 1, pageSize = 100) {
   const p = Math.max(1, +page), sz = Math.max(1, +pageSize), offset = (p - 1) * sz;
-  const shows = db.prepare(
+  const shows = timedQuery(
+    db,
     `SELECT s.id, s.title, s.path
        FROM shows s
       LIMIT ? OFFSET ?`,
-  ).all(sz, offset);
-  const total = db.prepare('SELECT COUNT(*) AS count FROM shows').get().count;
+    [sz, offset],
+    'all',
+  );
+  const total = timedQuery(db, 'SELECT COUNT(*) AS count FROM shows', [], 'get').count;
   return { shows, total, page: p, pageSize: sz, totalPages: Math.ceil(total / sz) };
 }
 
 function getSetting(db, key, defaultValue = null) {
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+  const row = timedQuery(db, 'SELECT value FROM settings WHERE key = ?', [key], 'get');
   return row ? row.value : defaultValue;
 }
 
 function setSetting(db, key, value) {
-  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value);
+  timedQuery(db, 'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value], 'run');
 }
 
 function withPerformanceLogging(name, fn) {
@@ -127,7 +127,7 @@ function withPerformanceLogging(name, fn) {
 
 function getImportMode(db) {
   try {
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('import_mode');
+    const row = timedQuery(db, 'SELECT value FROM settings WHERE key = ?', ['import_mode'], 'get');
     return row ? row.value : 'none';
   } catch (error) {
     logger.error('Failed to get import mode:', error);
@@ -137,8 +137,7 @@ function getImportMode(db) {
 
 function setImportMode(db, mode) {
   try {
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-      .run('import_mode', mode);
+    timedQuery(db, 'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['import_mode', mode], 'run');
   } catch (error) {
     logger.error('Failed to set import mode:', error);
     throw error;
@@ -147,7 +146,7 @@ function setImportMode(db, mode) {
 
 function getPollingInterval(db) {
   try {
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('polling_interval');
+    const row = timedQuery(db, 'SELECT value FROM settings WHERE key = ?', ['polling_interval'], 'get');
     return row ? parseInt(row.value, 10) : 900; // Default to 15 minutes (900 seconds)
   } catch (error) {
     logger.error('Failed to get polling interval:', error);
@@ -159,12 +158,72 @@ function setPollingInterval(db, interval) {
   try {
     // Ensure interval is between 60 seconds (1 minute) and 86400 seconds (24 hours)
     const validInterval = Math.max(60, Math.min(86400, interval));
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-      .run('polling_interval', validInterval.toString());
+    timedQuery(db, 'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['polling_interval', validInterval.toString()], 'run');
   } catch (error) {
     logger.error('Failed to set polling interval:', error);
     throw error;
   }
+}
+
+// In-memory query performance log
+const recentQueries = [];
+const MAX_RECENT = 100;
+
+function logQueryPerformance(sql, duration) {
+  recentQueries.push({ sql, duration, timestamp: Date.now() });
+  if (recentQueries.length > MAX_RECENT) {
+    recentQueries.shift();
+  }
+}
+
+function getPerformanceStats() {
+  if (recentQueries.length === 0) {
+    return { avgQueryTime: 0, slowestQueries: [], queryCount: 0 };
+  }
+  const avgQueryTime = recentQueries.reduce((a, q) => a + q.duration, 0) / recentQueries.length;
+  const slowestQueries = [...recentQueries].sort((a, b) => b.duration - a.duration).slice(0, 5);
+  return {
+    avgQueryTime: Math.round(avgQueryTime),
+    slowestQueries: slowestQueries.map((q) => ({ sql: q.sql, duration: Math.round(q.duration) })),
+    queryCount: recentQueries.length,
+  };
+}
+
+// Wrap a DB call to log performance
+function timedQuery(db, sql, params = [], fn = 'all') {
+  const start = process.hrtime.bigint();
+  let result;
+  try {
+    result = db.prepare(sql)[fn](...params);
+  } finally {
+    const duration = Number(process.hrtime.bigint() - start) / 1e6;
+    logQueryPerformance(sql, duration);
+  }
+  return result;
+}
+
+function getShowById(db, id) {
+  return timedQuery(db, 'SELECT * FROM shows WHERE id = ?', [id], 'get');
+}
+
+function deleteShowsByIds(db, ids) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return 0;
+  }
+  return db.transaction(() => {
+    const placeholders = ids.map(() => '?').join(',');
+
+    // This is simplified. For full cascade, you'd delete from related tables first.
+    // The schema is set to ON DELETE CASCADE, so this should be enough.
+    const stmt = `DELETE FROM shows WHERE id IN (${placeholders})`;
+    const result = timedQuery(db, stmt, ids, 'run');
+    return result.changes;
+  })();
+}
+
+function findShowByTitleAndPath(db, title, path) {
+  const sql = 'SELECT id FROM shows WHERE title = ? AND path = ?';
+  return timedQuery(db, sql, [title, path], 'get');
 }
 
 export {
@@ -184,4 +243,9 @@ export {
   getPollingInterval,
   setPollingInterval,
   logger,
+  getPerformanceStats,
+  timedQuery,
+  getShowById,
+  deleteShowsByIds,
+  findShowByTitleAndPath,
 };

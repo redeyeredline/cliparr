@@ -1,5 +1,7 @@
 // src/integration/routes/api.js - General API routes
 import express from 'express';
+import { getDb, getPerformanceStats } from '../database/Db_Operations.js';
+
 const router = express.Router();
 
 // Health check endpoint
@@ -45,6 +47,16 @@ router.get('/db-test', (req, res) => {
       error: error.message,
     });
   }
+});
+
+// System diagnostics endpoint
+router.get('/system/diagnostics', async (req, res) => {
+  const db = getDb();
+  const dbStats = getPerformanceStats();
+  res.json({
+    uptime: process.uptime(), // seconds
+    dbStats,
+  });
 });
 
 export default router;
