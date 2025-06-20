@@ -131,9 +131,9 @@
 - ❌ add alphabet bar to import modal
 - ❌ ASK BOLT can you cleanly/easily include the alphabet bar from the homepage to the import modal?
       also have bolt process the settings page with its new ui
-      enter key should hit delte button on main table
-      save button on settings page should act like delete button on main page
-      save button should still be clickable with enter when it appears
+    ✅  enter key should hit delte button on main table
+    ✅  save button on settings page should act like delete button on main page
+    ✅  save button should still be clickable with enter when it appears
 
 ## 19. Import Mode Automation
 - ✅ create trigger when setting import mode changes to auto to trigger a scan upon saving to import all shows automatically

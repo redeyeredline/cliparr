@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Save } from 'lucide-react';
 import ImportModeControl from '../components/ImportModeControl';
 import PollingIntervalControl from '../components/PollingIntervalControl';
 import { useToast } from '../components/ToastContext';
@@ -141,15 +142,29 @@ const SettingsPage = () => {
                   />
                 </div>
               </div>
+              {/* Floating Save Bar */}
               {hasChanges && (
-                <div className="flex justify-end mt-10">
-                  <button
-                    className="px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50 text-base shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105"
-                    onClick={handleSave}
-                    disabled={saving}
+                <div className="fixed bottom-6 right-6 z-50">
+                  <div
+                    className={`
+                      bg-gray-800/90 backdrop-blur-lg border border-gray-700/50 
+                      rounded-2xl shadow-2xl p-2
+                    `}
                   >
-                    {saving ? 'Saving...' : 'Save Changes'}
-                  </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className={`
+                        bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-xl
+                        shadow-lg shadow-blue-500/25 transition-all duration-200 hover:shadow-blue-500/40
+                        hover:scale-105 flex items-center space-x-2 disabled:opacity-50
+                      `}
+                      aria-label="Save settings"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

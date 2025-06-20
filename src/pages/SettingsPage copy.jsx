@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ImportModeControl from '../components/ImportModeControl';
 import PollingIntervalControl from '../components/PollingIntervalControl';
 import { useToast } from '../components/ToastContext';
@@ -48,7 +48,7 @@ const SettingsPage = () => {
   };
 
   // Handler to save all settings
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     const hasChanges = (pendingMode !== importMode) ||
                       (pendingInterval !== currentInterval);
 
@@ -87,7 +87,7 @@ const SettingsPage = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [pendingMode, importMode, pendingInterval, currentInterval, toast]);
 
   const hasChanges = (pendingMode !== importMode) ||
                     (pendingInterval !== currentInterval);

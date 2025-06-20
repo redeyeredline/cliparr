@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useShiftSelect } from '../utils/selectionUtils';
 import { X, Download, Check, ChevronUp, ChevronDown } from 'lucide-react';
 
@@ -37,9 +37,9 @@ export default function ImportModal({
   });
   const modalRef = useRef<HTMLDivElement>(null);
 
-  const handleOk = () => {
+  const handleOk = useCallback(() => {
     onImport(selected as number[]);
-  };
+  }, [onImport, selected]);
 
   useEffect(() => {
     deselectAll();

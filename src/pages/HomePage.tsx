@@ -258,13 +258,13 @@ function HomePage() {
     deselectAll();
   }, [shows, deselectAll]);
 
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     if (selected.length === sortedShows.length) {
       deselectAll();
     } else {
       selectAll();
     }
-  };
+  }, [selected.length, sortedShows.length, deselectAll, selectAll]);
 
   const handleSort = (key: keyof Show) => {
     if (sortKey === key) {
@@ -277,6 +277,7 @@ function HomePage() {
       localStorage.setItem('cliparr-table-sort-key', key);
       localStorage.setItem('cliparr-table-sort-direction', 'asc');
     }
+    handleSelectAll();
   };
 
   const handleLetterClick = (letter: string) => {
@@ -346,7 +347,7 @@ function HomePage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     try {
       const result = await apiClient.deleteShows(selected);
       toast({ type: 'success', message: `${result.deleted} shows deleted` });
@@ -355,7 +356,36 @@ function HomePage() {
     } catch {
       toast({ type: 'error', message: 'Failed to delete shows' });
     }
-  };
+  }, [selected, toast, handleSelectAll, fetchShows]);
+
+  // Global Enter key handler for delete
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && selected.length > 0) {
+        const activeElement = document.activeElement as HTMLElement;
+        if (activeElement) {
+          const tagName = activeElement.tagName.toUpperCase();
+          // Prevent delete only when focused on elements where the user can type.
+          const isTypingElement =
+            (tagName === 'INPUT' && (activeElement as HTMLInputElement).type === 'text') ||
+            tagName === 'TEXTAREA' ||
+            activeElement.isContentEditable;
+
+          if (!isTypingElement) {
+            e.preventDefault();
+            handleDelete();
+          }
+        } else {
+          // If no element is focused, allow delete.
+          e.preventDefault();
+          handleDelete();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [selected, handleDelete]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -363,7 +393,7 @@ function HomePage() {
         <div className="h-full flex flex-col">
 
           {/* Search Bar */}
-          <div className="mb-6">
+          <div className="mb-5">
             <div className="relative">
               <Search
                 className={`
@@ -387,7 +417,7 @@ function HomePage() {
           </div>
 
           {/* Stats Bar */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center space-x-6">
               <div className="text-sm text-gray-400">
                 <span className="text-white font-medium">{sortedShows.length}</span> shows
@@ -431,7 +461,7 @@ function HomePage() {
                       `}
                     >
                       <tr>
-                        <th className="w-16 px-6 py-4 text-center">
+                        <th className="w-16 px-6 py-1 text-center">
                           <div className="flex items-center justify-center">
                             <input
                               type="checkbox"
@@ -450,7 +480,7 @@ function HomePage() {
                         </th>
                         <th
                           className={`
-                            px-6 py-4 text-left text-sm font-semibold text-gray-300 uppercase 
+                            px-6 py-1 text-left text-sm font-semibold text-gray-300 uppercase 
                             tracking-wider cursor-pointer hover:bg-gray-700/30 
                             transition-all duration-200 group
                           `}
@@ -485,7 +515,7 @@ function HomePage() {
                         </th>
                         <th
                           className={`
-                            px-6 py-4 text-left text-sm font-semibold text-gray-300 uppercase 
+                            px-6 py-1 text-left text-sm font-semibold text-gray-300 uppercase 
                             tracking-wider cursor-pointer hover:bg-gray-700/30 
                             transition-all duration-200 group
                           `}
@@ -540,7 +570,7 @@ function HomePage() {
                           tabIndex={0}
                           onKeyDown={(e) => handleKeyDown(e, show.id, idx)}
                         >
-                          <td className="w-16 px-6 py-4 text-center">
+                          <td className="w-16 px-6 py-1 text-center">
                             <div className="flex items-center justify-center">
                               <input
                                 type="checkbox"
@@ -562,14 +592,14 @@ function HomePage() {
                                   transition-opacity duration-200
                                 `}
                               ></div>
-                              <div className="text-white font-medium text-lg">{show.title}</div>
+                              <div className="text-white text-lg">{show.title}</div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-1 whitespace-nowrap">
                             <div
                               className={`
                                 text-gray-300 font-mono text-sm bg-gray-800/50 
-                                px-3 py-1 rounded-lg inline-block
+                                py-1 rounded-lg inline-block
                               `}
                             >
                               {show.path}
