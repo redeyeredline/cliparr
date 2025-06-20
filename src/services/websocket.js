@@ -16,14 +16,12 @@ export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}
   logger.info({ path }, 'WebSocketServer listening');
 
   wsServer.on('connection', (ws) => {
-    logger.debug('WebSocket client connected');
     ws.isAlive = true;
 
     // heartbeat
     ws.on('pong', () => (ws.isAlive = true));
 
     ws.on('message', (raw) => {
-      logger.debug({ raw }, 'WS message');
       // echo
       ws.send(JSON.stringify({
         type: 'echo',
@@ -37,7 +35,7 @@ export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}
     });
 
     ws.on('close', () => {
-      logger.debug('WebSocket disconnected');
+      // Connection closed
     });
 
     // welcome payload

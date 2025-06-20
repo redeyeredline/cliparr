@@ -8,8 +8,6 @@ router.get('/', (req, res) => {
   const logger = req.app.get('logger');
 
   try {
-    logger.info('Fetching all shows');
-
     const query = `
       SELECT 
         s.id, 
@@ -20,8 +18,6 @@ router.get('/', (req, res) => {
 
     const shows = db.prepare(query).all();
     const total = shows.length;
-
-    logger.info(`Found ${shows.length} shows in local database`);
 
     res.json({
       shows,
@@ -44,16 +40,12 @@ router.post('/', (req, res) => {
   try {
     const { title, path: showPath } = req.body;
 
-    logger.info(`Creating show: ${title}`);
-
     const insertStmt = db.prepare(`
       INSERT INTO shows (title, path)
       VALUES (?, ?)
     `);
 
     const result = insertStmt.run(title, showPath);
-
-    logger.info(`Show created with ID: ${result.lastInsertRowid}`);
 
     res.json({
       success: true,
@@ -96,7 +88,6 @@ router.get('/:id', (req, res) => {
       return res.status(404).json({ error: 'Show not found' });
     }
 
-    logger.info(`Retrieved show: ${show.title}`);
     res.json(show);
   } catch (error) {
     logger.error('Failed to fetch show:', error);
@@ -132,7 +123,6 @@ router.put('/:id', (req, res) => {
       return res.status(404).json({ error: 'Show not found' });
     }
 
-    logger.info(`Updated show ID: ${showId}`);
     res.json({
       success: true,
       message: 'Show updated successfully',
@@ -165,7 +155,6 @@ router.delete('/:id', (req, res) => {
       return res.status(404).json({ error: 'Show not found' });
     }
 
-    logger.info(`Deleted show ID: ${showId}`);
     res.json({
       success: true,
       message: 'Show deleted successfully',
@@ -220,9 +209,6 @@ router.post('/delete', (req, res) => {
         ).run(...ids);
       }
     })();
-    logger.info(
-      `Cascade deleted shows and related data for IDs: ${ids}`,
-    );
     res.json({ success: true, deleted: ids.length });
   } catch (error) {
     logger.error('Failed to cascade delete shows:', error.message, error.stack);

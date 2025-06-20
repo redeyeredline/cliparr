@@ -14,7 +14,6 @@ const router = express.Router();
 const SONARR_URL = process.env.SONARR_URL;
 const SONARR_API_KEY = process.env.SONARR_API_KEY;
 
-logger.info(`Loaded SONARR_URL from env: ${SONARR_URL}`);
 if (SONARR_API_KEY) {
   logger.info(
     `Loaded SONARR_API_KEY from env: ${SONARR_API_KEY.slice(0, 4)}... (masked)`,
@@ -83,7 +82,6 @@ const testSonarrConnection = async () => {
     logger.info(`Testing connection to Sonarr at ${SONARR_URL}`);
     const response = await sonarrClient.get('/api/v3/system/status');
     logger.info('Successfully connected to Sonarr API');
-    logger.debug({ version: response.data.version }, 'Sonarr version');
   } catch (error) {
     logger.error('Failed to connect to Sonarr API:', error.message);
     throw error;
@@ -98,7 +96,6 @@ testSonarrConnection().catch((error) => {
 // Get unimported shows from Sonarr
 router.get('/unimported', async (req, res) => {
   try {
-    logger.info('Fetching unimported shows from Sonarr');
     const response = await sonarrClient.get('/api/v3/series');
     const shows = response.data;
 
@@ -109,7 +106,6 @@ router.get('/unimported', async (req, res) => {
 
     const unimportedShows = shows.filter((show) => !importedSet.has(show.title + '|' + show.path));
 
-    logger.info(`Found ${unimportedShows.length} unimported shows`);
     res.json(unimportedShows);
   } catch (error) {
     logger.error({ error: error.message }, 'Failed to fetch unimported shows');
@@ -123,8 +119,6 @@ router.get('/unimported', async (req, res) => {
 // --- REFACTOR: Extract import logic to a function ---
 async function importShowById(showId, req, wss, db) {
   try {
-    logger.info(`Starting import for show ID: ${showId}`);
-
     // Send initial progress
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
@@ -141,15 +135,10 @@ async function importShowById(showId, req, wss, db) {
     // Get show details from Sonarr
     const showResponse = await sonarrClient.get(`/api/v3/series/${showId}`);
     const show = showResponse.data;
-    logger.info({ show }, 'Fetched show details from Sonarr');
 
     // Get episodes for the show
     const episodeResponse = await sonarrClient.get(`/api/v3/episode?seriesId=${showId}`);
     const episodes = episodeResponse.data;
-    logger.info(
-      { episodeCount: episodes.length, episodes: episodes.slice(0, 3) },
-      'Fetched episodes from Sonarr (showing first 3)',
-    );
 
     // Group episodes by season
     const seasons = {};
@@ -166,7 +155,6 @@ async function importShowById(showId, req, wss, db) {
     // Use a transaction for data consistency
     let dbShowId = null;
     try {
-      logger.info('Beginning database transaction for import');
       db.transaction(() => {
         // Check if show already exists
         const existingShow = db.prepare(`
@@ -176,7 +164,6 @@ async function importShowById(showId, req, wss, db) {
         if (existingShow) {
           // Show already exists, use existing ID
           dbShowId = existingShow.id;
-          logger.info(`Show already exists with ID: ${dbShowId}`);
         } else {
           // Insert new show
           const showResult = db.prepare(`
@@ -188,7 +175,6 @@ async function importShowById(showId, req, wss, db) {
             show.path,
           );
           dbShowId = showResult.lastInsertRowid;
-          logger.info(`Inserted new show with ID: ${dbShowId}`);
         }
 
         // Insert seasons and episodes
@@ -215,7 +201,6 @@ async function importShowById(showId, req, wss, db) {
           });
         });
       })();
-      logger.info('Database transaction for import completed successfully');
 
       // Send completion update with local DB show id
       wss.clients.forEach((client) => {

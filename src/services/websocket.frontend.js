@@ -13,7 +13,6 @@ class WebSocketClient {
 
   connect() {
     if (this.ws?.readyState === WebSocket.OPEN || this.isConnecting) {
-      logger.debug('WebSocket already connected or connecting');
       return;
     }
 

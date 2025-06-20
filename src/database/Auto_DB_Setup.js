@@ -12,18 +12,12 @@ export function getDatabaseSingleton(dbPath) {
   }
 
   try {
-    logger.info(
-      { dbPath },
-      'Initializing database',
-    );
-
     // Ensure absolute path
     const absoluteDbPath = path.isAbsolute(dbPath) ? dbPath : path.resolve(process.cwd(), dbPath);
     const dbDir = path.dirname(absoluteDbPath);
 
     // Create database directory if it doesn't exist
     if (!fs.existsSync(dbDir)) {
-      logger.info({ dbDir }, 'Creating database directory');
       fs.mkdirSync(dbDir, { recursive: true });
     }
 
@@ -48,7 +42,6 @@ export function getDatabaseSingleton(dbPath) {
 
       // Only set defaults if settings table is empty
       if (settingsCount === 0) {
-        logger.info('Settings table is empty, initializing default settings');
         const defaultSettings = [
           { key: 'import_mode', value: 'none' },
           { key: 'polling_interval', value: '900' },
@@ -61,16 +54,6 @@ export function getDatabaseSingleton(dbPath) {
         for (const setting of defaultSettings) {
           insertStmt.run(setting.key, setting.value);
         }
-
-        // Verify settings were set
-        const verifyStmt = dbInstance.prepare(
-          'SELECT key, value FROM settings WHERE key IN (?, ?)',
-        );
-        const results = verifyStmt.all('import_mode', 'polling_interval');
-
-        logger.info({ settings: results }, 'Default settings initialized');
-      } else {
-        logger.info('Settings table already has data, skipping default initialization');
       }
     });
 

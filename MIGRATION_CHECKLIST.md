@@ -54,26 +54,26 @@
   ✅ Letter-based navigation
   ✅ Dynamic letter availability based on shows
   ✅ Smooth scrolling to sections
-- ❌ Table Features
-  - Sortable columns
+- ✅ Table Features
+  ✅ Sortable columns
   💭 Pagination
   ✅ Row selection
-  - Custom styling (dark theme)
+  ✅ Custom styling (dark theme)
 - ❌ Show Details Page
   - Season-based collapsible tables
   - Episode information display
   - File details
 - ❌ Styling & Layout
-  - Dark theme implementation
-  - Consistent color scheme
+  ✅ Dark theme implementation
+  ✅ Consistent color scheme
   - Responsive design
-  - Custom table styling
+  ✅ Custom table styling
   ✅ Modal components
   ✅ Toast notifications
-- ❌ Navigation
+- ✅ Navigation
   ✅ Sidebar with icons
   ✅ Active state indicators
-  - Nested menu items
+  💭 Nested menu items
   ✅ Import modal integration
 
 ## 10. Database Initialization and Connection Status
@@ -99,7 +99,7 @@
       Right now you've got individual checkboxes—allow holding Shift to select a contiguous block. It maps exactly to desktop expectations and only adds a handful of lines to your click-handler logic
 - ✅ Overall remove some extra spacing and padding in the nav bar and the main table to tighten things up
       remove excess spacing from all tables 1 px at a time and see changes to find one i like
-- ❌ When using keyboard shortcuts and you get into the table the space bar should allow you to select the row you are ons tick box currently it only allows you to select the select all tick box.
+- ✅ When using keyboard shortcuts and you get into the table the space bar should allow you to select the row you are ons tick box currently it only allows you to select the select all tick box.
 ## 13. Mobile & Responsive Tasks
 - ❌ Need a hamburger nav or transform the table into a card list on mobile
 - ❌ Responsive behavior
@@ -108,10 +108,10 @@
 - ❌ properly add an alphabet bar to the import modal 
 - ❌ fix scroll bars site wide to remove the up and down arrows
 - ✅ enter onkeybnoard in import modal should click on import
-- ❌ keyboard shortcuts should begin in intellegently useful points on the page
+- ❌ keyboard shortcuts should begin in intelligently useful points on the page
 ## 14. Bug Fixes & Issues
 - 💭 the home page randomly refrehses. repeatedly
-- ❌ review all logging and remove things that are no longer needed
+- ✅ review all logging and remove things that are no longer needed
 - ✅ we lost the tooltip on why the import refresh is grayed out
 
 ## 15. Infrastructure Investigation
@@ -126,14 +126,14 @@
 - ✅ feed current nav bar to bolt to get similiar styling to new home page
 
 ## 18. UI/UX Improvements
-- ❌ fix excess spacing on new home page
+- ✅ fix excess spacing on new home page
 - ✅ repipe everything to new home page
 - ❌ add alphabet bar to import modal
 - ❌ ASK BOLT can you cleanly/easily include the alphabet bar from the homepage to the import modal?
       also have bolt process the settings page with its new ui
-    ✅  enter key should hit delte button on main table
-    ✅  save button on settings page should act like delete button on main page
-    ✅  save button should still be clickable with enter when it appears
+- ✅  enter key should hit delte button on main table
+- ✅  save button on settings page should act like delete button on main page
+- ✅  save button should still be clickable with enter when it appears
 
 ## 19. Import Mode Automation
 - ✅ create trigger when setting import mode changes to auto to trigger a scan upon saving to import all shows automatically

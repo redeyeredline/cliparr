@@ -99,18 +99,29 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
       `} role="navigation" aria-label="Main navigation">
         {/* Logo */}
         <div className="mb-8">
-          <div className="flex items-center space-x-3">
+          <button
+            onClick={() => navigate('/')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate('/');
+              }
+            }}
+            className="group flex items-center space-x-3 rounded-lg p-1"
+            aria-label="Go to home page"
+          >
             <div className={`
               w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl 
               flex items-center justify-center shadow-lg shadow-blue-500/25
+              group-hover:shadow-blue-500/40 transition-shadow duration-200
             `}>
               <Zap className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Cliparr</h1>
-              <p className="text-xs text-gray-400">Media Manager</p>
+              <h1 className="text-xl font-bold text-white group-hover:text-blue-300 transition-colors duration-200">Cliparr</h1>
+              <p className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors duration-200">Media Manager</p>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Navigation */}

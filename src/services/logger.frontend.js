@@ -1,9 +1,9 @@
 const logger = {
   info: (message, ...args) => {
-    console.warn(`[INFO] ${message}`, ...args);
+    console.log(`[INFO] ${message}`, ...args);
   },
   debug: (message, ...args) => {
-    console.warn(`[DEBUG] ${message}`, ...args);
+    console.log(`[DEBUG] ${message}`, ...args);
   },
   warn: (message, ...args) => {
     console.warn(`[WARN] ${message}`, ...args);

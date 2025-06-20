@@ -65,7 +65,6 @@ router.get('/polling-interval', (req, res) => {
   const db = getDb();
   try {
     const interval = getPollingInterval(db);
-    logger.info({ interval }, 'GET polling interval');
     res.json({ interval });
   } catch (error) {
     logger.error('Failed to get polling interval:', error);
@@ -80,7 +79,6 @@ router.get('/polling-interval', (req, res) => {
 router.post('/polling-interval', (req, res) => {
   const db = getDb();
   const { interval } = req.body;
-  logger.info({ interval }, 'POST polling interval');
   try {
     if (!interval || isNaN(interval) || interval < 60 || interval > 86400) {
       return res.status(400).json({
@@ -97,7 +95,6 @@ router.post('/polling-interval', (req, res) => {
     }
 
     const savedInterval = getPollingInterval(db);
-    logger.info({ savedInterval }, 'Saved polling interval');
     res.json({ status: 'ok', interval: savedInterval });
   } catch (error) {
     logger.error('Failed to set polling interval:', error);

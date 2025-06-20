@@ -20,7 +20,6 @@ export class ImportTaskManager {
 
     // Don't start the task if mode is 'none'
     if (mode === 'none') {
-      logger.info('Import mode is set to none, not starting import task');
       return;
     }
 
@@ -47,7 +46,6 @@ export class ImportTaskManager {
 
     // Wait for any running task to complete
     while (this.isRunning) {
-      logger.info('Waiting for running import task to complete...');
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
@@ -66,7 +64,6 @@ export class ImportTaskManager {
       if (this.taskInterval) {
         clearInterval(this.taskInterval);
         this.taskInterval = null;
-        logger.info('Import task stopped due to none mode');
       }
       return;
     }
@@ -75,7 +72,6 @@ export class ImportTaskManager {
     if (this.taskInterval) {
       clearInterval(this.taskInterval);
       this.taskInterval = setInterval(() => this.runTask(false), newInterval * 1000);
-      logger.info(`Updated import task interval to ${newInterval}s`);
     } else {
       // If task was stopped (e.g. due to none mode), restart it
       this.start();
@@ -140,7 +136,6 @@ export class ImportTaskManager {
         if (existingShow) {
           // Show already exists, use existing ID
           dbShowId = existingShow.id;
-          logger.info(`Show already exists with ID: ${dbShowId}`);
         } else {
           // Insert new show
           const showResult = db.prepare(`
@@ -152,7 +147,6 @@ export class ImportTaskManager {
             showDetails.path,
           );
           dbShowId = showResult.lastInsertRowid;
-          logger.info(`Inserted new show with ID: ${dbShowId}`);
         }
 
         // Insert or update seasons and episodes
@@ -180,7 +174,6 @@ export class ImportTaskManager {
         });
       })();
 
-      logger.info(`Successfully imported show: ${showDetails.title}`);
       return true;
     } catch (error) {
       logger.error(`Failed to import show ${show.title}:`, error);
@@ -190,7 +183,6 @@ export class ImportTaskManager {
 
   async runTask(isInitialRun = false) {
     if (this.isRunning) {
-      logger.debug('Previous task still running, skipping');
       return;
     }
 
@@ -199,9 +191,6 @@ export class ImportTaskManager {
       const db = getDb();
 
       const mode = getImportMode(db);
-      logger.info(
-        `Running import task in ${mode} mode (${isInitialRun ? 'initial run' : 'refresh'})`,
-      );
 
       this.broadcastStatus({
         status: 'running',
@@ -211,7 +200,6 @@ export class ImportTaskManager {
       });
 
       if (this.shutdownRequested) {
-        logger.info('Shutdown requested, skipping import task');
         return;
       }
 
@@ -227,8 +215,6 @@ export class ImportTaskManager {
         const showsToProcess = mode === 'auto'
           ? sonarrShows.filter((show) => !importedSet.has(show.title + '|' + show.path))
           : sonarrShows.filter((show) => importedSet.has(show.title + '|' + show.path));
-
-        logger.info(`Found ${showsToProcess.length} shows to process in ${mode} mode`);
 
         // Process each show
         for (const show of showsToProcess) {
@@ -261,8 +247,6 @@ export class ImportTaskManager {
             );
 
             if (newEpisodes.length > 0) {
-              logger.info(`Found ${newEpisodes.length} new episodes for show: ${show.title}`);
-
               // Group new episodes by season
               const seasons = {};
               newEpisodes.forEach((episode) => {

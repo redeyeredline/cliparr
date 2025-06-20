@@ -11,7 +11,6 @@ function upsertReturningId(db, insertSql, insertParams, selectSql, selectParams)
 }
 
 function insertShow(db, show) {
-  logger.info({ showTitle: show.title }, 'Insert show');
   return upsertReturningId(
     db,
     'INSERT OR REPLACE INTO shows (title, path) VALUES (?, ?)',
@@ -22,7 +21,6 @@ function insertShow(db, show) {
 }
 
 function insertSeason(db, showId, seasonNumber) {
-  logger.debug({ showId, seasonNumber }, 'Insert season');
   return upsertReturningId(
     db,
     'INSERT OR IGNORE INTO seasons (show_id, season_number) VALUES (?, ?)',
@@ -33,7 +31,6 @@ function insertSeason(db, showId, seasonNumber) {
 }
 
 function insertEpisode(db, seasonId, ep) {
-  logger.debug({ episodeNumber: ep.episodeNumber }, 'Insert episode');
   return upsertReturningId(
     db,
     'INSERT OR REPLACE INTO episodes (season_id, episode_number, title) VALUES (?, ?, ?)',
@@ -44,7 +41,6 @@ function insertEpisode(db, seasonId, ep) {
 }
 
 function insertEpisodeFile(db, episodeId, file) {
-  logger.debug({ episodeId, path: file.path }, 'Insert file');
   return db.prepare(
     'INSERT INTO episode_files (episode_id, file_path, size) VALUES (?, ?, ?)',
   ).run(
@@ -55,7 +51,6 @@ function insertEpisodeFile(db, episodeId, file) {
 }
 
 function processShowData(db, show, episodes = [], files = []) {
-  logger.info({ showTitle: show.title, count: episodes.length }, 'Process show');
   return db.transaction(() => {
     const showDbId = insertShow(db, show);
     const seasonMap = new Map(), epMap = new Map();
@@ -75,7 +70,6 @@ function processShowData(db, show, episodes = [], files = []) {
 }
 
 function batchInsertShows(db, shows) {
-  logger.info({ showCount: shows.length }, 'Batch insert shows');
   return db.transaction(() => {
     const stmt = db.prepare(
       'INSERT OR IGNORE INTO shows (title, path) VALUES (?, ?)',
@@ -92,7 +86,6 @@ function batchInsertShows(db, shows) {
 
 function getImportedShows(db, page = 1, pageSize = 100) {
   const p = Math.max(1, +page), sz = Math.max(1, +pageSize), offset = (p - 1) * sz;
-  logger.info({ page: p, pageSize: sz }, 'Fetch shows');
   const shows = db.prepare(
     `SELECT s.id, s.title, s.path
        FROM shows s
@@ -168,7 +161,6 @@ function setPollingInterval(db, interval) {
     const validInterval = Math.max(60, Math.min(86400, interval));
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
       .run('polling_interval', validInterval.toString());
-    logger.info({ interval: validInterval }, 'Polling interval updated');
   } catch (error) {
     logger.error('Failed to set polling interval:', error);
     throw error;
