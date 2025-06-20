@@ -165,7 +165,11 @@ export const useKeyboardNavigation = () => {
       const meta = e.metaKey;
 
       // Don't trigger shortcuts when typing in input fields
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true') {
+      if (
+        e.target.tagName === 'INPUT' ||
+        e.target.tagName === 'TEXTAREA' ||
+        e.target.contentEditable === 'true'
+      ) {
         return;
       }
 
@@ -347,7 +351,6 @@ export const accessibilityUtils = {
   // Check if element should be focusable
   shouldBeFocusable: (element) => {
     const tag = element.tagName.toLowerCase();
-    const type = element.type;
 
     return (
       tag === 'button' ||

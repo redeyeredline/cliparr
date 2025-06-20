@@ -26,7 +26,14 @@ const EmptyState: React.FC = () => {
         <button
           ref={plusButtonRef}
           onClick={openImportModal}
-          className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/25 transition-all duration-200 hover:scale-110 focus:outline-none"
+          className={`
+            absolute -top-2 -right-2 w-8 h-8 
+            bg-gradient-to-br from-blue-500 to-purple-600 
+            rounded-full flex items-center justify-center 
+            shadow-lg shadow-blue-500/25 
+            transition-all duration-200 hover:scale-110 
+            focus:outline-none
+          `}
           aria-label="Import Shows"
           tabIndex={0}
           type="button"

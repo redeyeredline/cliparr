@@ -199,7 +199,9 @@ export class ImportTaskManager {
       const db = getDb();
 
       const mode = getImportMode(db);
-      logger.info(`Running import task in ${mode} mode (${isInitialRun ? 'initial run' : 'refresh'})`);
+      logger.info(
+        `Running import task in ${mode} mode (${isInitialRun ? 'initial run' : 'refresh'})`,
+      );
 
       this.broadcastStatus({
         status: 'running',

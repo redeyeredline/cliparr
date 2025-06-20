@@ -37,6 +37,10 @@ export default function ImportModal({
   });
   const modalRef = useRef<HTMLDivElement>(null);
 
+  const handleOk = () => {
+    onImport(selected as number[]);
+  };
+
   useEffect(() => {
     deselectAll();
   }, [shows, open, deselectAll]);
@@ -54,7 +58,7 @@ export default function ImportModal({
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose, selected.length]);
+  }, [open, onClose, selected.length, handleOk]);
 
   if (!open) {
     return null;
@@ -72,10 +76,6 @@ export default function ImportModal({
     } else {
       selectAllItems();
     }
-  };
-
-  const handleOk = () => {
-    onImport(selected as number[]);
   };
 
   return (

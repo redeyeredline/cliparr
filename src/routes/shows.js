@@ -191,11 +191,15 @@ router.post('/delete', (req, res) => {
     db.transaction(() => {
       // Get all episode IDs for the shows
       const episodeRows = db.prepare(
-        `SELECT e.id FROM episodes e JOIN seasons s ON e.season_id = s.id WHERE s.show_id IN (${ids.map(() => '?').join(',')})`,
+        `SELECT e.id FROM episodes e 
+         JOIN seasons s ON e.season_id = s.id 
+         WHERE s.show_id IN (${ids.map(() => '?').join(',')})`,
       ).all(...ids);
       const episodeIds = episodeRows.map((row) => row.id);
       if (episodeIds.length > 0) {
-        db.prepare(`DELETE FROM episode_files WHERE episode_id IN (${episodeIds.map(() => '?').join(',')})`).run(...episodeIds);
+        db.prepare(
+          `DELETE FROM episode_files WHERE episode_id IN (${episodeIds.map(() => '?').join(',')})`,
+        ).run(...episodeIds);
       }
       // Only run if there are seasons for these shows
       const seasonRows = db.prepare(
@@ -203,18 +207,30 @@ router.post('/delete', (req, res) => {
       ).all(...ids);
       const seasonIds = seasonRows.map((row) => row.id);
       if (seasonIds.length > 0) {
-        db.prepare(`DELETE FROM episodes WHERE season_id IN (${seasonIds.map(() => '?').join(',')})`).run(...seasonIds);
+        db.prepare(
+          `DELETE FROM episodes WHERE season_id IN (${seasonIds.map(() => '?').join(',')})`,
+        ).run(...seasonIds);
       }
       if (ids.length > 0) {
-        db.prepare(`DELETE FROM seasons WHERE show_id IN (${ids.map(() => '?').join(',')})`).run(...ids);
-        db.prepare(`DELETE FROM shows WHERE id IN (${ids.map(() => '?').join(',')})`).run(...ids);
+        db.prepare(
+          `DELETE FROM seasons WHERE show_id IN (${ids.map(() => '?').join(',')})`,
+        ).run(...ids);
+        db.prepare(
+          `DELETE FROM shows WHERE id IN (${ids.map(() => '?').join(',')})`,
+        ).run(...ids);
       }
     })();
-    logger.info(`Cascade deleted shows and related data for IDs: ${ids}`);
+    logger.info(
+      `Cascade deleted shows and related data for IDs: ${ids}`,
+    );
     res.json({ success: true, deleted: ids.length });
   } catch (error) {
     logger.error('Failed to cascade delete shows:', error.message, error.stack);
-    res.status(500).json({ error: 'Failed to cascade delete shows', message: error.message, stack: error.stack });
+    res.status(500).json({
+      error: 'Failed to cascade delete shows',
+      message: error.message,
+      stack: error.stack,
+    });
   }
 });
 

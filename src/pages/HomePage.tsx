@@ -365,13 +365,22 @@ function HomePage() {
           {/* Search Bar */}
           <div className="mb-6">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Search
+                className={`
+                  absolute left-4 top-1/2 transform -translate-y-1/2
+                  text-gray-400 w-5 h-5
+                `}
+              />
               <input
                 type="text"
                 placeholder="Search shows..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all duration-200 backdrop-blur-sm"
+                className={`
+                  w-full pl-12 pr-4 py-3 bg-gray-800/50 border border-gray-700/50 rounded-xl
+                  text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50
+                  focus:border-transparent transition-all duration-200 backdrop-blur-sm
+                `}
               />
             </div>
           </div>
