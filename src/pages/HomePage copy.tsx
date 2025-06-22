@@ -4,7 +4,7 @@ import { logger } from '../services/logger.frontend.js';
 import { wsClient } from '../services/websocket.frontend.js';
 import AlphabetSidebar from '../components/AlphabetSidebar';
 import { useToast } from '../components/ToastContext';
-import EmptyState from '../components/EmptyState.js';
+import EmptyState from '../components/EmptyState.tsx';
 import { useShiftSelect } from '../utils/selectionUtils';
 
 interface Show {

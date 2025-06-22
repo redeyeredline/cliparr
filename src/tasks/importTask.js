@@ -18,13 +18,13 @@ export class ImportTaskManager {
     this.shutdownRequested = false;
   }
 
-  start() {
+  async start() {
     if (this.taskInterval) {
       logger.warn('Import task already running');
       return;
     }
 
-    const db = getDb();
+    const db = await getDb();
     const mode = getImportMode(db);
 
     // Don't start the task if mode is 'none'
@@ -36,7 +36,7 @@ export class ImportTaskManager {
     logger.info(`Starting import task with ${interval}s interval`);
 
     // Run initial import immediately
-    this.runTask(true);
+    await this.runTask(true);
 
     // Then set up periodic task
     this.taskInterval = setInterval(() => this.runTask(false), interval * 1000);
@@ -63,8 +63,8 @@ export class ImportTaskManager {
     logger.info('Import task stopped');
   }
 
-  updateInterval() {
-    const db = getDb();
+  async updateInterval() {
+    const db = await getDb();
     const mode = getImportMode(db);
     const newInterval = getPollingInterval(db);
 
@@ -83,7 +83,7 @@ export class ImportTaskManager {
       this.taskInterval = setInterval(() => this.runTask(false), newInterval * 1000);
     } else {
       // If task was stopped (e.g. due to none mode), restart it
-      this.start();
+      await this.start();
     }
   }
 
@@ -202,7 +202,7 @@ export class ImportTaskManager {
 
     try {
       this.isRunning = true;
-      const db = getDb();
+      const db = await getDb();
 
       const mode = getImportMode(db);
 

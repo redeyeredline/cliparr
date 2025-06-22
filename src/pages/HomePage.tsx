@@ -6,7 +6,7 @@ import { logger } from '../services/logger.frontend.js';
 import { wsClient } from '../services/websocket.frontend.js';
 import AlphabetSidebar from '../components/AlphabetSidebar';
 import { useToast } from '../components/ToastContext';
-import EmptyState from '../components/EmptyState.js';
+import EmptyState from '../components/EmptyState.tsx';
 import { useShiftSelect } from '../utils/selectionUtils';
 
 interface Show {
@@ -189,7 +189,9 @@ function HomePage() {
 
   const fetchShows = useCallback(async () => {
     try {
+      logger.info('Fetching shows from API...');
       const data = await apiClient.getShows();
+      logger.info({ showsCount: data.shows?.length, total: data.total }, 'Received shows data from API');
       setShows(data.shows);
     } catch (err) {
       logger.error('Failed to fetch shows:', err);

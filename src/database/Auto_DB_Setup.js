@@ -6,22 +6,32 @@ import { STATEMENTS } from './Schema.mjs';
 
 let dbInstance = null;
 
-export function getDatabaseSingleton(dbPath) {
+export async function getDatabaseSingleton(dbPath) {
   if (dbInstance) {
+    logger.debug('Returning existing database instance');
     return dbInstance;
   }
 
   try {
+    logger.info('Creating new database instance...');
     // Ensure absolute path
     const absoluteDbPath = path.isAbsolute(dbPath) ? dbPath : path.resolve(process.cwd(), dbPath);
     const dbDir = path.dirname(absoluteDbPath);
 
-    // Create database directory if it doesn't exist
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
+    // Create database directory if it doesn't exist (non-blocking)
+    try {
+      await fs.promises.stat(dbDir);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        logger.info({ dbDir }, 'Creating database directory');
+        await fs.promises.mkdir(dbDir, { recursive: true });
+      } else {
+        throw error;
+      }
     }
 
     // Create database connection
+    logger.info({ dbPath: absoluteDbPath }, 'Opening database connection');
     dbInstance = new Database(absoluteDbPath);
 
     // Batch PRAGMA settings

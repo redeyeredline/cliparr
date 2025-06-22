@@ -1,7 +1,20 @@
 import { getDatabaseSingleton } from './Auto_DB_Setup.js';
 import { logger } from '../services/logger.js';
+import { promises as fsPromises } from 'fs';
 
-function getDb(dbPath = 'data/cliparr.db') {
+// Simple prepared-statement cache to avoid recompiling SQL on every call
+const stmtCache = new Map();
+
+function getCachedStmt(db, sql) {
+  let stmt = stmtCache.get(sql);
+  if (!stmt) {
+    stmt = db.prepare(sql);
+    stmtCache.set(sql, stmt);
+  }
+  return stmt;
+}
+
+async function getDb(dbPath = 'data/cliparr.db') {
   return getDatabaseSingleton(dbPath);
 }
 
@@ -70,14 +83,24 @@ function processShowData(db, show, episodes = [], files = []) {
 }
 
 function batchInsertShows(db, shows) {
+  if (!shows || shows.length === 0) {
+    return;
+  }
+
   return db.transaction(() => {
-    shows.forEach((s) => {
-      try {
-        timedQuery(db, 'INSERT OR IGNORE INTO shows (title, path) VALUES (?, ?)', [s.title || '', s.path || ''], 'run');
-      } catch {
-        logger.warn({ showTitle: s.title }, 'Batch insert error');
-      }
-    });
+    // Build multi-row INSERT statement
+    const placeholders = shows.map(() => '(?, ?)').join(', ');
+    const sql = `INSERT OR IGNORE INTO shows (title, path) VALUES ${placeholders}`;
+
+    // Flatten the parameters array
+    const params = shows.flatMap((s) => [s.title || '', s.path || '']);
+
+    try {
+      timedQuery(db, sql, params, 'run');
+    } catch (error) {
+      logger.error({ error: error.message, showCount: shows.length }, 'Batch insert failed');
+      throw error;
+    }
   })();
 }
 
@@ -194,7 +217,9 @@ function timedQuery(db, sql, params = [], fn = 'all') {
   const start = process.hrtime.bigint();
   let result;
   try {
-    result = db.prepare(sql)[fn](...params);
+    // Use cached prepared statement instead of preparing each time
+    const stmt = getCachedStmt(db, sql);
+    result = stmt[fn](...params);
   } finally {
     const duration = Number(process.hrtime.bigint() - start) / 1e6;
     logQueryPerformance(sql, duration);

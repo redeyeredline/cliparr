@@ -11,8 +11,8 @@ import {
 import { logger } from '../services/logger.js';
 
 // GET current import mode
-router.get('/import-mode', (req, res) => {
-  const db = getDb();
+router.get('/import-mode', async (req, res) => {
+  const db = await getDb();
   try {
     const mode = getImportMode(db);
     res.json({ mode });
@@ -26,8 +26,8 @@ router.get('/import-mode', (req, res) => {
 });
 
 // POST set import mode
-router.post('/import-mode', (req, res) => {
-  const db = getDb();
+router.post('/import-mode', async (req, res) => {
+  const db = await getDb();
   const { mode } = req.body;
   try {
     if (!['auto', 'import', 'none'].includes(mode)) {
@@ -40,11 +40,11 @@ router.post('/import-mode', (req, res) => {
     const importTaskManager = req.app.get('importTaskManager');
     if (importTaskManager) {
       // This will handle stopping/starting the task based on the new mode
-      importTaskManager.updateInterval();
+      await importTaskManager.updateInterval();
 
       // Trigger immediate scan when switching to auto mode
       if (mode === 'auto') {
-        importTaskManager.runTask(true);
+        await importTaskManager.runTask(true);
         res.json({ status: 'ok', mode, autoScanTriggered: true });
         return;
       }
@@ -61,8 +61,8 @@ router.post('/import-mode', (req, res) => {
 });
 
 // GET current polling interval
-router.get('/polling-interval', (req, res) => {
-  const db = getDb();
+router.get('/polling-interval', async (req, res) => {
+  const db = await getDb();
   try {
     const interval = getPollingInterval(db);
     res.json({ interval });
@@ -76,8 +76,8 @@ router.get('/polling-interval', (req, res) => {
 });
 
 // POST set polling interval
-router.post('/polling-interval', (req, res) => {
-  const db = getDb();
+router.post('/polling-interval', async (req, res) => {
+  const db = await getDb();
   const { interval } = req.body;
   try {
     if (!interval || isNaN(interval) || interval < 60 || interval > 86400) {
@@ -91,7 +91,7 @@ router.post('/polling-interval', (req, res) => {
     const importTaskManager = req.app.get('importTaskManager');
     if (importTaskManager) {
       // This will handle updating the interval or stopping if mode is 'none'
-      importTaskManager.updateInterval();
+      await importTaskManager.updateInterval();
     }
 
     const savedInterval = getPollingInterval(db);

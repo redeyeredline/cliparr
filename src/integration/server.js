@@ -38,8 +38,12 @@ export async function startServer() {
   }
 
   try {
-    dbInstance = getDatabaseSingleton(config.db.path);
+    logger.info('Initializing database...');
+    dbInstance = await getDatabaseSingleton(config.db.path);
+    logger.info('Database initialized successfully');
+    
     const app = createApp({ db: dbInstance, logger, wss: null });
+    logger.info('Express app created');
 
     serverInstance = http.createServer(app);
     setupWebSocket(serverInstance, config.ws);
@@ -49,7 +53,7 @@ export async function startServer() {
     // Initialize and start the import task manager
     importTaskManager = new ImportTaskManager(wss);
     app.set('importTaskManager', importTaskManager);
-    importTaskManager.start();
+    await importTaskManager.start();
 
     serverInstance.listen(config.port, config.host, () =>
       logger.info(`Listening on ${config.host}:${config.port}`),
