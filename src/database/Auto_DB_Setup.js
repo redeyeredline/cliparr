@@ -8,7 +8,6 @@ let dbInstance = null;
 
 export async function getDatabaseSingleton(dbPath) {
   if (dbInstance) {
-    logger.debug('Returning existing database instance');
     return dbInstance;
   }
 

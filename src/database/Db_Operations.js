@@ -341,7 +341,6 @@ export {
   setImportMode,
   getPollingInterval,
   setPollingInterval,
-  logger,
   getPerformanceStats,
   timedQuery,
   getShowById,

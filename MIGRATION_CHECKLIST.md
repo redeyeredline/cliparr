@@ -153,53 +153,53 @@ when swithing to docker make sure we look at the pathing import from the os+ son
 Here’s an updated optimization checklist (SQLite-only—no PostgreSQL migration mentioned). Nothing has been changed yet; please review and tell me which items you’d like implemented.
 1. Backend / Database (better-sqlite3)
 ✅ Prepared-statement cache
-Db_Operations.js recompiles SQL every call (db.prepare(...)[fn]()).
-Store prepared statements (or a tiny cache) to reduce parse overhead.
+  Db_Operations.js recompiles SQL every call (db.prepare(...)[fn]()).
+  Store prepared statements (or a tiny cache) to reduce parse overhead.
 ✅Batch inserts
-batchInsertShows runs one INSERT per show inside a loop.
-Use multi-row insert:
-INSERT INTO shows (title, path) VALUES (?, ?), (?, ?), ...;
-Non-blocking FS calls
-fs.existsSync & fs.mkdirSync in Auto_DB_Setup.js block the event loop.
-Replace with await fs.promises.stat / mkdir.
+  batchInsertShows runs one INSERT per show inside a loop.
+  Use multi-row insert:
+  INSERT INTO shows (title, path) VALUES (?, ?), (?, ?), ...;
+✅Non-blocking FS calls
+  fs.existsSync & fs.mkdirSync in Auto_DB_Setup.js block the event loop.
+  Replace with await fs.promises.stat / mkdir.
 PRAGMA optimize
-After schema creation call PRAGMA optimize; periodically (e.g. on startup/shutdown) for automatic index maintenance.
-Foreign-key enforcement toggle
-Confirm PRAGMA foreign_keys = ON; (not explicitly set yet) so cascades work reliably.
+  After schema creation call PRAGMA optimize; periodically (e.g. on startup/shutdown) for automatic index maintenance.
+  Foreign-key enforcement toggle
+  Confirm PRAGMA foreign_keys = ON; (not explicitly set yet) so cascades work reliably.
 Query logging throttling
-timedQuery logs every query; for large imports this floods memory (recentQueries).
-Keep only slow queries (>20 ms) or limit the array by time window, not count.
-Remove logger re-export
-Db_Operations.js re-exports the logger, creating a potential circular dependency.
+  timedQuery logs every query; for large imports this floods memory (recentQueries).
+  Keep only slow queries (>20 ms) or limit the array by time window, not count.
+✅Remove logger re-export
+  Db_Operations.js re-exports the logger, creating a potential circular dependency.
 2. Backend / General Node
 • Graceful shutdown
-Add process.on('SIGINT'|'SIGTERM') handler that stops ImportTaskManager, flushes logs, and closes DB.
+  Add process.on('SIGINT'|'SIGTERM') handler that stops ImportTaskManager, flushes logs, and closes DB.
 Environment lookups
-Read process.env.SONARR_* once at module load; reuse constants instead of reading inside every request.
+  Read process.env.SONARR_* once at module load; reuse constants instead of reading inside every request.
 Parallel show import
-importTask processes shows sequentially.
-Use a small concurrency pool (e.g. p-limit with 4–6) to shorten initial sync.
+  importTask processes shows sequentially.
+  Use a small concurrency pool (e.g. p-limit with 4–6) to shorten initial sync.
 WebSocket broadcast efficiency
-Filter wss.clients by client.readyState === OPEN once and reuse the array, or throttle broadcasts if status messages fire rapidly.
+  Filter wss.clients by client.readyState === OPEN once and reuse the array, or throttle broadcasts if status messages fire rapidly.
 3. Front-End React
 • Delete duplicate “copy” pages (HomePage copy.tsx, SettingsPage copy.jsx) to avoid confusion.
-Consistent extensions
-Rename .js React components (EmptyState.js, etc.) to .jsx for uniformity (no code changes).
+✅Consistent extensions
+  Rename .js React components (EmptyState.js, etc.) to .jsx for uniformity (no code changes).
 Table virtualization
-HomePage renders entire show list; switch to react-window for smooth scrolling when shows > 500.
+  HomePage renders entire show list; switch to react-window for smooth scrolling when shows > 500.
 Debounced search
-Wrap setSearchQuery with lodash.debounce (≈200 ms) to cut re-renders while typing.
+  Wrap setSearchQuery with lodash.debounce (≈200 ms) to cut re-renders while typing.
 Icon tree-shaking
-Import only used Lucide icons where needed (import { Search } from 'lucide-react') instead of star imports to slim bundle.
+  Import only used Lucide icons where needed (import { Search } from 'lucide-react') instead of star imports to slim bundle.
 Code-split routes
-Apply React.lazy & Suspense to ShowDetailsPage, SettingsPage, etc., reducing initial bundle size.
+  Apply React.lazy & Suspense to ShowDetailsPage, SettingsPage, etc., reducing initial bundle size.
 4. Tooling & Build
 • ESLint / Prettier
-Enforce 100-char line length (your preference) via max-len & prettier config.
+  Enforce 100-char line length (your preference) via max-len & prettier config.
 Vite build-time splits
-Use build.rollupOptions.output.manualChunks to separate vendor libs (react, lucide-react) from app code for better caching.
+  Use build.rollupOptions.output.manualChunks to separate vendor libs (react, lucide-react) from app code for better caching.
 Dockerfile improvements
-Convert to multi-stage build (builder → slim runtime) and add HEALTHCHECK.
+  Convert to multi-stage build (builder → slim runtime) and add HEALTHCHECK.
 Pin Node to an explicit LTS version (e.g. 18-alpine) for reproducibility.
 5. Miscellaneous
 • Remove unused imports / variables flagged by ESLint.
