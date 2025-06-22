@@ -58,10 +58,10 @@ function processShowData(db, show, episodes = [], files = []) {
       const sid = seasonMap.get(ep.seasonNumber)
         || insertSeason(db, showDbId, ep.seasonNumber);
       seasonMap.set(ep.seasonNumber, sid);
-      epMap.set(ep.episodeNumber, insertEpisode(db, sid, ep));
+      epMap.set(ep.id, insertEpisode(db, sid, ep));
     });
     files.forEach((f) => {
-      const eid = epMap.get(f.episodeNumber);
+      const eid = epMap.get(f.episodeId);
       if (eid) {
         insertEpisodeFile(db, eid, f);
       }
@@ -206,6 +206,80 @@ function getShowById(db, id) {
   return timedQuery(db, 'SELECT * FROM shows WHERE id = ?', [id], 'get');
 }
 
+// Enhanced function to get show with complete season/episode/file details
+function getShowWithDetails(db, id) {
+  // Get basic show info first
+  const show = getShowById(db, id);
+  if (!show) {
+    return null;
+  }
+
+  // Get all seasons for this show with episode counts
+  const seasons = timedQuery(
+    db,
+    `SELECT 
+       s.id, 
+       s.season_number,
+       COUNT(e.id) as episode_count
+     FROM seasons s
+     JOIN episodes e ON s.id = e.season_id
+     JOIN episode_files ef ON e.id = ef.episode_id
+     WHERE s.show_id = ?
+     GROUP BY s.id, s.season_number
+     ORDER BY s.season_number`,
+    [id],
+    'all',
+  );
+
+  // For each season, get episodes with file counts
+  const seasonsWithEpisodes = seasons.map((season) => {
+    const episodes = timedQuery(
+      db,
+      `SELECT 
+         e.id,
+         e.episode_number,
+         e.title,
+         COUNT(ef.id) as file_count
+       FROM episodes e
+       JOIN episode_files ef ON e.id = ef.episode_id
+       WHERE e.season_id = ?
+       GROUP BY e.id, e.episode_number, e.title
+       ORDER BY e.episode_number`,
+      [season.id],
+      'all',
+    );
+
+    return {
+      ...season,
+      episodes,
+    };
+  });
+
+  return {
+    ...show,
+    seasons: seasonsWithEpisodes,
+  };
+}
+
+// Get episode files for a specific episode
+function getEpisodeFiles(db, episodeId) {
+  return timedQuery(
+    db,
+    `SELECT 
+       ef.id,
+       ef.file_path,
+       ef.size,
+       e.title as episode_title,
+       e.episode_number
+     FROM episode_files ef
+     JOIN episodes e ON ef.episode_id = e.id
+     WHERE ef.episode_id = ?
+     ORDER BY ef.file_path`,
+    [episodeId],
+    'all',
+  );
+}
+
 function deleteShowsByIds(db, ids) {
   if (!Array.isArray(ids) || ids.length === 0) {
     return 0;
@@ -248,4 +322,6 @@ export {
   getShowById,
   deleteShowsByIds,
   findShowByTitleAndPath,
+  getShowWithDetails,
+  getEpisodeFiles,
 };

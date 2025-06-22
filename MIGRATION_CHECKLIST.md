@@ -40,7 +40,7 @@
 - ✅ Health check endpoint
 - ✅ Database connection status indicator on frontend
 - ✅ Performance logging/diagnostics endpoint
-- ❌ database health endpoint
+- ✅ database health endpoint
 - ❌ database health check/status/report warnings/errors/thresholds if db having perf issues
 
 ## 8. Error Handling & Logging
@@ -60,8 +60,8 @@
   ✅ Row selection
   ✅ Custom styling (dark theme)
 - ❌ Show Details Page
-  - Season-based collapsible tables
-  - Episode information display
+  ✅Season-based collapsible tables
+  ✅ Episode information display
   - File details
 - ❌ Styling & Layout
   ✅ Dark theme implementation
@@ -131,7 +131,7 @@
 - ❌ add alphabet bar to import modal
 - ❌ ASK BOLT can you cleanly/easily include the alphabet bar from the homepage to the import modal?
       also have bolt process the settings page with its new ui
-- ✅  enter key should hit delte button on main table
+- ✅  enter key should hit delete button on main table (WORKING - DO NOT TOUCH)
 - ✅  save button on settings page should act like delete button on main page
 - ✅  save button should still be clickable with enter when it appears
 
@@ -143,6 +143,12 @@
 - ✅ No old toast systems or alert() calls found
 - ✅ WebSocket events appropriately use console logging for debugging
 - ✅ User-facing notifications properly use the modern toast system
+
+look into perf issues while changing pages
+i also breifly see the main page no shows imported placeholder during a seasons view going back to the home page. we need to implement some logic or a brief loading wheel instead
+
+
+when swithing to docker make sure we look at the pathing import from the os+ sonarr we are doing in pathmap.js
 
 ---
 

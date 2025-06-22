@@ -49,6 +49,18 @@ class ApiClient {
     return response.data;
   }
 
+  // Get show with complete season/episode details
+  async getShowWithDetails(id) {
+    const response = await api.get(`/shows/${id}?details=true`);
+    return response.data;
+  }
+
+  // Get files for a specific episode
+  async getEpisodeFiles(episodeId) {
+    const response = await api.get(`/shows/episodes/${episodeId}/files`);
+    return response.data;
+  }
+
   async createShow(showData) {
     const response = await api.post('/shows', showData);
     return response.data;

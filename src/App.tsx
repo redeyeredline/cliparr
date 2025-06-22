@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import SettingsPage from './pages/SettingsPage';
 import SystemPage from './pages/SystemPage';
+import ShowDetailsPage from './pages/ShowDetailsPage';
 import NavigationBar from './components/layout/NavigationBar';
 import { ToastProvider } from './components/ToastProvider';
 import { ImportModalProvider } from './components/ImportModalProvider';
@@ -15,6 +16,7 @@ function App() {
           <NavigationBar>
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/shows/:id" element={<ShowDetailsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/system" element={<SystemPage />} />
             </Routes>

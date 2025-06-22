@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Trash2, Check, ChevronUp, ChevronDown } from 'lucide-react';
 import { apiClient } from '../integration/api-client';
 import { logger } from '../services/logger.frontend.js';
@@ -42,6 +43,7 @@ const getDisplayLetter = (title: string): string => {
 
 function HomePage() {
   // State hooks
+  const navigate = useNavigate();
   const [health, setHealth] = useState('checking...');
   const [shows, setShows] = useState<Show[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -144,6 +146,10 @@ function HomePage() {
       stopPropagation: () => event.stopPropagation(),
       nativeEvent: isNativeEvent ? event : event.nativeEvent,
     } as React.MouseEvent);
+  };
+
+  const handleShowClick = (showId: number) => {
+    navigate(`/shows/${showId}`);
   };
 
   const testDatabase = useCallback(async () => {
@@ -592,7 +598,12 @@ function HomePage() {
                                   transition-opacity duration-200
                                 `}
                               ></div>
-                              <div className="text-white text-lg">{show.title}</div>
+                              <button
+                                onClick={() => handleShowClick(show.id)}
+                                className="text-white text-lg hover:text-blue-400 transition-colors duration-200 cursor-pointer text-left"
+                              >
+                                {show.title}
+                              </button>
                             </div>
                           </td>
                           <td className="px-6 py-1 whitespace-nowrap">

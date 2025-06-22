@@ -10,6 +10,8 @@ import {
   findShowByTitleAndPath,
   processShowData,
 } from '../database/Db_Operations.js';
+import fs from 'fs';
+import { mapSonarrPath } from '../utils/pathMap.js';
 
 // Load environment variables
 dotenv.config();
@@ -139,10 +141,74 @@ async function importShowById(showId, req, wss, db) {
     const show = showResponse.data;
 
     const episodeResponse = await sonarrClient.get(`/api/v3/episode?seriesId=${showId}`);
-    const episodes = episodeResponse.data;
+    const allEpisodes = episodeResponse.data;
+
+    const fileResponse = await sonarrClient.get(`/api/v3/episodefile?seriesId=${showId}`);
+    const episodeFiles = fileResponse.data;
+
+    // Start with Sonarr's hasFile flag but we'll correct it after mapping
+    let episodes = allEpisodes.filter((ep) => ep.hasFile);
+
+    // Build episodeId -> episodeNumber map
+    const idToNumber = new Map();
+    episodes.forEach((ep) => idToNumber.set(ep.id, ep.episodeNumber));
+
+    // Map files
+    const files = episodeFiles
+      .map((file) => {
+        let epId = null;
+        if (Array.isArray(file.episodeIds) && file.episodeIds.length) {
+          epId = file.episodeIds[0];
+        } else if (file.episodeId) {
+          epId = file.episodeId;
+        } else {
+          // Fallback 1: parse SxxEyy pattern
+          const searchStr = file.relativePath || file.path || '';
+          const m = searchStr.match(/S(\d{2})E(\d{2})/i);
+          if (m) {
+            const sNum = parseInt(m[1], 10);
+            const eNum = parseInt(m[2], 10);
+            const epMatch = episodes.find((e) => e.seasonNumber === sNum && e.episodeNumber === eNum);
+            if (epMatch) {
+              epId = epMatch.id;
+            }
+          }
+          // Fallback 2: date-based filenames (YYYY-MM-DD, YYYY.MM.DD, etc.)
+          if (!epId) {
+            const dMatch = searchStr.match(/(\d{4})[.\-_ ]?(\d{2})[.\-_ ]?(\d{2})/);
+            if (dMatch) {
+              const dateStr = `${dMatch[1]}-${dMatch[2]}-${dMatch[3]}`;
+              const epMatch = allEpisodes.find(
+                (e) =>
+                  (e.airDate && e.airDate.startsWith(dateStr)) ||
+                  (e.airDateUtc && e.airDateUtc.startsWith(dateStr)),
+              );
+              if (epMatch) {
+                epId = epMatch.id;
+              }
+            }
+          }
+        }
+        if (!epId) {
+          return null;
+        }
+        const hostPath = mapSonarrPath(file.path || file.relativePath || '');
+        return {
+          episodeId: epId,
+          path: hostPath,
+          size: file.size || 0,
+        };
+      })
+      .filter((v) => v !== null);
+
+    // Ensure episode list contains every episode we matched files against
+    if (files.length) {
+      const idsWithFiles = new Set(files.map((f) => f.episodeId));
+      episodes = allEpisodes.filter((ep) => idsWithFiles.has(ep.id));
+    }
 
     // All DB logic is now in one performance-logged function call
-    processShowData(db, show, episodes, []);
+    processShowData(db, show, episodes, files);
 
     // Get the ID of the show we just processed for websocket reporting
     const newShow = findShowByTitleAndPath(db, show.title, show.path);

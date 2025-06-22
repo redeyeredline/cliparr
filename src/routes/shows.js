@@ -1,6 +1,6 @@
 // src/integration/routes/shows.js - Shows API routes
 import express from 'express';
-import { getImportedShows, getShowById, deleteShowsByIds } from '../database/Db_Operations.js';
+import { getImportedShows, getShowById, deleteShowsByIds, getShowWithDetails, getEpisodeFiles } from '../database/Db_Operations.js';
 
 const router = express.Router();
 
@@ -23,13 +23,17 @@ router.get('/:id', (req, res) => {
   const db = req.app.get('db');
   const logger = req.app.get('logger');
   const showId = parseInt(req.params.id);
+  const includeDetails = req.query.details === 'true';
 
   if (isNaN(showId)) {
     return res.status(400).json({ error: 'Invalid show ID' });
   }
 
   try {
-    const show = getShowById(db, showId);
+    const show = includeDetails
+      ? getShowWithDetails(db, showId)
+      : getShowById(db, showId);
+
     if (!show) {
       return res.status(404).json({ error: 'Show not found' });
     }
@@ -37,6 +41,25 @@ router.get('/:id', (req, res) => {
   } catch (error) {
     logger.error('Failed to fetch show:', error);
     res.status(500).json({ error: 'Failed to fetch show' });
+  }
+});
+
+// Get episode files for a specific episode
+router.get('/episodes/:episodeId/files', (req, res) => {
+  const db = req.app.get('db');
+  const logger = req.app.get('logger');
+  const episodeId = parseInt(req.params.episodeId);
+
+  if (isNaN(episodeId)) {
+    return res.status(400).json({ error: 'Invalid episode ID' });
+  }
+
+  try {
+    const files = getEpisodeFiles(db, episodeId);
+    res.json({ files });
+  } catch (error) {
+    logger.error('Failed to fetch episode files:', error);
+    res.status(500).json({ error: 'Failed to fetch episode files' });
   }
 });
 

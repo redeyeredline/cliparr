@@ -1,6 +1,6 @@
-import { useEffect, useRef, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useMemo } from 'react';
+import { Download, X, Check, ChevronUp, ChevronDown } from 'lucide-react';
 import { useShiftSelect } from '../utils/selectionUtils';
-import { X, Download, Check, ChevronUp, ChevronDown } from 'lucide-react';
 
 export interface Show {
   id: number;
@@ -17,6 +17,20 @@ interface ImportModalProps {
   error?: string | null;
 }
 
+// Helper function to get the sortable title (removes leading articles) - same as HomePage
+const getSortableTitle = (title: string): string => {
+  const articles = ['the ', 'a ', 'an '];
+  const lowerTitle = title.toLowerCase();
+
+  for (const article of articles) {
+    if (lowerTitle.startsWith(article)) {
+      return title.substring(article.length).trim();
+    }
+  }
+
+  return title;
+};
+
 export default function ImportModal({
   open,
   onClose,
@@ -25,16 +39,25 @@ export default function ImportModal({
   loading = false,
   error = null,
 }: ImportModalProps) {
-  const {
-    selected,
-    handleToggle,
-    selectAll: selectAllItems,
-    deselectAll,
-    isSelected,
-  } = useShiftSelect({
-    items: shows,
+  // Sort shows by title using the same logic as the main table
+  const sortedShows = useMemo(() => {
+    return [...shows].sort((a, b) => {
+      const aVal = getSortableTitle(a.title);
+      const bVal = getSortableTitle(b.title);
+
+      return aVal.localeCompare(bVal, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+    });
+  }, [shows]);
+
+  const shiftSelect = useShiftSelect({
+    items: sortedShows,
     getId: (show) => show.id,
   });
+
+  const { selected, handleToggle, selectAll, deselectAll, isSelected } = shiftSelect;
   const modalRef = useRef<HTMLDivElement>(null);
 
   const handleOk = useCallback(() => {
@@ -71,10 +94,10 @@ export default function ImportModal({
   };
 
   const handleSelectAll = () => {
-    if (selected.length === shows.length) {
+    if (selected.length === sortedShows.length) {
       deselectAll();
     } else {
-      selectAllItems();
+      selectAll();
     }
   };
 
@@ -130,7 +153,7 @@ export default function ImportModal({
                       <div className="flex items-center justify-center">
                         <input
                           type="checkbox"
-                          checked={shows.length > 0 && selected.length === shows.length}
+                          checked={sortedShows.length > 0 && selected.length === sortedShows.length}
                           onChange={handleSelectAll}
                           className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
                           aria-label="Select all shows"
@@ -138,18 +161,12 @@ export default function ImportModal({
                       </div>
                     </th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300 uppercase tracking-wider">
-                      <div className="flex items-center space-x-2">
-                        <span>Title</span>
-                        <div className="flex flex-col">
-                          <ChevronUp className="w-3 h-3 text-gray-500" />
-                          <ChevronDown className="w-3 h-3 -mt-1 text-gray-500" />
-                        </div>
-                      </div>
+                      <span>Title</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700/30">
-                  {shows.map((show) => (
+                  {sortedShows.map((show) => (
                     <tr
                       key={show.id}
                       className={`group transition-all duration-200 hover:bg-gray-700/20 ${
@@ -181,7 +198,7 @@ export default function ImportModal({
                 </tbody>
               </table>
               {/* Empty State */}
-              {shows.length === 0 && !loading && (
+              {sortedShows.length === 0 && !loading && (
                 <div className="flex flex-col items-center justify-center h-64 text-gray-400">
                   <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mb-4">
                     <Download className="w-8 h-8" />
@@ -197,12 +214,7 @@ export default function ImportModal({
         {/* Footer */}
         <div className="flex items-center justify-between p-6 border-t border-gray-700/50 bg-gray-800/50">
           <div className="text-sm text-gray-400">
-            {selected.length > 0 && (
-              <span className="flex items-center space-x-2">
-                <Check className="w-4 h-4 text-blue-400" />
-                <span>{selected.length} shows selected</span>
-              </span>
-            )}
+            {/* Removed redundant show count - only shown in button now */}
           </div>
           <div className="flex items-center space-x-3">
             <button

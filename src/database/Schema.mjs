@@ -42,7 +42,8 @@ const STATEMENTS = [
     // indexes
     `CREATE INDEX IF NOT EXISTS idx_shows_title            ON shows(title COLLATE NOCASE)`,
     `CREATE INDEX IF NOT EXISTS idx_seasons_show_id        ON seasons(show_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_episodes_season_id     ON episodes(season_id)`
+    `CREATE INDEX IF NOT EXISTS idx_episodes_season_id     ON episodes(season_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_episode_files_episode_id ON episode_files(episode_id)`
   ];
   
   // 2) Export both the raw list and a helper to get them:
