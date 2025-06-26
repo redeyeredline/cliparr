@@ -41,7 +41,7 @@ export async function startServer() {
     logger.info('Initializing database...');
     dbInstance = await getDatabaseSingleton(config.db.path);
     logger.info('Database initialized successfully');
-    
+
     const app = createApp({ db: dbInstance, logger, wss: null });
     logger.info('Express app created');
 

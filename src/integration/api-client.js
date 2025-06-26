@@ -123,6 +123,16 @@ class ApiClient {
     return response.data;
   }
 
+  async getAllSettings() {
+    const response = await api.get('/settings/all');
+    return response.data;
+  }
+
+  async setAllSettings(settings) {
+    const response = await api.post('/settings/all', settings);
+    return response.data;
+  }
+
   async deleteShows(ids) {
     const response = await api.post('/shows/delete', { ids });
     return response.data;

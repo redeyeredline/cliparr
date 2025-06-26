@@ -7,6 +7,8 @@ import {
   setImportMode,
   getPollingInterval,
   setPollingInterval,
+  getSetting,
+  setSetting,
 } from '../database/Db_Operations.js';
 import { logger } from '../services/logger.js';
 
@@ -102,6 +104,65 @@ router.post('/polling-interval', async (req, res) => {
       error: 'Failed to set polling interval',
       details: error && (error.stack || error.message || error),
     });
+  }
+});
+
+// GET all settings
+router.get('/all', async (req, res) => {
+  const db = await getDb();
+  try {
+    const keys = [
+      'sonarr_url',
+      'sonarr_api_key',
+      'output_directory',
+      'min_confidence_threshold',
+      'backup_originals',
+      'auto_process_verified',
+      'import_mode',
+      'polling_interval',
+    ];
+    const settings = {};
+    for (const key of keys) {
+      settings[key] = getSetting(db, key, null);
+    }
+    res.json(settings);
+  } catch (error) {
+    logger.error('Failed to get all settings:', error);
+    res.status(500).json({ error: 'Failed to get all settings' });
+  }
+});
+
+// POST update all settings
+router.post('/all', async (req, res) => {
+  const db = await getDb();
+  const {
+    sonarr_url,
+    sonarr_api_key,
+    output_directory,
+    min_confidence_threshold,
+    backup_originals,
+    auto_process_verified,
+    import_mode,
+    polling_interval,
+  } = req.body;
+  try {
+    setSetting(db, 'sonarr_url', sonarr_url || '');
+    setSetting(db, 'sonarr_api_key', sonarr_api_key || '');
+    setSetting(db, 'output_directory', output_directory || '');
+    setSetting(db, 'min_confidence_threshold',
+      min_confidence_threshold !== undefined ? String(min_confidence_threshold) : '0.8');
+    setSetting(db, 'backup_originals', backup_originals ? '1' : '0');
+    setSetting(db, 'auto_process_verified', auto_process_verified ? '1' : '0');
+    if (import_mode) {
+      setImportMode(db, import_mode);
+    }
+    if (polling_interval) {
+      setPollingInterval(db, parseInt(polling_interval, 10));
+    }
+    res.json({ status: 'ok' });
+  } catch (error) {
+    logger.error('Failed to update all settings:', error);
+    res.status(500).json({ error: 'Failed to update all settings' });
   }
 });
 
