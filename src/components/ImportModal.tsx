@@ -8,6 +8,8 @@ export interface Show {
   id: number;
   title: string;
   path: string;
+  episodeCount?: number;
+  episodeFileCount?: number;
 }
 
 interface ImportModalProps {
@@ -190,9 +192,14 @@ export default function ImportModal({
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                          <div className="text-white font-medium text-lg">{show.title}</div>
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center">
+                            <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                            <div className="text-white font-medium text-lg">{show.title}</div>
+                          </div>
+                          {show.episodeFileCount === 0 && (
+                            <span className="text-red-400 text-sm font-semibold whitespace-nowrap">No downloaded files in Sonarr</span>
+                          )}
                         </div>
                       </td>
                     </tr>

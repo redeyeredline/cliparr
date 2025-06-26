@@ -23,6 +23,8 @@ export async function getDatabaseSingleton(dbPath) {
       await fs.promises.stat(dbDir);
     } catch (error) {
       if (error.code === 'ENOENT') {
+        // Create the directory if it doesn't exist
+        await fs.promises.mkdir(dbDir, { recursive: true });
         // logger.info({ dbDir }, 'Creating database directory');
       } else {
         throw error;

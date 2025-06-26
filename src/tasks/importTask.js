@@ -8,7 +8,6 @@ import {
   getImportedShows,
   processShowData,
   getSetting,
-  // You might need more functions here depending on the logic for new episodes
 } from '../database/Db_Operations.js';
 import fs from 'fs';
 import { mapSonarrPath } from '../utils/pathMap.js';
@@ -30,6 +29,16 @@ export class ImportTaskManager {
 
     const db = await getDb();
     const mode = getImportMode(db);
+    logger.info(`Import mode from database: ${mode}`);
+
+    // Log all current settings for debugging
+    const allSettings = {
+      import_mode: getSetting(db, 'import_mode', 'not set'),
+      polling_interval: getSetting(db, 'polling_interval', 'not set'),
+      sonarr_url: getSetting(db, 'sonarr_url', 'not set'),
+      sonarr_api_key: getSetting(db, 'sonarr_api_key', 'not set'),
+    };
+    logger.info('Current database settings:', allSettings);
 
     // Don't start the task if mode is 'none'
     if (mode === 'none') {
@@ -40,9 +49,48 @@ export class ImportTaskManager {
     // Check if Sonarr is configured before starting
     const sonarrUrl = getSetting(db, 'sonarr_url', '');
     const sonarrApiKey = getSetting(db, 'sonarr_api_key', '');
+    logger.info(`Sonarr URL configured: ${sonarrUrl ? 'yes' : 'no'}, API key configured: ${sonarrApiKey ? 'yes' : 'no'}`);
 
     if (!sonarrUrl || !sonarrApiKey) {
       logger.info('Sonarr not configured; not starting import task');
+      return;
+    }
+
+    // Test Sonarr connectivity before starting import task
+    let connectivityTestPassed = false;
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 seconds
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        logger.info(`Testing Sonarr connectivity (attempt ${attempt}/${maxRetries})...`);
+        const testResponse = await fetch(`${sonarrUrl.replace(/\/$/, '')}/api/v3/system/status`, {
+          headers: {
+            'X-Api-Key': sonarrApiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 5000, // 5 second timeout
+        });
+
+        if (testResponse.ok) {
+          logger.info('Sonarr API connectivity test successful');
+          connectivityTestPassed = true;
+          break;
+        } else {
+          logger.warn(`Sonarr API test failed with status ${testResponse.status} (attempt ${attempt}/${maxRetries})`);
+        }
+      } catch (error) {
+        logger.warn(`Sonarr API connectivity test failed: ${error.message} (attempt ${attempt}/${maxRetries})`);
+      }
+
+      if (attempt < maxRetries) {
+        logger.info(`Retrying Sonarr connectivity test in ${retryDelay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      }
+    }
+
+    if (!connectivityTestPassed) {
+      logger.warn('Sonarr API connectivity test failed after all retries; not starting import task');
       return;
     }
 
@@ -143,20 +191,25 @@ export class ImportTaskManager {
       const sonarrUrl = getSetting(db, 'sonarr_url', '');
       const sonarrApiKey = getSetting(db, 'sonarr_api_key', '');
       if (!sonarrUrl || !sonarrApiKey) {
+        // Only log if Sonarr is not configured
         logger.info(`Sonarr URL or API key not set in DB; skipping import for show: ${show.title}`);
         return true;
       }
+
       const [showDetails, episodes, episodeFiles] = await Promise.all([
         this.fetchFromSonarr(`series/${show.id}`, db),
         this.fetchFromSonarr(`episode?seriesId=${show.id}`, db),
         this.fetchFromSonarr(`episodefile?seriesId=${show.id}`, db),
       ]);
+
       if (!showDetails || !episodes || !episodeFiles) {
+        // Only log if Sonarr API is not configured
         logger.info(`Sonarr API not configured; skipping import for show: ${show.title}`);
         return true;
       }
 
       let episodesWithFile = episodes.filter((ep) => ep.hasFile);
+
       const files = episodeFiles
         .map((file) => {
           let epId = null;
@@ -209,31 +262,22 @@ export class ImportTaskManager {
         episodesWithFile = episodes.filter((ep) => idsWithFiles.has(ep.id));
       }
 
-      // If there are no files to import, skip and do not log as error
+      // If there are no files to import, skip silently
       if (!files.length) {
-        logger.info(`No new episodes/files to import for show: ${show.title}`);
         return true;
       }
 
       processShowData(db, showDetails, episodesWithFile, files);
       return true;
     } catch (error) {
-      console.log('importShow error diagnostic:', error, error && error.message, typeof error);
-      logger.info('importShow error diagnostic:', {
-        error: error,
-        message: error && error.message,
-        stringified: (() => {
-          try {
-            return JSON.stringify(error);
-          } catch {
-            return undefined;
-          }
-        })(),
-        type: typeof error,
-      });
       const msg = String(error);
       if (msg.includes('UNIQUE constraint failed') || msg.toLowerCase().includes('constraint')) {
+        // Only log constraint errors
         logger.info(`No new data to import for show: ${show.title} (constraint)`);
+        return true;
+      }
+      if (msg.includes('404')) {
+        logger.info(`Show not found in Sonarr: ${show.title} (404)`);
         return true;
       }
       logger.error(`Failed to import show ${show.title}:`, error);
@@ -274,6 +318,39 @@ export class ImportTaskManager {
           mode,
           isInitialRun,
           message: 'Sonarr not configured',
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      // Test Sonarr connectivity before proceeding
+      try {
+        const testResponse = await fetch(`${sonarrUrl.replace(/\/$/, '')}/api/v3/system/status`, {
+          headers: {
+            'X-Api-Key': sonarrApiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 5000,
+        });
+
+        if (!testResponse.ok) {
+          logger.warn(`Sonarr API not available (status ${testResponse.status}); skipping import task`);
+          this.broadcastStatus({
+            status: 'completed',
+            mode,
+            isInitialRun,
+            message: `Sonarr API not available (${testResponse.status})`,
+            timestamp: new Date().toISOString(),
+          });
+          return;
+        }
+      } catch (error) {
+        logger.warn(`Sonarr API connectivity failed: ${error.message}; skipping import task`);
+        this.broadcastStatus({
+          status: 'completed',
+          mode,
+          isInitialRun,
+          message: `Sonarr API connectivity failed: ${error.message}`,
           timestamp: new Date().toISOString(),
         });
         return;

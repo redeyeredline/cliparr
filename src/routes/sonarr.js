@@ -32,7 +32,26 @@ router.get('/unimported', async (req, res) => {
 
     const unimportedShows = allSonarrShows.filter((show) => !importedSet.has(show.title + '|' + show.path));
 
-    res.json(unimportedShows);
+    // Fetch episode counts for each unimported show
+    const showsWithEpisodeCounts = await Promise.all(
+      unimportedShows.map(async (show) => {
+        let episodeCount = 0;
+        let episodeFileCount = 0;
+        try {
+          const { data: episodes } = await sonarrClient.get(`/api/v3/episode?seriesId=${show.id}`);
+          episodeCount = Array.isArray(episodes) ? episodes.length : 0;
+        } catch (err) {
+          episodeCount = 0;
+        }
+        // Use statistics.episodeFileCount if available
+        if (show.statistics && typeof show.statistics.episodeFileCount === 'number') {
+          episodeFileCount = show.statistics.episodeFileCount;
+        }
+        return { ...show, episodeCount, episodeFileCount };
+      }),
+    );
+
+    res.json(showsWithEpisodeCounts);
   } catch (error) {
     logger.error({ error: error.message }, 'Failed to fetch unimported shows');
     res.status(500).json({ error: 'Failed to fetch unimported shows', details: error.message });
@@ -189,10 +208,6 @@ router.post('/import/:id', async (req, res) => {
     logger.error('Logger is not set on app');
     return res.status(500).json({ success: false, message: 'Logger not initialized' });
   }
-  if (!sonarrClient) {
-    logger.error('Sonarr client is not set on app');
-    return res.status(500).json({ success: false, message: 'Sonarr client not initialized' });
-  }
   try {
     const showId = req.params.id;
     const wss = req.app.get('wss');
@@ -217,10 +232,6 @@ router.post('/import', async (req, res) => {
   if (!logger) {
     logger.error('Logger is not set on app');
     return res.status(500).json({ success: false, message: 'Logger not initialized' });
-  }
-  if (!sonarrClient) {
-    logger.error('Sonarr client is not set on app');
-    return res.status(500).json({ success: false, message: 'Sonarr client not initialized' });
   }
   const { showIds } = req.body;
   if (!Array.isArray(showIds) || showIds.length === 0) {

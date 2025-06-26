@@ -16,7 +16,7 @@ function getCachedStmt(db, sql) {
   return stmt;
 }
 
-async function getDb(dbPath = 'data/cliparr.db') {
+async function getDb(dbPath = 'src/database/data/cliparr.db') {
   return getDatabaseSingleton(dbPath);
 }
 
