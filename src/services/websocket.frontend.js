@@ -1,3 +1,5 @@
+// Frontend WebSocket client for real-time communication with backend server.
+// Provides connection management, automatic reconnection, and event listener system.
 import { logger } from './logger.frontend.js';
 
 class WebSocketClient {

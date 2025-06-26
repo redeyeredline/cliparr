@@ -1,4 +1,6 @@
-// src/routes/settings.js - Settings API routes
+// API routes for application settings management including import modes and polling intervals.
+// Handles CRUD operations for Sonarr configuration, processing settings, and system preferences.
+
 import express from 'express';
 const router = express.Router();
 import {

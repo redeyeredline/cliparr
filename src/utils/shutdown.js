@@ -1,3 +1,5 @@
+// Graceful shutdown utility that handles process termination signals and cleanup.
+// Registers handlers for SIGTERM, SIGINT, and uncaught exceptions with timeout protection.
 // src/utils/shutdown.js
 import { logger } from '../services/logger.js';
 

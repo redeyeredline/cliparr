@@ -1,3 +1,5 @@
+// Alphabet navigation sidebar with dynamic sizing and ellipsis truncation for large datasets.
+// Provides clickable letter navigation with responsive font sizing and overflow handling.
 import { useRef, useEffect, useState } from 'react';
 
 const MIN_LETTERS_TOP = 3;

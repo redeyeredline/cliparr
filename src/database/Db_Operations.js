@@ -1,3 +1,5 @@
+// Database operations module providing CRUD functions for shows, episodes, and settings.
+// Includes performance monitoring, query caching, and transaction management for SQLite operations.
 import { getDatabaseSingleton } from './Auto_DB_Setup.js';
 import { logger } from '../services/logger.js';
 import { promises as fsPromises } from 'fs';

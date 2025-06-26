@@ -1,3 +1,5 @@
+// Main dashboard page displaying imported shows with search, sorting, and alphabet navigation.
+// Handles show selection, import progress updates, and provides navigation to show details.
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Trash2, Check, ChevronUp, ChevronDown } from 'lucide-react';

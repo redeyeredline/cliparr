@@ -1,3 +1,5 @@
+// Detailed view page for individual shows displaying seasons, episodes, and file information.
+// Provides expandable season navigation and episode listing with file details.
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronUp, ArrowLeft, Folder, FileText } from 'lucide-react';

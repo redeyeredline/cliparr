@@ -1,3 +1,5 @@
+// React hook for managing shift-click range selection in tables and lists.
+// Provides multi-select functionality similar to Gmail and file managers with range selection.
 import { useState, useCallback } from 'react';
 
 /**

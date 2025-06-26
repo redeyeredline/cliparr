@@ -1,3 +1,5 @@
+// React application entry point that renders the main App component.
+// Sets up the root DOM element and enables React StrictMode for development.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';

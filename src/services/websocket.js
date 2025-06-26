@@ -1,3 +1,5 @@
+// Backend WebSocket server setup for real-time communication with frontend clients.
+// Provides connection management, heartbeat monitoring, and message broadcasting capabilities.
 // src/services/websocket.js
 import { WebSocketServer } from 'ws';
 import { logger } from './logger.js';
@@ -13,7 +15,6 @@ let wsServer;
  */
 export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}) {
   wsServer = new WebSocketServer({ server, path });
-  logger.info({ path }, 'WebSocketServer listening');
 
   wsServer.on('connection', (ws) => {
     ws.isAlive = true;
@@ -59,7 +60,7 @@ export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}
 
   wsServer.on('close', () => clearInterval(interval));
 
-  logger.info('WebSocket server initialized');
+  logger.info('✅ WebSocket initialized');
 }
 
 /** Get the running WebSocketServer instance */

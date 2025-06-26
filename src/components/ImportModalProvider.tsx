@@ -1,3 +1,5 @@
+// Provider component for import modal functionality with state management and API integration.
+// Handles fetching unimported shows, import operations, and modal state across the application.
 import React, { useState, useCallback } from 'react';
 import ImportModal, { Show } from './ImportModal';
 import { apiClient } from '../integration/api-client';

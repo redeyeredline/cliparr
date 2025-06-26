@@ -214,3 +214,4 @@ Consider dotenv-flow for multi-env config; keep .env.example free of DB secrets 
 
 
 
+look for any other links to the env file and clean those up with info from the new settings page and pathing. 

@@ -1,3 +1,5 @@
+// Main navigation sidebar component with routing, keyboard shortcuts, and accessibility features.
+// Provides navigation between pages and import modal with focus management and skip links.
 import React, { useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useImportModal } from '../../hooks/useImportModal';

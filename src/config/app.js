@@ -1,3 +1,6 @@
+// Environment-specific application configuration for development and production.
+// Provides CORS settings and other app-level configuration based on NODE_ENV.
+
 // Development configuration
 const devConfig = {
   cors: {

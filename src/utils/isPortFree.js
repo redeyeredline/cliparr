@@ -1,3 +1,5 @@
+// Utility function to check if a network port is available for binding.
+// Uses Node.js net module to test port availability before server startup.
 import net from 'net';
 
 /**

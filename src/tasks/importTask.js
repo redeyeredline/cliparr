@@ -1,3 +1,5 @@
+// Background import task manager that periodically syncs shows from Sonarr to local database.
+// Handles automatic import scheduling, episode mapping, and WebSocket status broadcasting.
 import { logger } from '../services/logger.js';
 import {
   getDb,
@@ -5,6 +7,7 @@ import {
   getPollingInterval,
   getImportedShows,
   processShowData,
+  getSetting,
   // You might need more functions here depending on the logic for new episodes
 } from '../database/Db_Operations.js';
 import fs from 'fs';
@@ -99,44 +102,54 @@ export class ImportTaskManager {
     });
   }
 
-  async fetchFromSonarr(endpoint) {
-    const response = await fetch(`${process.env.SONARR_URL}/api/v3/${endpoint}`, {
+  async fetchFromSonarr(endpoint, db) {
+    const sonarrUrl = getSetting(db, 'sonarr_url', '');
+    const sonarrApiKey = getSetting(db, 'sonarr_api_key', '');
+    if (!sonarrUrl || !sonarrApiKey) {
+      logger.info('Sonarr URL or API key not set in DB; skipping Sonarr API call.');
+      return null;
+    }
+    const url = `${sonarrUrl.replace(/\/$/, '')}/api/v3/${endpoint}`;
+    const response = await fetch(url, {
       headers: {
-        'X-Api-Key': process.env.SONARR_API_KEY,
+        'X-Api-Key': sonarrApiKey,
         'Content-Type': 'application/json',
       },
     });
-
     if (!response.ok) {
       throw new Error(`Sonarr API error: ${response.status}`);
     }
-
     return response.json();
   }
 
   async importShow(show, db) {
     try {
+      // Use DB settings for Sonarr URL/API key
+      const sonarrUrl = getSetting(db, 'sonarr_url', '');
+      const sonarrApiKey = getSetting(db, 'sonarr_api_key', '');
+      if (!sonarrUrl || !sonarrApiKey) {
+        logger.info(`Sonarr URL or API key not set in DB; skipping import for show: ${show.title}`);
+        return true;
+      }
       const [showDetails, episodes, episodeFiles] = await Promise.all([
-        this.fetchFromSonarr(`series/${show.id}`),
-        this.fetchFromSonarr(`episode?seriesId=${show.id}`),
-        this.fetchFromSonarr(`episodefile?seriesId=${show.id}`),
+        this.fetchFromSonarr(`series/${show.id}`, db),
+        this.fetchFromSonarr(`episode?seriesId=${show.id}`, db),
+        this.fetchFromSonarr(`episodefile?seriesId=${show.id}`, db),
       ]);
+      if (!showDetails || !episodes || !episodeFiles) {
+        logger.info(`Sonarr API not configured; skipping import for show: ${show.title}`);
+        return true;
+      }
 
-      // We'll gather episodes that truly have a file after path mapping below.
-      // Start with the Sonarr-supplied hasFile flag but correct it after we map files.
       let episodesWithFile = episodes.filter((ep) => ep.hasFile);
-
-      // Map Sonarr episodeFile objects to our simplified file rows
       const files = episodeFiles
         .map((file) => {
-          // Try to get episodeId directly (v4). If not present, derive via SxxEyy in relativePath.
           let epId = null;
           if (Array.isArray(file.episodeIds) && file.episodeIds.length) {
             epId = file.episodeIds[0];
           } else if (file.episodeId) {
             epId = file.episodeId;
           } else {
-            // Fallback: parse SxxEyy pattern
             const searchStr = file.relativePath || file.path || '';
             const match = searchStr.match(/S(\d{2})E(\d{2})/i);
             if (match) {
@@ -149,7 +162,6 @@ export class ImportTaskManager {
                 epId = epMatch.id;
               }
             }
-            // NEW: Fallback for daily shows using date-based filenames (e.g. 2023-12-01)
             if (!epId) {
               const dateMatch = searchStr.match(/(\d{4})[.\-_ ]?(\d{2})[.\-_ ]?(\d{2})/);
               if (dateMatch) {
@@ -177,19 +189,38 @@ export class ImportTaskManager {
         })
         .filter((v) => v !== null);
 
-      // Ensure episodesWithFile contains every episode we ultimately mapped a file to.
       if (files.length) {
         const idsWithFiles = new Set(files.map((f) => f.episodeId));
         episodesWithFile = episodes.filter((ep) => idsWithFiles.has(ep.id));
       }
 
-      logger.info({ count: episodesWithFile.length }, 'episodesWithFile');
-      logger.info({ count: files.length, sample: files.slice(0, 3) }, 'files');
+      // If there are no files to import, skip and do not log as error
+      if (!files.length) {
+        logger.info(`No new episodes/files to import for show: ${show.title}`);
+        return true;
+      }
 
-      // Insert into DB (episodesWithFile guarantees only real episodes)
       processShowData(db, showDetails, episodesWithFile, files);
       return true;
     } catch (error) {
+      console.log('importShow error diagnostic:', error, error && error.message, typeof error);
+      logger.info('importShow error diagnostic:', {
+        error: error,
+        message: error && error.message,
+        stringified: (() => {
+          try {
+            return JSON.stringify(error);
+          } catch {
+            return undefined;
+          }
+        })(),
+        type: typeof error,
+      });
+      const msg = String(error);
+      if (msg.includes('UNIQUE constraint failed') || msg.toLowerCase().includes('constraint')) {
+        logger.info(`No new data to import for show: ${show.title} (constraint)`);
+        return true;
+      }
       logger.error(`Failed to import show ${show.title}:`, error);
       return false;
     }
@@ -217,26 +248,57 @@ export class ImportTaskManager {
         return;
       }
 
-      if (mode === 'auto' || (mode === 'import' && isInitialRun)) {
-        const sonarrShows = await this.fetchFromSonarr('series');
+      // Check if Sonarr is configured before attempting any API calls
+      const sonarrUrl = getSetting(db, 'sonarr_url', '');
+      const sonarrApiKey = getSetting(db, 'sonarr_api_key', '');
 
-        // Use the centralized DB function
-        const { shows: importedShows } = getImportedShows(db, 1, 10000);
-        const importedSet = new Set(importedShows.map((show) => show.title + '|' + show.path));
+      if (!sonarrUrl || !sonarrApiKey) {
+        logger.info('Sonarr not configured; skipping import task');
+        this.broadcastStatus({
+          status: 'completed',
+          mode,
+          isInitialRun,
+          message: 'Sonarr not configured',
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
 
-        const showsToProcess = sonarrShows.filter((show) => !importedSet.has(show.title + '|' + show.path));
-
-        for (const show of showsToProcess) {
-          if (this.shutdownRequested) {
-            break;
+      if (mode === 'auto') {
+        // AUTO: Import all unimported shows
+        try {
+          const sonarrShows = await this.fetchFromSonarr('series', db);
+          if (!sonarrShows) {
+            logger.info('Sonarr API not available; skipping auto import');
+            return;
           }
-          await this.importShow(show, db);
+          const { shows: importedShows } = getImportedShows(db, 1, 10000);
+          const importedSet = new Set(importedShows.map((show) => show.title + '|' + show.path));
+          const showsToProcess = sonarrShows.filter((show) => !importedSet.has(show.title + '|' + show.path));
+
+          for (const show of showsToProcess) {
+            if (this.shutdownRequested) {
+              break;
+            }
+            await this.importShow(show, db);
+          }
+        } catch (error) {
+          logger.info('Sonarr API error during auto import; skipping:', error.message);
+          return;
         }
-      } else if (mode === 'import' && !isInitialRun) {
-        // This part needs more complex logic to check for new episodes.
-        // For now, let's ensure the main import path is logged.
-        // We can refactor this episode check later if needed.
-        logger.info('Skipping new episode check in background task for now.');
+      } else if (mode === 'import') {
+        // IMPORT: Only check for new episodes for already imported shows
+        const { shows: importedShows } = getImportedShows(db, 1, 10000);
+        if (importedShows.length === 0) {
+          logger.info('No shows imported; nothing to do in import mode.');
+        } else {
+          for (const show of importedShows) {
+            if (this.shutdownRequested) {
+              break;
+            }
+            await this.importShow(show, db);
+          }
+        }
       }
 
       this.broadcastStatus({

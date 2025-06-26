@@ -1,3 +1,5 @@
+// Radio button control for selecting import modes with descriptive labels and accessibility.
+// Provides three modes: Auto, Import, and None with keyboard navigation support.
 import React, { useEffect } from 'react';
 
 interface ImportModeControlProps {

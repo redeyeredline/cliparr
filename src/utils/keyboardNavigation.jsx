@@ -1,3 +1,5 @@
+// Comprehensive keyboard navigation utilities for React components including focus management.
+// Provides arrow key navigation, focus traps, keyboard shortcuts, and accessibility features.
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 /**

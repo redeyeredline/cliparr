@@ -1,4 +1,6 @@
-// src/integration/api-client.js - API client for React frontend
+// Frontend API client providing HTTP methods for backend communication.
+// Handles requests to health, shows, Sonarr, and settings endpoints with error interceptors.
+
 import axios from 'axios';
 
 const API_BASE = 'http://localhost:8485';

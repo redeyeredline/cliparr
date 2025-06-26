@@ -1,3 +1,5 @@
+// Settings management page for configuring Sonarr connection, processing options, and import behavior.
+// Provides form controls for API credentials, output directories, and confidence thresholds.
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, CheckCircle, XCircle } from 'lucide-react';
 import ImportModeControl from '../components/ImportModeControl';

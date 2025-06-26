@@ -1,3 +1,5 @@
+// Main React application component that sets up routing and global providers.
+// Defines the application structure with navigation and toast/import modal contexts.
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';

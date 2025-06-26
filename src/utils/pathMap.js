@@ -1,3 +1,5 @@
+// Path mapping utility to convert Sonarr container paths to host system paths.
+// Uses environment variables to map between Docker container and host file system paths.
 export function mapSonarrPath(absPath) {
   const from = process.env.SONARR_PATH_PREFIX || '';
   const to = process.env.HOST_PATH_PREFIX || '';

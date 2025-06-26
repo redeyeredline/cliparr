@@ -1,3 +1,5 @@
+// Modal-specific alphabet sidebar with dynamic button sizing and ResizeObserver integration.
+// Provides responsive letter navigation for modal dialogs with ellipsis truncation.
 import React, { useRef, useState, useLayoutEffect } from 'react';
 
 const MIN_BUTTON_HEIGHT = 20;

@@ -1,4 +1,5 @@
-// src/database/schema.js
+// Database schema definition containing table creation statements and indexes.
+// Defines the structure for shows, seasons, episodes, files, and settings tables.
 
 // 1) Define your SQL statements in one place:
 const STATEMENTS = [
@@ -6,8 +7,11 @@ const STATEMENTS = [
     `
     CREATE TABLE IF NOT EXISTS shows (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sonarr_id INTEGER,
+      sonarr_instance_id TEXT,
       title TEXT NOT NULL,
-      path TEXT
+      path TEXT,
+      UNIQUE(sonarr_id, sonarr_instance_id)
     )`,
     `
     CREATE TABLE IF NOT EXISTS seasons (

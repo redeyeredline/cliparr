@@ -1,3 +1,5 @@
+// Radio button control for selecting import polling intervals with accessibility features.
+// Provides interval options from 15 minutes to 24 hours with disabled state handling.
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../integration/api-client';
 

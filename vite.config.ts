@@ -1,3 +1,5 @@
+// Vite configuration for React development with integrated backend server startup.
+// Configures development server, HMR, build settings, and backend integration plugin.
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -17,7 +19,7 @@ export default defineConfig({
           try {
             const { startServer } = await import('./src/integration/server.js');
             await startServer();
-            console.log('✅ Backend server started successfully');
+            console.info('✅ Backend server started successfully');
           } catch (err) {
             console.error('❌ Failed to start backend server:', err);
           }

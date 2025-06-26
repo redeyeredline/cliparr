@@ -1,3 +1,5 @@
+// Modal component for importing shows from Sonarr with multi-select functionality.
+// Provides a searchable interface for selecting and importing unimported shows with shift-select support.
 import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 import { Download, X, Check, ChevronUp, ChevronDown } from 'lucide-react';
 import { useShiftSelect } from '../utils/selectionUtils';

@@ -1,3 +1,5 @@
+// Express application factory that sets up middleware, routes, and shared services.
+// Configures CORS, JSON parsing, and mounts API route handlers for the backend.
 // src/app.js
 import express from 'express';
 import cors from './middleware/cors.js';

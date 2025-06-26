@@ -1,3 +1,5 @@
+// Toast notification provider component that displays success, error, and info messages.
+// Provides animated toast notifications with auto-dismiss functionality and manual close for errors.
 import { useState, useCallback, ReactNode } from 'react';
 import { ToastContext } from './ToastContext';
 import { CheckCircle, XCircle, Info, X } from 'lucide-react';

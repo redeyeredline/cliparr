@@ -1,3 +1,5 @@
+// Database singleton manager that initializes SQLite connection and creates schema.
+// Handles database setup, default settings insertion, and connection lifecycle management.
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
@@ -12,7 +14,6 @@ export async function getDatabaseSingleton(dbPath) {
   }
 
   try {
-    logger.info('Creating new database instance...');
     // Ensure absolute path
     const absoluteDbPath = path.isAbsolute(dbPath) ? dbPath : path.resolve(process.cwd(), dbPath);
     const dbDir = path.dirname(absoluteDbPath);
@@ -22,15 +23,14 @@ export async function getDatabaseSingleton(dbPath) {
       await fs.promises.stat(dbDir);
     } catch (error) {
       if (error.code === 'ENOENT') {
-        logger.info({ dbDir }, 'Creating database directory');
-        await fs.promises.mkdir(dbDir, { recursive: true });
+        // logger.info({ dbDir }, 'Creating database directory');
       } else {
         throw error;
       }
     }
 
     // Create database connection
-    logger.info({ dbPath: absoluteDbPath }, 'Opening database connection');
+    // logger.info({ dbPath: absoluteDbPath }, 'Opening database connection');
     dbInstance = new Database(absoluteDbPath);
 
     // Batch PRAGMA settings
@@ -67,16 +67,16 @@ export async function getDatabaseSingleton(dbPath) {
     });
 
     init();
-    logger.info({ dbPath: absoluteDbPath }, 'Database initialized successfully');
+    logger.info('✅ Database started');
     return dbInstance;
 
   } catch (err) {
-    logger.error({ err, dbPath }, 'Database initialization failed');
+    console.error('❌ Database failed to start:', err);
     if (dbInstance) {
       try {
         dbInstance.close();
       } catch (closeErr) {
-        logger.error({ err: closeErr }, 'Error closing database after initialization failure');
+        console.error('Error closing database after initialization failure:', closeErr);
       }
       dbInstance = null;
     }

@@ -1,3 +1,5 @@
+// Application configuration manager that loads environment variables and provides defaults.
+// Centralizes server, database, WebSocket, and CORS settings for the backend application.
 // src/config/index.js
 import path from 'path';
 import dotenv from 'dotenv';
@@ -38,10 +40,5 @@ const config = {
     credentials: true,
   },
 };
-
-// fail fast on critical ENV
-if (!config.sonarr.apiKey) {
-  throw new Error('Missing ENV var: SONARR_API_KEY');
-}
 
 export default config;

@@ -1,3 +1,5 @@
+// Empty state component displayed when no shows are imported, with import modal trigger.
+// Provides visual feedback and call-to-action for users to start importing shows from Sonarr.
 import React, { useRef, useEffect } from 'react';
 import { useImportModal } from '../hooks/useImportModal';
 import { Database, Plus } from 'lucide-react';

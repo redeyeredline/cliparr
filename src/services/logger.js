@@ -1,3 +1,5 @@
+// Backend logging service using Pino for structured logging with environment-specific formatting.
+// Provides JSON logging for production and pretty-printed logs for development with error serialization.
 /* eslint-env node */
 // src/services/logger.js
 import pino from 'pino';

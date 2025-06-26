@@ -1,3 +1,5 @@
+// System diagnostics page displaying server uptime and database performance statistics.
+// Shows query performance metrics and slowest queries for monitoring system health.
 import React, { useEffect, useState } from 'react';
 import { Cpu } from 'lucide-react';
 

@@ -1,4 +1,6 @@
-// src/integration/routes/shows.js - Shows API routes
+// API routes for managing imported shows including listing, fetching details, and batch deletion.
+// Provides endpoints for show data retrieval and episode file management from the database.
+
 import express from 'express';
 import { getImportedShows, getShowById, deleteShowsByIds, getShowWithDetails, getEpisodeFiles } from '../database/Db_Operations.js';
 

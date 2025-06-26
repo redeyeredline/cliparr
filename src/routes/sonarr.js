@@ -1,4 +1,6 @@
-// src/routes/sonarr.js
+// Sonarr API integration routes for importing shows and syncing with external Sonarr instance.
+// Handles show import process, episode mapping, and WebSocket progress notifications.
+
 import express from 'express';
 import axios from 'axios';
 import { logger } from '../services/logger.js';
@@ -9,105 +11,22 @@ import {
   getImportedShows,
   findShowByTitleAndPath,
   processShowData,
+  getSetting,
 } from '../database/Db_Operations.js';
-import fs from 'fs';
 import { mapSonarrPath } from '../utils/pathMap.js';
 
 // Load environment variables
 dotenv.config();
 const router = express.Router();
 
-// Validate environment variables
-const SONARR_URL = process.env.SONARR_URL;
-const SONARR_API_KEY = process.env.SONARR_API_KEY;
-
-if (SONARR_API_KEY) {
-  logger.info(
-    `Loaded SONARR_API_KEY from env: ${SONARR_API_KEY.slice(0, 4)}... (masked)`,
-  );
-} else {
-  logger.warn('SONARR_API_KEY is not set in environment variables!');
-}
-
-// Configure axios with longer timeout and better error handling
-const sonarrClient = axios.create({
-  baseURL: SONARR_URL,
-  timeout: 15000, // 15 second timeout
-  headers: {
-    'X-Api-Key': SONARR_API_KEY,
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add response interceptor for better error handling
-sonarrClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.code === 'ECONNABORTED') {
-      logger.error('Sonarr API request timed out');
-      throw new Error(
-        'Sonarr API request timed out. Please check if Sonarr is running and accessible.',
-      );
-    }
-    if (error.response) {
-      if (error.response.status === 401) {
-        logger.error('Invalid Sonarr API key');
-        throw new Error(
-          'Invalid Sonarr API key. Please check your SONARR_API_KEY environment variable.',
-        );
-      }
-      logger.error(
-        {
-          status: error.response.status,
-          data: error.response.data,
-        },
-        'Sonarr API error response',
-      );
-      throw new Error(
-        'Sonarr API error: ' +
-        error.response.status +
-        ' - ' +
-        JSON.stringify(error.response.data),
-      );
-    }
-    if (error.request) {
-      logger.error('No response received from Sonarr API');
-      throw new Error(
-        'No response from Sonarr API at ' +
-        SONARR_URL +
-        '. Please check if Sonarr is running and accessible.',
-      );
-    }
-    logger.error({ error: error.message }, 'Sonarr API request failed');
-    throw error;
-  },
-);
-
-// Test Sonarr connection on startup
-const testSonarrConnection = async () => {
-  try {
-    logger.info(`Testing connection to Sonarr at ${SONARR_URL}`);
-    await sonarrClient.get('/api/v3/system/status');
-    logger.info('Successfully connected to Sonarr API');
-  } catch (error) {
-    logger.error('Failed to connect to Sonarr API:', error.message);
-    throw error;
-  }
-};
-
-// Test connection immediately
-testSonarrConnection().catch((error) => {
-  logger.error('Sonarr API connection test failed:', error.message);
-});
-
 // Get unimported shows from Sonarr
 router.get('/unimported', async (req, res) => {
   try {
+    const db = req.app.get('db');
+    const sonarrClient = await getSonarrClient(db);
     const { data: allSonarrShows } = await sonarrClient.get('/api/v3/series');
 
     // Filter out shows that are already imported
-    const db = req.app.get('db');
-    // Fetch a large number to simulate getting all shows for the uniqueness check
     const { shows: importedShows } = getImportedShows(db, 1, 10000);
     const importedSet = new Set(importedShows.map((show) => show.title + '|' + show.path));
 
@@ -120,10 +39,24 @@ router.get('/unimported', async (req, res) => {
   }
 });
 
+async function getSonarrClient(db) {
+  const sonarr_url = getSetting(db, 'sonarr_url', 'http://localhost:8989');
+  const sonarr_api_key = getSetting(db, 'sonarr_api_key', '');
+  return axios.create({
+    baseURL: sonarr_url,
+    timeout: 15000,
+    headers: {
+      'X-Api-Key': sonarr_api_key,
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 // --- REFACTOR: Extract import logic to a function ---
 async function importShowById(showId, req, wss, db) {
   let dbShowId = null;
   try {
+    const sonarrClient = await getSonarrClient(db);
     // Send initial progress
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {

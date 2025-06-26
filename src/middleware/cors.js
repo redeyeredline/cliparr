@@ -1,3 +1,5 @@
+// CORS middleware for handling cross-origin requests with configurable settings.
+// Sets appropriate headers for browser security and handles preflight OPTIONS requests.
 // src/middleware/cors.js
 import config from '../config/app.js';
 
