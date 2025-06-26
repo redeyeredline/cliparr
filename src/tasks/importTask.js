@@ -12,6 +12,7 @@ import {
 } from '../database/Db_Operations.js';
 import fs from 'fs';
 import { mapSonarrPath } from '../utils/pathMap.js';
+import WebSocket from 'ws';
 
 export class ImportTaskManager {
   constructor(wss) {
@@ -32,14 +33,28 @@ export class ImportTaskManager {
 
     // Don't start the task if mode is 'none'
     if (mode === 'none') {
+      logger.info('Import mode is "none"; not starting import task');
+      return;
+    }
+
+    // Check if Sonarr is configured before starting
+    const sonarrUrl = getSetting(db, 'sonarr_url', '');
+    const sonarrApiKey = getSetting(db, 'sonarr_api_key', '');
+
+    if (!sonarrUrl || !sonarrApiKey) {
+      logger.info('Sonarr not configured; not starting import task');
       return;
     }
 
     const interval = getPollingInterval(db);
     logger.info(`Starting import task with ${interval}s interval`);
 
-    // Run initial import immediately
-    await this.runTask(true);
+    // Run initial import immediately (but it will handle errors gracefully now)
+    try {
+      await this.runTask(true);
+    } catch (error) {
+      logger.info('Initial import task failed, but continuing with scheduled tasks:', error.message);
+    }
 
     // Then set up periodic task
     this.taskInterval = setInterval(() => this.runTask(false), interval * 1000);
