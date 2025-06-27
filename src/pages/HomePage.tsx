@@ -10,6 +10,7 @@ import AlphabetSidebar from '../components/AlphabetSidebar';
 import { useToast } from '../components/ToastContext';
 import EmptyState from '../components/EmptyState.tsx';
 import { useShiftSelect } from '../utils/selectionUtils';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface Show {
   id: number;
@@ -450,13 +451,8 @@ function HomePage() {
             {shows.length === 0 ? (
               <EmptyState />
             ) : (
-              <div
-                className={`
-                  h-full bg-gray-800/30 backdrop-blur-sm rounded-2xl 
-                  border border-gray-700/30 shadow-2xl overflow-hidden
-                `}
-              >
-                <div className="h-full overflow-auto">
+              <Card className="h-full overflow-hidden">
+                <CardContent className="h-full overflow-auto">
                   <table
                     ref={tableRef}
                     className="w-full"
@@ -638,8 +634,8 @@ function HomePage() {
                       <p className="text-sm">Try adjusting your search criteria</p>
                     </div>
                   )}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         </div>

@@ -83,12 +83,12 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
   };
 
   return (
-    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/30 shadow-2xl p-8 w-full">
-      <div className="mb-6">
+    <Card className="w-full">
+      <CardHeader>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-white" />
-            <span className="text-xl font-bold text-white">Processing Profiles</span>
+            <CardTitle className="text-xl font-bold text-white">Processing Profiles</CardTitle>
           </div>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
@@ -226,19 +226,21 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
             </DialogContent>
           </Dialog>
         </div>
-      </div>
-      {/* Empty state if no profiles */}
-      {(!profiles || profiles.length === 0) && (
-        <div className="flex flex-col items-center justify-center py-12">
-          <Monitor className="w-16 h-16 mb-4 text-gray-400" />
-          <h3 className="font-semibold text-gray-200 mb-2 text-lg">No Processing Profiles</h3>
-          <p className="text-gray-400 mb-4">Create custom profiles for different quality and performance needs</p>
-          <Button onClick={() => setShowCreateDialog(true)} className="bg-gray-700/60 text-white hover:bg-gray-700/80">
-            <Plus className="w-4 h-4 mr-2" />
-            Create First Profile
-          </Button>
-        </div>
-      )}
-    </div>
+      </CardHeader>
+      <CardContent>
+        {/* Empty state if no profiles */}
+        {(!profiles || profiles.length === 0) && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Monitor className="w-16 h-16 mb-4 text-gray-400" />
+            <h3 className="font-semibold text-gray-200 mb-2 text-lg">No Processing Profiles</h3>
+            <p className="text-gray-400 mb-4">Create custom profiles for different quality and performance needs</p>
+            <Button onClick={() => setShowCreateDialog(true)} className="bg-gray-700/60 text-white hover:bg-gray-700/80">
+              <Plus className="w-4 h-4 mr-2" />
+              Create First Profile
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

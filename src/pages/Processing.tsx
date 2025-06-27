@@ -96,8 +96,8 @@ export default function Processing() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
-      <Card className="rounded-2xl shadow-xl border-0 bg-slate-800/90 backdrop-blur-md">
-        <CardContent className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 p-8">
+      <Card>
+        <CardContent className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
           <div>
             <h1 className="text-4xl font-extrabold text-white mb-2 tracking-tight">
               Advanced Processing
