@@ -7,6 +7,7 @@ import healthRoutes from './routes/health.js';
 import showRoutes from './routes/shows.js';
 import sonarrRoutes from './routes/sonarr.js';
 import settingsRoutes from './routes/settings.js';
+import hardwareRoutes from './routes/hardware.js';
 
 /**
  * Assemble and return an Express application.
@@ -35,6 +36,7 @@ export function createApp({ db, logger, wss }) {
   app.use('/shows', showRoutes);
   app.use('/sonarr', sonarrRoutes);
   app.use('/settings', settingsRoutes);
+  app.use('/hardware', hardwareRoutes);
 
   return app;
 }

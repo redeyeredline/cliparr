@@ -35,7 +35,6 @@
 - ✅ Import progress events
 - ✅ Diagnostics events
 
-
 ## 7. Health & Diagnostics
 - ✅ Health check endpoint
 - ✅ Database connection status indicator on frontend
@@ -59,21 +58,21 @@
   💭 Pagination
   ✅ Row selection
   ✅ Custom styling (dark theme)
-- ❌ Show Details Page
+- ✅ Show Details Page
   ✅Season-based collapsible tables
   ✅ Episode information display
   - File details
-- ❌ Styling & Layout
+- ✅ Styling & Layout
   ✅ Dark theme implementation
   ✅ Consistent color scheme
-  - Responsive design
+  ✅ Responsive design
   ✅ Custom table styling
   ✅ Modal components
   ✅ Toast notifications
 - ✅ Navigation
   ✅ Sidebar with icons
   ✅ Active state indicators
-  💭 Nested menu items
+  ✅ Nested menu items
   ✅ Import modal integration
 
 ## 10. Database Initialization and Connection Status
@@ -102,8 +101,6 @@
 - ✅ When using keyboard shortcuts and you get into the table the space bar should allow you to select the row you are ons tick box currently it only allows you to select the select all tick box.
 ## 13. Mobile & Responsive Tasks
 - ❌ Need a hamburger nav or transform the table into a card list on mobile
-- ❌ Responsive behavior
-      On narrower viewports, you may want the two sections to stack vertically rather than squeeze horizontally. Ensuring both labels and controls wrap cleanly will maintain ease of use on tablet or phone
 - ❌ the alphabet bar should expand to fill all avail vertical space more gracefully
 - ❌ properly add an alphabet bar to the import modal 
 - ❌ fix scroll bars site wide to remove the up and down arrows
@@ -145,7 +142,7 @@
 - ✅ User-facing notifications properly use the modern toast system
 
 ✅ look into perf issues while changing pages
-i also breifly see the main page no shows imported placeholder during a seasons view going back to the home page. we need to implement some logic or a brief loading wheel instead
+
 
 
 when swithing to docker make sure we look at the pathing import from the os+ sonarr we are doing in pathmap.js

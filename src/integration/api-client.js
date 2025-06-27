@@ -139,6 +139,17 @@ class ApiClient {
     const response = await api.post('/shows/delete', { ids });
     return response.data;
   }
+
+  // Hardware endpoints
+  async detectHardware() {
+    const response = await api.get('/hardware/detect');
+    return response.data;
+  }
+
+  async getHardwareInfo() {
+    const response = await api.get('/hardware/info');
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();

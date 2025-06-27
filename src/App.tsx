@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage';
 import SettingsPage from './pages/SettingsPage';
 import SystemPage from './pages/SystemPage';
 import ShowDetailsPage from './pages/ShowDetailsPage';
+import HardwarePage from './pages/Hardware';
 import NavigationBar from './components/layout/NavigationBar';
 import { ToastProvider } from './components/ToastProvider';
 import { ImportModalProvider } from './components/ImportModalProvider';
@@ -21,6 +22,7 @@ function App() {
               <Route path="/shows/:id" element={<ShowDetailsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/system" element={<SystemPage />} />
+              <Route path="/hardware" element={<HardwarePage />} />
             </Routes>
           </NavigationBar>
         </ImportModalProvider>

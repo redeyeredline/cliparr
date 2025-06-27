@@ -38,7 +38,6 @@ export class ImportTaskManager {
       sonarr_url: getSetting(db, 'sonarr_url', 'not set'),
       sonarr_api_key: getSetting(db, 'sonarr_api_key', 'not set'),
     };
-    logger.info('Current database settings:', allSettings);
 
     // Don't start the task if mode is 'none'
     if (mode === 'none') {
