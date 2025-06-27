@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,7 @@ import HardwareDetection from '../components/HardwareDetection';
 import ProcessingProfiles from '../components/ProcessingProfiles';
 import PerformanceBenchmark from '../components/PerformanceBenchmark';
 import { apiClient } from '../integration/api-client';
+import { wsClient } from '../services/websocket.frontend';
 
 export default function Hardware() {
   const [hardwareInfo, setHardwareInfo] = useState(null);
@@ -25,31 +26,60 @@ export default function Hardware() {
   const [benchmarkResults, setBenchmarkResults] = useState(null);
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [error, setError] = useState(null);
+  const [progress, setProgress] = useState(null);
+  const progressRef = useRef(null);
 
-  const loadData = async () => {
-    try {
-      setError(null);
-      // Load hardware info if available
-      const response = await apiClient.getHardwareInfo();
-      if (response.status === 'success') {
-        setHardwareInfo(response.data);
-      }
-      // For now, we'll use empty profiles since the entities aren't implemented yet
-      setProfiles([]);
-    } catch (error) {
-      console.error('Error loading hardware data:', error);
-      setError('Failed to load hardware information');
-    }
-  };
-
+  // On first load, fetch cached hardware info and benchmark results
   useEffect(() => {
-    loadData();
+    const loadInitialData = async () => {
+      setError(null);
+      try {
+        const hwResp = await apiClient.getHardwareInfo();
+        if (hwResp.status === 'success') {
+          setHardwareInfo(hwResp.data);
+        }
+      } catch (e) {
+        // No cached hardware info yet is not a fatal error
+        setHardwareInfo(null);
+      }
+      try {
+        const benchResp = await apiClient.getBenchmarkResults();
+        if (benchResp.status === 'success') {
+          setBenchmarkResults(benchResp.data);
+        }
+      } catch (e) {
+        setBenchmarkResults(null);
+      }
+      setProfiles([]); // Profiles not implemented yet
+    };
+    loadInitialData();
   }, []);
 
+  useEffect(() => {
+    // Listen for benchmark progress events
+    const handleProgress = (data) => {
+      if (data.type === 'benchmark_progress') {
+        setProgress(data);
+        progressRef.current = data;
+        // If complete, set results and stop benchmarking
+        if (data.stage === 'complete') {
+          setBenchmarkResults(data.results);
+          setIsBenchmarking(false);
+          setProgress(null);
+        }
+      }
+    };
+    wsClient.connect();
+    wsClient.addEventListener('message', handleProgress);
+    return () => {
+      wsClient.removeEventListener('message', handleProgress);
+    };
+  }, []);
+
+  // Only re-detect hardware if user clicks button
   const detectHardware = async () => {
     setIsDetecting(true);
     setError(null);
-
     try {
       const response = await apiClient.detectHardware();
       if (response.status === 'success') {
@@ -57,48 +87,32 @@ export default function Hardware() {
       } else {
         throw new Error(response.error || 'Hardware detection failed');
       }
-    } catch (error) {
-      console.error('Hardware detection failed:', error);
-      setError(error.message || 'Hardware detection failed');
+    } catch (detectError) {
+      console.error('Hardware detection failed:', detectError);
+      setError(detectError.message || 'Hardware detection failed');
     }
-
     setIsDetecting(false);
   };
 
+  // Only run benchmark if user clicks button
   const runBenchmark = async () => {
     setIsBenchmarking(true);
     setBenchmarkResults(null);
     setError(null);
-
+    setProgress({ stage: 'Starting', percent: 0, status: 'running', message: 'Starting benchmark...' });
     try {
-      // Simulate benchmark results for now
-      // In the future, this could be a real benchmark API
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-
-      const mockResults = {
-        cpu_score: Math.floor(Math.random() * 3000) + 1000,
-        gpu_score: Math.floor(Math.random() * 8000) + 2000,
-        memory_bandwidth: Math.floor(Math.random() * 50) + 25,
-        encoding_speed: {
-          h264_cpu: Math.floor(Math.random() * 10) + 5,
-          h264_gpu: Math.floor(Math.random() * 50) + 25,
-          h265_cpu: Math.floor(Math.random() * 5) + 2,
-          h265_gpu: Math.floor(Math.random() * 30) + 15,
-        },
-        recommended_profiles: [
-          hardwareInfo?.nvenc_support ? 'High Quality (NVENC)' : 'Balanced (CPU)',
-          'Fast Processing',
-          'Archive Quality',
-        ],
-      };
-
-      setBenchmarkResults(mockResults);
-    } catch (error) {
-      console.error('Benchmark failed:', error);
-      setError('Benchmark failed');
+      const response = await apiClient.runHardwareBenchmark();
+      if (response.status === 'success') {
+        // Results will be set by WebSocket event
+      } else {
+        throw new Error(response.error || 'Benchmark failed');
+      }
+    } catch (benchmarkError) {
+      console.error('Benchmark failed:', benchmarkError);
+      setError(benchmarkError.message || 'Benchmark failed');
+      setIsBenchmarking(false);
+      setProgress(null);
     }
-
-    setIsBenchmarking(false);
   };
 
   return (
@@ -155,17 +169,19 @@ export default function Hardware() {
           <ProcessingProfiles
             profiles={profiles}
             hardwareInfo={hardwareInfo}
-            onRefresh={loadData}
+            onRefresh={() => {}}
           />
         </div>
 
         {/* Performance Benchmark */}
-        <div>
+        <div style={{ minWidth: 400, maxWidth: 400 }}>
           <PerformanceBenchmark
             benchmarkResults={benchmarkResults}
             isBenchmarking={isBenchmarking}
             hardwareInfo={hardwareInfo}
             onRunBenchmark={runBenchmark}
+            progress={progress}
+            cardClassName="max-w-[400px] w-full"
           />
         </div>
       </div>

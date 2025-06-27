@@ -20,9 +20,9 @@ function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/shows/:id" element={<ShowDetailsPage />} />
+              <Route path="/hardware" element={<HardwarePage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/system" element={<SystemPage />} />
-              <Route path="/hardware" element={<HardwarePage />} />
             </Routes>
           </NavigationBar>
         </ImportModalProvider>

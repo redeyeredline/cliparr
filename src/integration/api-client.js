@@ -142,12 +142,22 @@ class ApiClient {
 
   // Hardware endpoints
   async detectHardware() {
-    const response = await api.get('/hardware/detect');
+    const response = await api.post('/hardware/detect');
     return response.data;
   }
 
   async getHardwareInfo() {
     const response = await api.get('/hardware/info');
+    return response.data;
+  }
+
+  async getBenchmarkResults() {
+    const response = await api.get('/hardware/benchmark/results');
+    return response.data;
+  }
+
+  async runHardwareBenchmark() {
+    const response = await api.post('/hardware/benchmark', {}, { timeout: 300000 }); // 5 minutes
     return response.data;
   }
 }

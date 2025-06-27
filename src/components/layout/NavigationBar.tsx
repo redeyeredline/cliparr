@@ -21,9 +21,9 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
   const navItems = [
     { path: '/', label: 'Home', icon: Home, shortcut: 'h' },
     { path: 'import-modal', label: 'Import', icon: Download, isImport: true, shortcut: 'i' },
+    { path: '/hardware', label: 'Hardware', icon: Monitor, shortcut: 'w' },
     { path: '/settings', label: 'Settings', icon: Settings, shortcut: 's' },
     { path: '/system', label: 'System', icon: Cpu, shortcut: 'y' },
-    { path: '/hardware', label: 'Hardware', icon: Monitor, shortcut: 'w' },
   ];
 
   // Keyboard shortcuts for navigation

@@ -83,23 +83,23 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
   };
 
   return (
-    <Card className="border-slate-200 shadow-sm">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Processing Profiles
-          </CardTitle>
+    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/30 shadow-2xl p-8 w-full">
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-white" />
+            <span className="text-xl font-bold text-white">Processing Profiles</span>
+          </div>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button size="sm" className="bg-slate-800 hover:bg-slate-900">
+              <Button size="sm" className="bg-gray-700/60 text-white hover:bg-gray-700/80">
                 <Plus className="w-4 h-4 mr-2" />
                 Create Profile
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Create Processing Profile</DialogTitle>
+                <DialogTitle className="text-white">Create Processing Profile</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-4">
@@ -226,58 +226,19 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
             </DialogContent>
           </Dialog>
         </div>
-      </CardHeader>
-      <CardContent>
-        {profiles.length === 0 ? (
-          <div className="text-center py-8">
-            <Settings className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-            <h3 className="font-semibold text-slate-600 mb-2">No Processing Profiles</h3>
-            <p className="text-slate-500 mb-4">Create custom profiles for different quality and performance needs</p>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create First Profile
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {profiles.map((profile: ProcessingProfile) => (
-              <div key={profile.id} className="p-4 border border-slate-200 rounded-lg">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-slate-900">{profile.name}</h3>
-                    {profile.description && (
-                      <p className="text-sm text-slate-600 mt-1">{profile.description}</p>
-                    )}
-                  </div>
-                  <Badge className={getHardwareAccelerationBadge(profile.hardware_acceleration)}>
-                    {profile.hardware_acceleration === 'none' ? 'CPU' :
-                      profile.hardware_acceleration.replace(/_/g, ' ').toUpperCase()}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-slate-500">Video:</span>
-                    <div className="font-medium">{profile.video_codec.toUpperCase()}</div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Audio:</span>
-                    <div className="font-medium">{profile.audio_codec.toUpperCase()}</div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Quality:</span>
-                    <div className="font-medium">{profile.quality_preset}</div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Container:</span>
-                    <div className="font-medium">{profile.container.toUpperCase()}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+      {/* Empty state if no profiles */}
+      {(!profiles || profiles.length === 0) && (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Monitor className="w-16 h-16 mb-4 text-gray-400" />
+          <h3 className="font-semibold text-gray-200 mb-2 text-lg">No Processing Profiles</h3>
+          <p className="text-gray-400 mb-4">Create custom profiles for different quality and performance needs</p>
+          <Button onClick={() => setShowCreateDialog(true)} className="bg-gray-700/60 text-white hover:bg-gray-700/80">
+            <Plus className="w-4 h-4 mr-2" />
+            Create First Profile
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
