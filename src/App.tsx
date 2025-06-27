@@ -7,6 +7,8 @@ import SettingsPage from './pages/SettingsPage';
 import SystemPage from './pages/SystemPage';
 import ShowDetailsPage from './pages/ShowDetailsPage';
 import HardwarePage from './pages/Hardware';
+import ProcessingPage from './pages/Processing';
+import ReviewPage from './pages/Review';
 import NavigationBar from './components/layout/NavigationBar';
 import { ToastProvider } from './components/ToastProvider';
 import { ImportModalProvider } from './components/ImportModalProvider';
@@ -23,6 +25,8 @@ function App() {
               <Route path="/hardware" element={<HardwarePage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/system" element={<SystemPage />} />
+              <Route path="/processing" element={<ProcessingPage />} />
+              <Route path="/review" element={<ReviewPage />} />
             </Routes>
           </NavigationBar>
         </ImportModalProvider>

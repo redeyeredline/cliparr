@@ -97,7 +97,7 @@ export default function PerformanceBenchmark({
   const encoding_speed = getLiveEncodingSpeed(isBenchmarking, progress, benchmarkResults);
 
   // Find max FPS for scaling bars
-  let allFps: number[] = [];
+  const allFps: number[] = [];
   for (const type of encodeTypes) {
     for (const res of resolutions) {
       const val = encoding_speed[type.key]?.[res.key];

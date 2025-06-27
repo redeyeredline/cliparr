@@ -19,15 +19,40 @@ import PerformanceBenchmark from '../components/PerformanceBenchmark';
 import { apiClient } from '../integration/api-client';
 import { wsClient } from '../services/websocket.frontend';
 
+interface HardwareInfo {
+  [key: string]: any;
+}
+
+interface BenchmarkResults {
+  cpu_score: number;
+  gpu_score: number;
+  memory_bandwidth: number;
+  encoding_speed: {
+    [key: string]: { [key: string]: number };
+  };
+  recommended_profiles: string[];
+  benchmark_duration: number;
+  timestamp: string;
+  note?: string;
+}
+
+interface Progress {
+  stage: string;
+  percent: number;
+  status: string;
+  message: string;
+  results?: BenchmarkResults;
+}
+
 export default function Hardware() {
-  const [hardwareInfo, setHardwareInfo] = useState(null);
-  const [profiles, setProfiles] = useState([]);
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [benchmarkResults, setBenchmarkResults] = useState(null);
-  const [isBenchmarking, setIsBenchmarking] = useState(false);
-  const [error, setError] = useState(null);
-  const [progress, setProgress] = useState(null);
-  const progressRef = useRef(null);
+  const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | null>(null);
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [isDetecting, setIsDetecting] = useState<boolean>(false);
+  const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResults | null>(null);
+  const [isBenchmarking, setIsBenchmarking] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const progressRef = useRef<Progress | null>(null);
 
   // On first load, fetch cached hardware info and benchmark results
   useEffect(() => {
@@ -57,7 +82,7 @@ export default function Hardware() {
 
   useEffect(() => {
     // Listen for benchmark progress events
-    const handleProgress = (data) => {
+    const handleProgress = (data: any) => {
       if (data.type === 'benchmark_progress') {
         setProgress(data);
         progressRef.current = data;
@@ -87,7 +112,7 @@ export default function Hardware() {
       } else {
         throw new Error(response.error || 'Hardware detection failed');
       }
-    } catch (detectError) {
+    } catch (detectError: any) {
       console.error('Hardware detection failed:', detectError);
       setError(detectError.message || 'Hardware detection failed');
     }
@@ -107,7 +132,7 @@ export default function Hardware() {
       } else {
         throw new Error(response.error || 'Benchmark failed');
       }
-    } catch (benchmarkError) {
+    } catch (benchmarkError: any) {
       console.error('Benchmark failed:', benchmarkError);
       setError(benchmarkError.message || 'Benchmark failed');
       setIsBenchmarking(false);
@@ -181,7 +206,6 @@ export default function Hardware() {
             hardwareInfo={hardwareInfo}
             onRunBenchmark={runBenchmark}
             progress={progress}
-            cardClassName="max-w-[400px] w-full"
           />
         </div>
       </div>

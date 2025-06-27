@@ -4,7 +4,7 @@ import React, { useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useImportModal } from '../../hooks/useImportModal';
 import { useKeyboardNavigation, useFocusRestoration } from '../../utils/keyboardNavigation';
-import { Home, Download, Settings, Zap, Cpu, Monitor } from 'lucide-react';
+import { Home, Download, Settings, Zap, Cpu, Monitor, Play, Eye } from 'lucide-react';
 
 interface NavigationBarProps {
   children: React.ReactNode;
@@ -21,6 +21,8 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
   const navItems = [
     { path: '/', label: 'Home', icon: Home, shortcut: 'h' },
     { path: 'import-modal', label: 'Import', icon: Download, isImport: true, shortcut: 'i' },
+    { path: '/processing', label: 'Processing', icon: Play, shortcut: 'p' },
+    { path: '/review', label: 'Review', icon: Eye, shortcut: 'r' },
     { path: '/hardware', label: 'Hardware', icon: Monitor, shortcut: 'w' },
     { path: '/settings', label: 'Settings', icon: Settings, shortcut: 's' },
     { path: '/system', label: 'System', icon: Cpu, shortcut: 'y' },
@@ -31,6 +33,8 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
     'h': () => navigate('/'),
     's': () => navigate('/settings'),
     'i': () => openImportModal(),
+    'p': () => navigate('/processing'),
+    'r': () => navigate('/review'),
     'y': () => navigate('/system'),
     'w': () => navigate('/hardware'),
     'Escape': () => {

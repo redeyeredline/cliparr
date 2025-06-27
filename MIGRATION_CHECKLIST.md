@@ -212,3 +212,8 @@ Consider dotenv-flow for multi-env config; keep .env.example free of DB secrets 
 
 
 look for any other links to the env file and clean those up with info from the new settings page and pathing. 
+
+implement live file browser for output directory settings
+  add option to retain folder path in output directory
+  add option to overwrite existing files
+    make sure to have warnings
