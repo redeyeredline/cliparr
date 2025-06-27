@@ -2,7 +2,7 @@
 // Handles show selection, import progress updates, and provides navigation to show details.
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Trash2, Check, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Trash2, Check, ChevronUp, ChevronDown, Scan } from 'lucide-react';
 import { apiClient } from '../integration/api-client';
 import { logger } from '../services/logger.frontend.js';
 import { wsClient } from '../services/websocket.frontend.js';
@@ -51,6 +51,11 @@ function HomePage() {
   const [shows, setShows] = useState<Show[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
+  const [scanStatus, setScanStatus] = useState<{ active: number; completed: number; failed: number }>({
+    active: 0,
+    completed: 0,
+    failed: 0,
+  });
 
   // Load sort state from localStorage or use defaults
   const [sortKey, setSortKey] = useState<keyof Show>(() => {
@@ -201,61 +206,106 @@ function HomePage() {
     }
   }, []);
 
-  // Combined useEffect for initialization and cleanup
+  // WebSocket event handlers
   useEffect(() => {
-    let mounted = true;
-
-    // Set up WebSocket event listeners
     const handleConnection = (data: { status: string }) => {
-      if (!mounted) {
-        return;
-      }
-      if (data.status === 'error') {
-        logger.error('WebSocket connection failed');
+      if (data.status === 'connected') {
+        logger.info('WebSocket connected');
+      } else if (data.status === 'disconnected') {
+        logger.warn('WebSocket disconnected');
       }
     };
 
     const handleError = () => {
-      if (!mounted) {
-        return;
-      }
-      logger.error('WebSocket connection failed');
+      logger.error('WebSocket error');
     };
 
-    // Add import_progress listener for real-time show updates
     const handleImportProgress = async (data: ImportProgressEvent) => {
-      if (!mounted) {
-        return;
-      }
-      if (data.type === 'import_progress' && data.status === 'completed' && data.showId) {
-        try {
-          const newShow = await apiClient.getShow(data.showId);
-          setShows((prevShows) => {
-            const filtered = prevShows.filter((s) => s.id !== newShow.id);
-            return [...filtered, newShow];
-          });
-        } catch (err) {
-          logger.error('Failed to fetch new show:', err);
+      if (data.type === 'import_progress') {
+        if (data.status === 'completed') {
+          toast({ type: 'success', message: 'Import completed successfully' });
+          fetchShows();
+        } else if (data.status === 'failed') {
+          toast({ type: 'error', message: 'Import failed' });
+        } else {
+          toast({ type: 'info', message: `Import: ${data.status}` });
         }
       }
     };
 
-    // Add event listeners
+    const handleJobUpdate = (data: any) => {
+      if (data.type === 'job_update') {
+        // Update scan status
+        setScanStatus((prev) => {
+          if (data.status === 'active') {
+            return { ...prev, active: prev.active + 1 };
+          } else if (data.status === 'completed') {
+            return { ...prev, active: Math.max(0, prev.active - 1), completed: prev.completed + 1 };
+          } else if (data.status === 'failed') {
+            return { ...prev, active: Math.max(0, prev.active - 1), failed: prev.failed + 1 };
+          }
+          return prev;
+        });
+
+        // Show toast notifications for important job updates
+        if (data.status === 'completed') {
+          toast({
+            type: 'success',
+            message: `Scan job ${data.jobId} completed successfully`,
+          });
+        } else if (data.status === 'failed') {
+          toast({
+            type: 'error',
+            message: `Scan job ${data.jobId} failed: ${data.error}`,
+          });
+        } else if (data.status === 'active') {
+          toast({
+            type: 'info',
+            message: `Scan job ${data.jobId} started processing`,
+          });
+        }
+      }
+    };
+
+    const handleQueueStatus = (data: any) => {
+      if (data.type === 'queue_status') {
+        // Update scan status from queue data
+        if (data.queues) {
+          const showProcessingQueue = data.queues.find((q: any) => q.name === 'show-processing');
+          if (showProcessingQueue) {
+            setScanStatus({
+              active: showProcessingQueue.active || 0,
+              completed: showProcessingQueue.completed || 0,
+              failed: showProcessingQueue.failed || 0,
+            });
+          }
+        }
+        logger.info('Queue status update:', data.queues);
+      }
+    };
+
+    // Add WebSocket event listeners
     wsClient.addEventListener('connection', handleConnection);
     wsClient.addEventListener('error', handleError);
     wsClient.addEventListener('message', handleImportProgress);
+    wsClient.addEventListener('message', handleJobUpdate);
+    wsClient.addEventListener('message', handleQueueStatus);
 
-    // Initial setup
-    checkHealth();
-
-    // Cleanup
     return () => {
-      mounted = false;
+      // Clean up event listeners
       wsClient.removeEventListener('connection', handleConnection);
       wsClient.removeEventListener('error', handleError);
       wsClient.removeEventListener('message', handleImportProgress);
+      wsClient.removeEventListener('message', handleJobUpdate);
+      wsClient.removeEventListener('message', handleQueueStatus);
     };
-  }, [checkHealth]);
+  }, [toast, fetchShows]);
+
+  // Initial health check on mount
+  useEffect(() => {
+    checkHealth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch shows when health is good
   useEffect(() => {
@@ -369,6 +419,25 @@ function HomePage() {
     }
   }, [selected, toast, handleSelectAll, fetchShows]);
 
+  const handleScan = useCallback(async () => {
+    try {
+      const result = await apiClient.scanShows(selected);
+      toast({ type: 'success', message: `Scanning ${result.scanned} shows` });
+      handleSelectAll();
+    } catch {
+      toast({ type: 'error', message: 'Failed to scan shows' });
+    }
+  }, [selected, toast, handleSelectAll]);
+
+  const handleScanAll = useCallback(async () => {
+    try {
+      const result = await apiClient.scanShows(shows.map((show) => show.id));
+      toast({ type: 'success', message: `Scanning all ${result.scanned} shows` });
+    } catch {
+      toast({ type: 'error', message: 'Failed to scan all shows' });
+    }
+  }, [shows, toast]);
+
   // Global Enter key handler for delete
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -442,6 +511,56 @@ function HomePage() {
                 <div className="text-sm text-blue-400">
                   <span className="font-medium">{selected.length}</span> selected
                 </div>
+              )}
+              {/* Scan Status Indicator */}
+              {(scanStatus.active > 0 || scanStatus.completed > 0 || scanStatus.failed > 0) && (
+                <div className="flex items-center space-x-4 text-sm">
+                  {scanStatus.active > 0 && (
+                    <div className="text-amber-400">
+                      <span className="font-medium">{scanStatus.active}</span> scanning
+                    </div>
+                  )}
+                  {scanStatus.completed > 0 && (
+                    <div className="text-green-400">
+                      <span className="font-medium">{scanStatus.completed}</span> completed
+                    </div>
+                  )}
+                  {scanStatus.failed > 0 && (
+                    <div className="text-red-400">
+                      <span className="font-medium">{scanStatus.failed}</span> failed
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center space-x-3">
+              {shows.length > 0 && (
+                <button
+                  onClick={handleScanAll}
+                  className={`
+                    px-4 py-2 bg-green-600/90 hover:bg-green-500 text-white font-medium rounded-xl
+                    shadow-lg shadow-green-500/25 transition-all duration-200 hover:shadow-green-500/40
+                    hover:scale-105 flex items-center space-x-2
+                  `}
+                  aria-label="Scan all shows"
+                >
+                  <Scan className="w-4 h-4" />
+                  <span>Scan All</span>
+                </button>
+              )}
+              {selected.length > 0 && (
+                <button
+                  onClick={handleScan}
+                  className={`
+                    px-4 py-2 bg-blue-600/90 hover:bg-blue-500 text-white font-medium rounded-xl
+                    shadow-lg shadow-blue-500/25 transition-all duration-200 hover:shadow-blue-500/40
+                    hover:scale-105 flex items-center space-x-2
+                  `}
+                  aria-label={`Scan ${selected.length} selected shows`}
+                >
+                  <Scan className="w-4 h-4" />
+                  <span>Scan Selected ({selected.length})</span>
+                </button>
               )}
             </div>
           </div>

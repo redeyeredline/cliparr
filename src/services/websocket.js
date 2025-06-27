@@ -67,3 +67,58 @@ export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}
 export function getWebSocketServer() {
   return wsServer;
 }
+
+/**
+ * Broadcast a message to all connected WebSocket clients
+ * @param {object} message - The message to broadcast
+ */
+export function broadcastMessage(message) {
+  if (!wsServer) {
+    logger.warn('WebSocket server not initialized');
+    return;
+  }
+
+  const payload = JSON.stringify({
+    ...message,
+    timestamp: new Date().toISOString(),
+  });
+
+  wsServer.clients.forEach((client) => {
+    if (client.readyState === WebSocketServer.OPEN) {
+      client.send(payload);
+    }
+  });
+}
+
+/**
+ * Broadcast job queue updates to all connected clients
+ * @param {object} update - The job update data
+ */
+export function broadcastJobUpdate(update) {
+  broadcastMessage({
+    type: 'job_update',
+    ...update,
+  });
+}
+
+/**
+ * Broadcast processing status updates
+ * @param {object} status - The processing status data
+ */
+export function broadcastProcessingStatus(status) {
+  broadcastMessage({
+    type: 'processing_status',
+    ...status,
+  });
+}
+
+/**
+ * Broadcast queue status updates
+ * @param {object} queueStatus - The queue status data
+ */
+export function broadcastQueueStatus(queueStatus) {
+  broadcastMessage({
+    type: 'queue_status',
+    ...queueStatus,
+  });
+}

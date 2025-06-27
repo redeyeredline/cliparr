@@ -11,3 +11,47 @@ export interface MediaFile {
   created_date: string;
   updated_date?: string;
 }
+
+export class MediaFileEntity {
+  static async list(sortBy?: string, limit?: number): Promise<MediaFile[]> {
+    try {
+      const response = await fetch(`/api/media/files?sortBy=${sortBy || '-created_date'}&limit=${limit || 100}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch media files');
+      }
+      const data = await response.json();
+      return data.files || [];
+    } catch (error) {
+      console.error('Error fetching media files:', error);
+      return [];
+    }
+  }
+
+  static async getById(id: string | number): Promise<MediaFile | null> {
+    try {
+      const response = await fetch(`/api/media/files/${id}`);
+      if (!response.ok) {
+        return null;
+      }
+      const data = await response.json();
+      return data.file || null;
+    } catch (error) {
+      console.error('Error fetching media file:', error);
+      return null;
+    }
+  }
+
+  static async getByEpisodeId(episodeId: string | number): Promise<MediaFile[]> {
+    try {
+      const response = await fetch(`/api/media/files/episode/${episodeId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch media files for episode');
+      }
+      const data = await response.json();
+      return data.files || [];
+    } catch (error) {
+      console.error('Error fetching media files for episode:', error);
+      return [];
+    }
+  }
+}

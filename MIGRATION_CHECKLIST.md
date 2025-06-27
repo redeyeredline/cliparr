@@ -217,3 +217,245 @@ implement live file browser for output directory settings
   add option to retain folder path in output directory
   add option to overwrite existing files
     make sure to have warnings
+
+
+1. Use FFmpeg for heavy lifting, not hashing
+    Decode to WAV/PCM
+
+    bash
+    Copy
+    Edit
+    ffmpeg -i input.mp4 \
+      -vn \
+      -acodec pcm_s16le -ar 44100 -ac 1 \
+      show.wav
+    This gives you a linear PCM file you can fingerprint reliably.
+
+    Optional “where to look” hints
+
+    Silence detect to find roughly where credits start/end:
+
+    bash
+    Copy
+    Edit
+    ffmpeg -i show.wav \
+      -af silencedetect=noise=-40dB:d=1 \
+      -f null -
+    Spectrogram preview, if you want to eyeball repeated intro themes:
+
+
+2. Plug in a fingerprint library
+  Once you have raw audio, feed it to a fingerprint tool. A popular open-source choice is Chromaprint/AcoustID:
+  Install the fpcalc binary (part of Chromaprint):
+  Call it from Node:
+
+
+Call it from Node:
+
+
+    // fingerprint.js
+    import { execFile } from 'child_process';
+    export function fingerprint(filePath) {
+      return new Promise<string>((resolve, reject) => {
+        execFile('fpcalc', ['-json', filePath], (err, stdout) => {
+          if (err) return reject(err);
+          const data = JSON.parse(stdout);
+          resolve(data.fingerprint); // a long string of ints
+        });
+      });
+    }
+Compare fingerprints with a simple similarity metric (e.g. Levenshtein distance or cosine on hashed chunks):
+
+    import levenshtein from 'fast-levenshtein';
+
+    export function isMatch(fpA: string, fpB: string, threshold = 0.8) {
+      const dist = levenshtein.get(fpA, fpB);
+      const maxLen = Math.max(fpA.length, fpB.length);
+      return (1 - dist / maxLen) >= threshold;
+    }
+
+Sliding-window detection
+Wrap it all in a job that:
+
+Splits show.wav into overlapping chunks—say 10 s windows with 5 s overlap.
+
+Fingerprints each chunk and checks against your stored “intro” and “credit” fingerprints.
+
+Logs the time ranges where you hit your similarity threshold.
+
+
+    import { fingerprint, isMatch } from './fingerprint';
+    import ffmpeg from 'fluent-ffmpeg';
+
+    async function scanForSections(inputMp4, referenceFp, { window=10, overlap=5 }) {
+      // 1. extract to WAV (or reuse pre-decoded show.wav)
+      await new Promise(r => ffmpeg(inputMp4)
+        .output('show.wav')
+        .noVideo()
+        .audioCodec('pcm_s16le').audioFrequency(44100).audioChannels(1)
+        .on('end', r).run()
+      );
+
+      const matches = [];
+      for (let start = 0; start < DURATION; start += (window - overlap)) {
+        // cut chunk
+        const chunk = `chunk_${start}.wav`;
+        await new Promise(r => ffmpeg('show.wav')
+          .setStartTime(start)
+          .duration(window)
+          .output(chunk)
+          .on('end', r).run()
+        );
+        // fingerprint & compare
+        const fp = await fingerprint(chunk);
+        if (isMatch(fp, referenceFp)) matches.push({ start, end: start + window });
+      }
+      return matches;
+    }
+
+
+
+  Stitching the final video
+        Once you’ve got [introStart, introEnd] and [creditStart, creditEnd], use FFmpeg’s concat filter:
+
+          ffmpeg -i input.mp4 -filter_complex "
+          [0:v]trim=0:${introStart},setpts=PTS-STARTPTS[v0];
+          [0:a]atrim=0:${introStart},asetpts=PTS-STARTPTS[a0];
+          [0:v]trim=${introEnd}:${creditStart},setpts=PTS-STARTPTS[v1];
+          [0:a]atrim=${introEnd}:${creditStart},asetpts=PTS-STARTPTS[a1];
+          [0:v]trim=${creditEnd},setpts=PTS-STARTPTS[v2];
+          [0:a]atrim=${creditEnd},asetpts=PTS-STARTPTS[a2];
+          [v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[outv][outa]
+        " -map "[outv]" -map "[outa]" cleaned.mp4
+
+
+
+FFmpeg → decode, silence-detect, slice and stitch.
+
+Chromaprint/fpcalc → turn WAV into a fingerprint string.
+
+Levenshtein (or your own) → match those fingerprints.
+
+Loop windows → detect intros/credits.
+
+FFmpeg concat → drop them and produce your final file.
+
+That approach is essentially what Plex/Audirvana do under the hood, only they’ve tuned thresholds and use proprietary fingerprint databases. With Chromaprint and a good sliding-window strategy you can get very similar—and even finer—results.
+
+
+ Bulk-extract & fingerprint all episodes
+Extract raw audio (once per episode):
+
+bash
+Copy
+Edit
+ffmpeg -i episode1.mp4 \
+  -vn \
+  -acodec pcm_s16le -ar 44100 -ac 1 \
+  ep1.wav
+Slide‐window fingerprint each *.wav:
+
+js
+Copy
+Edit
+import { execFile } from 'child_process';
+async function fingerprintChunk(path) {
+  return new Promise<string>((res, rej) => {
+    execFile('fpcalc', ['-length', '10', '-json', path], (e, out) => {
+      if (e) return rej(e);
+      res(JSON.parse(out).fingerprint);
+    });
+  });
+}
+Collect a map of “fingerprint → [occurrences]”
+
+js
+Copy
+Edit
+// PSEUDO-CODE
+const fpMap = new Map<string, Array<{ep: string, time: number}>>();
+for (let ep of episodes) {
+  const duration = await getDuration(ep);
+  for (let t = 0; t < duration; t += 5) {
+    await cutWav(ep, t, 10, `chunk.wav`);
+    const fp = await fingerprintChunk('chunk.wav');
+    if (!fpMap.has(fp)) fpMap.set(fp, []);
+    fpMap.get(fp).push({ ep, time: t });
+  }
+}
+At this point fpMap contains every 10 s fingerprint and exactly where it showed up in each file.
+
+2. Find the “common” clusters
+Count in how many distinct episodes each fingerprint appears
+
+js
+Copy
+Edit
+const counts = new Map<string, Set<string>>();
+for (let [fp, occ] of fpMap) {
+  if (!counts.has(fp)) counts.set(fp, new Set());
+  occ.forEach(o => counts.get(fp).add(o.ep));
+}
+Filter to fingerprints that appear in ≥ 80 % of episodes
+
+js
+Copy
+Edit
+const threshold = Math.ceil(episodes.length * 0.8);
+const commonFPs = Array.from(counts)
+  .filter(([, eps]) => eps.size >= threshold)
+  .map(([fp]) => fp);
+Split into “intro” vs “credits” by where they occur
+
+js
+Copy
+Edit
+const introHits   = [], creditHits = [];
+for (let fp of commonFPs) {
+  const times = fpMap.get(fp).map(o => o.time);
+  const avg   = times.reduce((a,b)=>a+b,0)/times.length;
+  if (avg < 60)           introHits.push(avg);
+  else if (avg > DURATION-60) creditHits.push(avg);
+}
+// merge the intros into one continuous [min,max], same for credits
+const introStart = Math.min(...introHits);
+const introEnd   = Math.max(...introHits) + 10;
+const credStart  = Math.min(...creditHits);
+const credEnd    = Math.max(...creditHits) + 10;
+3. Suggest & trim
+Once you have your two segments:
+
+Intro: [introStart, introEnd]
+
+Credits: [credStart, credEnd]
+
+You can suggest to the user:
+
+“Based on scanning 10 episodes, I detect a repeating segment from
+~0 s→35 s as the intro, and from ~3200 s→3240 s as credits.
+Would you like to remove those?”
+
+And then apply an ffmpeg concat filter to cut them out:
+
+bash
+Copy
+Edit
+ffmpeg -i input.mp4 -filter_complex "
+  [0:v]trim=0:${introStart},setpts=PTS-STARTPTS[v0];
+  [0:a]atrim=0:${introStart},asetpts=PTS-STARTPTS[a0];
+  [0:v]trim=${introEnd}:${credStart},setpts=PTS-STARTPTS[v1];
+  [0:a]atrim=${introEnd}:${credStart},asetpts=PTS-STARTPTS[a1];
+  [0:v]trim=${credEnd},setpts=PTS-STARTPTS[v2];
+  [0:a]atrim=${credEnd},asetpts=PTS-STARTPTS[a2];
+  [v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[outv][outa]
+" -map "[outv]" -map "[outa]" cleaned.mp4
+Why this works
+You never need a pre-made “database” of intros/credits.
+
+You’re simply finding the common fingerprints across all episodes.
+
+Anything that repeats in most of the files at the same timestamp is almost certainly your intro or credits.
+
+Once you’ve identified and merged those time-ranges, you can offer those as suggestions for removal.
+
+Let me know if you want a more complete code sample for the clustering step or the user-confirmation UI!

@@ -322,6 +322,190 @@ function deleteShowsByIds(db, ids) {
   })();
 }
 
+function createProcessingJobsForShows(db, showIds) {
+  if (!Array.isArray(showIds) || showIds.length === 0) {
+    return 0;
+  }
+
+  return db.transaction(() => {
+    const placeholders = showIds.map(() => '?').join(',');
+
+    // Get all episode files for the specified shows
+    const episodeFiles = timedQuery(
+      db,
+      `SELECT 
+         ef.id as file_id,
+         ef.file_path,
+         ef.size,
+         e.id as episode_id,
+         e.title as episode_title,
+         e.episode_number,
+         s.season_number,
+         sh.title as show_title
+       FROM episode_files ef
+       JOIN episodes e ON ef.episode_id = e.id
+       JOIN seasons s ON e.season_id = s.id
+       JOIN shows sh ON s.show_id = sh.id
+       WHERE sh.id IN (${placeholders})
+       ORDER BY sh.title, s.season_number, e.episode_number`,
+      showIds,
+      'all',
+    );
+
+    let createdCount = 0;
+
+    // Create processing jobs for each file
+    for (const file of episodeFiles) {
+      // Check if a processing job already exists for this file
+      const existingJob = timedQuery(
+        db,
+        'SELECT id FROM processing_jobs WHERE media_file_id = ?',
+        [file.file_id],
+        'get',
+      );
+
+      if (!existingJob) {
+        // Create a new processing job
+        timedQuery(
+          db,
+          `INSERT INTO processing_jobs (
+            media_file_id, 
+            status, 
+            confidence_score, 
+            created_date
+          ) VALUES (?, ?, ?, ?)`,
+          [
+            file.file_id,
+            'scanning',
+            0.0,
+            new Date().toISOString(),
+          ],
+          'run',
+        );
+        createdCount++;
+      }
+    }
+
+    return createdCount;
+  })();
+}
+
+function getProcessingJobs(db, options = {}) {
+  const { sortBy = '-created_date', limit = 100, status } = options;
+
+  let sql = `
+    SELECT 
+      pj.*,
+      ef.file_path,
+      ef.size,
+      e.title as episode_title,
+      e.episode_number,
+      s.season_number,
+      sh.title as show_title
+    FROM processing_jobs pj
+    JOIN episode_files ef ON pj.media_file_id = ef.id
+    JOIN episodes e ON ef.episode_id = e.id
+    JOIN seasons s ON e.season_id = s.id
+    JOIN shows sh ON s.show_id = sh.id
+  `;
+
+  const params = [];
+
+  if (status) {
+    sql += ' WHERE pj.status = ?';
+    params.push(status);
+  }
+
+  // Handle sorting
+  const sortField = sortBy.startsWith('-') ? sortBy.substring(1) : sortBy;
+  const sortDirection = sortBy.startsWith('-') ? 'DESC' : 'ASC';
+  sql += ` ORDER BY pj.${sortField} ${sortDirection}`;
+
+  sql += ' LIMIT ?';
+  params.push(limit);
+
+  return timedQuery(db, sql, params, 'all');
+}
+
+function getProcessingJobById(db, jobId) {
+  const sql = `
+    SELECT 
+      pj.*,
+      ef.file_path,
+      ef.size,
+      e.title as episode_title,
+      e.episode_number,
+      s.season_number,
+      sh.title as show_title
+    FROM processing_jobs pj
+    JOIN episode_files ef ON pj.media_file_id = ef.id
+    JOIN episodes e ON ef.episode_id = e.id
+    JOIN seasons s ON e.season_id = s.id
+    JOIN shows sh ON s.show_id = sh.id
+    WHERE pj.id = ?
+  `;
+
+  return timedQuery(db, sql, [jobId], 'get');
+}
+
+function updateProcessingJob(db, jobId, updateData) {
+  const allowedFields = [
+    'status', 'confidence_score', 'intro_start', 'intro_end',
+    'credits_start', 'credits_end', 'manual_verified', 'processing_notes',
+  ];
+
+  const updates = [];
+  const params = [];
+
+  for (const [key, value] of Object.entries(updateData)) {
+    if (allowedFields.includes(key)) {
+      updates.push(`${key} = ?`);
+      params.push(value);
+    }
+  }
+
+  if (updates.length === 0) {
+    throw new Error('No valid fields to update');
+  }
+
+  updates.push('updated_date = ?');
+  params.push(new Date().toISOString());
+  params.push(jobId);
+
+  const sql = `UPDATE processing_jobs SET ${updates.join(', ')} WHERE id = ?`;
+  timedQuery(db, sql, params, 'run');
+
+  return getProcessingJobById(db, jobId);
+}
+
+function getProcessingJobStats(db) {
+  const stats = timedQuery(
+    db,
+    `SELECT 
+       status,
+       COUNT(*) as count
+     FROM processing_jobs
+     GROUP BY status`,
+    [],
+    'all',
+  );
+
+  const total = timedQuery(
+    db,
+    'SELECT COUNT(*) as count FROM processing_jobs',
+    [],
+    'get',
+  ).count;
+
+  return {
+    total,
+    byStatus: stats.reduce((acc, row) => {
+      acc[row.status] = row.count;
+      return acc;
+    }, {}),
+  };
+}
+
 function findShowByTitleAndPath(db, title, path) {
   const sql = 'SELECT id FROM shows WHERE title = ? AND path = ?';
   return timedQuery(db, sql, [title, path], 'get');
@@ -347,6 +531,11 @@ export {
   timedQuery,
   getShowById,
   deleteShowsByIds,
+  createProcessingJobsForShows,
+  getProcessingJobs,
+  getProcessingJobById,
+  updateProcessingJob,
+  getProcessingJobStats,
   findShowByTitleAndPath,
   getShowWithDetails,
   getEpisodeFiles,

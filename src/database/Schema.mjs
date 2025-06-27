@@ -38,6 +38,23 @@ const STATEMENTS = [
       FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE
     )`,
     `
+    CREATE TABLE IF NOT EXISTS processing_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      media_file_id INTEGER,
+      profile_id INTEGER,
+      status TEXT DEFAULT 'scanning',
+      confidence_score REAL DEFAULT 0.0,
+      intro_start REAL,
+      intro_end REAL,
+      credits_start REAL,
+      credits_end REAL,
+      manual_verified BOOLEAN DEFAULT 0,
+      processing_notes TEXT,
+      created_date TEXT,
+      updated_date TEXT,
+      FOREIGN KEY (media_file_id) REFERENCES episode_files(id) ON DELETE CASCADE
+    )`,
+    `
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT
@@ -47,7 +64,10 @@ const STATEMENTS = [
     `CREATE INDEX IF NOT EXISTS idx_shows_title            ON shows(title COLLATE NOCASE)`,
     `CREATE INDEX IF NOT EXISTS idx_seasons_show_id        ON seasons(show_id)`,
     `CREATE INDEX IF NOT EXISTS idx_episodes_season_id     ON episodes(season_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_episode_files_episode_id ON episode_files(episode_id)`
+    `CREATE INDEX IF NOT EXISTS idx_episode_files_episode_id ON episode_files(episode_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_processing_jobs_status ON processing_jobs(status)`,
+    `CREATE INDEX IF NOT EXISTS idx_processing_jobs_media_file_id ON processing_jobs(media_file_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_processing_jobs_created_date ON processing_jobs(created_date)`
   ];
   
   // 2) Export both the raw list and a helper to get them:

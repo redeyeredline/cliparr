@@ -7,19 +7,32 @@ import { getDatabaseSingleton } from '../database/Auto_DB_Setup.js';
 import { isPortInUse } from '../utils/isPortFree.js';
 import { ImportTaskManager } from '../tasks/importTask.js';
 import { registerGracefulShutdown } from '../utils/shutdown.js';
+import { initializeQueues, startQueues, stopQueues } from '../services/queue.js';
 
 let serverInstance, dbInstance, importTaskManager;
 
 export async function startServer() {
-  // If server is already running, don't start another one
+  // Prevent double-start
   if (serverInstance?.listening) {
     logger.info('Server already running, skipping initialization');
     return serverInstance;
   }
 
-  // Clean up any existing instances
+  // --- 1) Verify Redis is running ---
+  try {
+    const Redis = (await import('ioredis')).default;
+    const redis = new Redis({ host: 'localhost', port: 6379 });
+    await redis.ping();
+    await redis.quit();
+    logger.info('✅ Redis connection verified');
+  } catch (error) {
+    logger.error('❌ Redis connection failed. Please ensure Redis is running: sudo systemctl start redis-server');
+    throw new Error('Redis not available');
+  }
+
+  // --- 2) Tear down any old server/task instances ---
   if (importTaskManager) {
-    importTaskManager.stop();
+    await importTaskManager.stop();
     importTaskManager = null;
   }
 
@@ -27,67 +40,71 @@ export async function startServer() {
     try {
       serverInstance.close();
     } catch (err) {
-      logger.error('Error closing existing server:', err);
+      logger.error('Error closing old server:', err);
     }
     serverInstance = null;
   }
 
-  // Check if port is available
+  // --- 3) Ensure the HTTP port is free ---
   if (await isPortInUse(config.port)) {
     throw new Error(`Port ${config.port} in use`);
   }
 
   try {
+    // Initialize DB
     dbInstance = await getDatabaseSingleton(config.db.path);
 
+    // Create Express app
     const app = createApp({ db: dbInstance, logger, wss: null });
 
+    // HTTP & WebSocket
     serverInstance = http.createServer(app);
     setupWebSocket(serverInstance, config.ws);
     const wss = getWebSocketServer();
     app.set('wss', wss);
 
-    // Initialize and start the import task manager
+    // Import tasks
     importTaskManager = new ImportTaskManager(wss);
     app.set('importTaskManager', importTaskManager);
     await importTaskManager.start();
 
+    // Job queue (BullMQ will connect to localhost:6379)
+    await initializeQueues();
+    await startQueues();
+    logger.info('Job queue system initialized and started');
+
+    // Start listening
     serverInstance.listen(config.port, config.host, () =>
       logger.info(`Listening on ${config.host}:${config.port}`),
     );
 
-    // Register graceful shutdown handler
+    // Graceful shutdown
     registerGracefulShutdown(async () => {
-      logger.info('Starting graceful shutdown...');
+      logger.info('Starting graceful shutdown…');
 
-      // Stop the import task first
+      // Stop import tasks
       if (importTaskManager) {
         await importTaskManager.stop();
         importTaskManager = null;
       }
 
-      // Close WebSocket connections
+      // Stop queues
+      await stopQueues();
+
+      // Close WebSocket server
       if (wss) {
-        await new Promise((resolve) => {
-          wss.close(() => {
-            logger.info('WebSocket server closed');
-            resolve();
-          });
-        });
+        await new Promise((r) => wss.close(r));
+        logger.info('WebSocket server closed');
       }
 
       // Close HTTP server
       if (serverInstance?.listening) {
-        await new Promise((resolve) => {
-          serverInstance.close(() => {
-            logger.info('HTTP server closed');
-            resolve();
-          });
-        });
+        await new Promise((r) => serverInstance.close(r));
         serverInstance = null;
+        logger.info('HTTP server closed');
       }
 
-      // Close database connection
+      // Close DB
       if (dbInstance) {
         dbInstance.close();
         dbInstance = null;

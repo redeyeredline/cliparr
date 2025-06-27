@@ -2,7 +2,8 @@
 // Provides endpoints for show data retrieval and episode file management from the database.
 
 import express from 'express';
-import { getImportedShows, getShowById, deleteShowsByIds, getShowWithDetails, getEpisodeFiles } from '../database/Db_Operations.js';
+import { getImportedShows, getShowById, deleteShowsByIds, getShowWithDetails, getEpisodeFiles, createProcessingJobsForShows } from '../database/Db_Operations.js';
+import { enqueueShowProcessing } from '../services/queue.js';
 
 const router = express.Router();
 
@@ -81,6 +82,42 @@ router.post('/delete', (req, res) => {
   } catch (error) {
     logger.error('Failed to cascade delete shows:', error);
     res.status(500).json({ error: 'Failed to cascade delete shows' });
+  }
+});
+
+// Scan shows for file processing
+router.post('/scan', async (req, res) => {
+  const db = req.app.get('db');
+  const logger = req.app.get('logger');
+  const { showIds } = req.body;
+
+  if (!Array.isArray(showIds) || showIds.length === 0) {
+    return res.status(400).json({ error: 'showIds must be a non-empty array' });
+  }
+
+  try {
+    // Create processing jobs for the files
+    const scannedCount = createProcessingJobsForShows(db, showIds);
+
+    // Enqueue show processing jobs (as a batch)
+    const enqueuedJobId = await enqueueShowProcessing(showIds);
+
+    logger.info({
+      showIds,
+      scannedCount,
+      enqueuedJobId,
+    }, 'Shows scanned and enqueued for processing');
+
+    res.json({
+      success: true,
+      scanned: scannedCount,
+      enqueued: 1,
+      message: `Enqueued ${showIds.length} shows for processing`,
+    });
+  } catch (error) {
+    console.error('Failed to scan shows:', error);
+    logger.error('Failed to scan shows:', error, error && error.stack ? error.stack : '');
+    res.status(500).json({ error: 'Failed to scan shows', details: error && error.message });
   }
 });
 

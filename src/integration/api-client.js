@@ -140,6 +140,11 @@ class ApiClient {
     return response.data;
   }
 
+  async scanShows(showIds) {
+    const response = await api.post('/shows/scan', { showIds });
+    return response.data;
+  }
+
   // Hardware endpoints
   async detectHardware() {
     const response = await api.post('/hardware/detect');

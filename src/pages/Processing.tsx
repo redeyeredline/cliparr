@@ -3,6 +3,7 @@ import {
   ProcessingJob,
   ProcessingJobEntity,
   MediaFile,
+  MediaFileEntity,
   AudioAnalysis,
   AudioAnalysisEntity,
 } from '@/components/entities/all';
@@ -12,6 +13,9 @@ import ProcessingQueue from '../components/processing/ProcessingQueue';
 import AudioAnalyzer from '../components/processing/AudioAnalyzer';
 import ProcessingMonitor from '../components/processing/ProcessingMonitor';
 import BatchProcessor from '../components/processing/BatchProcessor';
+import QueueStatus from '../components/processing/QueueStatus';
+import { wsClient } from '../services/websocket.frontend.js';
+import { useToast } from '../components/ToastContext';
 
 export default function Processing() {
   const [jobs, setJobs] = useState<ProcessingJob[]>([]);
@@ -20,6 +24,8 @@ export default function Processing() {
   const [audioAnalyses, setAudioAnalyses] = useState<AudioAnalysis[]>([]);
   const [activeProcesses, setActiveProcesses] = useState<ProcessingJob[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [queueStatus, setQueueStatus] = useState<any>(null);
+  const toast = useToast();
 
   const loadData = async () => {
     if (isLoading) {
@@ -28,7 +34,7 @@ export default function Processing() {
     try {
       const [jobsData, filesData, audioData] = await Promise.all([
         ProcessingJobEntity.list('-created_date'),
-        Promise.resolve([]),
+        MediaFileEntity.list('-created_date'),
         AudioAnalysisEntity.list('-created_date', 20),
       ]);
       setJobs(jobsData);
@@ -47,9 +53,77 @@ export default function Processing() {
     }
   };
 
+  // WebSocket event handlers
+  useEffect(() => {
+    const handleJobUpdate = (data: any) => {
+      if (data.type === 'job_update') {
+        // Update the specific job in the state
+        setJobs((prevJobs) => {
+          return prevJobs.map((job) => {
+            if (job.id?.toString() === data.jobId?.toString()) {
+              return {
+                ...job,
+                status: data.status,
+                processing_notes: data.error || data.result?.message || job.processing_notes,
+                updated_date: new Date().toISOString(),
+              };
+            }
+            return job;
+          });
+        });
+
+        // Show toast notification for important updates
+        if (data.status === 'completed') {
+          toast({
+            type: 'success',
+            message: `Job ${data.jobId} completed successfully`,
+          });
+        } else if (data.status === 'failed') {
+          toast({
+            type: 'error',
+            message: `Job ${data.jobId} failed: ${data.error}`,
+          });
+        } else if (data.status === 'active') {
+          toast({
+            type: 'info',
+            message: `Job ${data.jobId} started processing`,
+          });
+        }
+      }
+    };
+
+    const handleQueueStatus = (data: any) => {
+      if (data.type === 'queue_status') {
+        setQueueStatus(data.queues);
+      }
+    };
+
+    const handleProcessingStatus = (data: any) => {
+      if (data.type === 'processing_status') {
+        // Update processing status
+        setQueueStatus(data);
+      }
+    };
+
+    // Add WebSocket event listeners
+    wsClient.addEventListener('message', handleJobUpdate);
+    wsClient.addEventListener('message', handleQueueStatus);
+    wsClient.addEventListener('message', handleProcessingStatus);
+
+    // Ensure WebSocket is connected
+    wsClient.connect();
+
+    return () => {
+      // Clean up event listeners
+      wsClient.removeEventListener('message', handleJobUpdate);
+      wsClient.removeEventListener('message', handleQueueStatus);
+      wsClient.removeEventListener('message', handleProcessingStatus);
+    };
+  }, [toast]);
+
   useEffect(() => {
     loadData();
-    const intervalId = setInterval(loadData, 3000);
+    const intervalId = setInterval(loadData, 10000); // Poll every 10 seconds for updates
     return () => clearInterval(intervalId);
   }, []);
 
@@ -95,82 +169,103 @@ export default function Processing() {
   const stats = getProcessingStats();
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8">
-      <Card>
-        <CardContent className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-          <div>
-            <h1 className="text-4xl font-extrabold text-white mb-2 tracking-tight">
-              Advanced Processing
-            </h1>
-            <p className="text-slate-300 font-medium text-lg">
-              FFmpeg-powered video processing with hardware acceleration
-            </p>
-          </div>
-          <div className="flex gap-8 bg-slate-900/80 rounded-xl shadow p-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-400">
-                {stats.processing}
-              </div>
-              <div className="text-xs text-slate-300">Processing</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-amber-400">
-                {stats.queued}
-              </div>
-              <div className="text-xs text-slate-300">Queued</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-emerald-400">
-                {stats.completed}
-              </div>
-              <div className="text-xs text-slate-300">Completed</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-white">Processing</h1>
+      </div>
+
+      {/* Queue Status Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <QueueStatus queueStatus={queueStatus} />
+        </div>
+        <div className="space-y-6">
+          {/* Active Processes Summary */}
+          <Card className="border-0 rounded-2xl shadow-lg bg-slate-800/90 backdrop-blur-md">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-white">
+                Active Processes ({activeProcesses.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activeProcesses.length === 0 ? (
+                <p className="text-slate-500 text-center py-4">No active processes</p>
+              ) : (
+                <div className="space-y-3">
+                  {activeProcesses.slice(0, 5).map((process) => (
+                    <div
+                      key={process.id}
+                      className="p-3 bg-slate-900/50 rounded-lg border border-slate-700"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-white font-medium">
+                          {process.media_file?.title || 'Unknown'}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          {process.status}
+                        </span>
+                      </div>
+                      {process.processing_notes && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          {process.processing_notes}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  {activeProcesses.length > 5 && (
+                    <p className="text-xs text-slate-500 text-center">
+                      +{activeProcesses.length - 5} more processes
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
       <Tabs defaultValue="queue" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 bg-slate-900/80 rounded-xl p-1">
-          <TabsTrigger value="queue" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-300 rounded-lg">
-            Processing Queue
-          </TabsTrigger>
-          <TabsTrigger value="audio" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-300 rounded-lg">
-            Audio Analysis
-          </TabsTrigger>
-          <TabsTrigger value="monitor" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-300 rounded-lg">
-            Live Monitor
-          </TabsTrigger>
-          <TabsTrigger value="batch" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-300 rounded-lg">
-            Batch Processing
-          </TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 bg-slate-800/90 backdrop-blur-md border border-slate-700">
+          <TabsTrigger value="queue" className="text-white">Queue</TabsTrigger>
+          <TabsTrigger value="monitor" className="text-white">Monitor</TabsTrigger>
+          <TabsTrigger value="analyzer" className="text-white">Analyzer</TabsTrigger>
+          <TabsTrigger value="batch" className="text-white">Batch</TabsTrigger>
         </TabsList>
+
         <TabsContent value="queue" className="space-y-6">
           <ProcessingQueue
             jobs={jobs}
             mediaFiles={mediaFiles}
-            profiles={profiles}
-            onStopProcessing={stopProcessing}
+            onRefresh={loadData}
             isLoading={isLoading}
           />
         </TabsContent>
-        <TabsContent value="audio" className="space-y-6">
+
+        <TabsContent value="monitor" className="space-y-6">
+          <ProcessingMonitor
+            jobs={jobs}
+            mediaFiles={mediaFiles}
+            onRefresh={loadData}
+            isLoading={isLoading}
+          />
+        </TabsContent>
+
+        <TabsContent value="analyzer" className="space-y-6">
           <AudioAnalyzer
             audioAnalyses={audioAnalyses}
             mediaFiles={mediaFiles}
             onRefresh={loadData}
+            isLoading={isLoading}
           />
         </TabsContent>
-        <TabsContent value="monitor" className="space-y-6">
-          <ProcessingMonitor
-            activeProcesses={activeProcesses}
-            mediaFiles={mediaFiles}
-          />
-        </TabsContent>
+
         <TabsContent value="batch" className="space-y-6">
           <BatchProcessor
-            jobs={jobs.filter((j) => j.status === 'verified' && j.manual_verified)}
+            jobs={jobs}
             mediaFiles={mediaFiles}
             profiles={profiles}
-            onStartBatch={startBatchProcessing}
+            onRefresh={loadData}
+            isLoading={isLoading}
           />
         </TabsContent>
       </Tabs>
