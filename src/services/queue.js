@@ -69,18 +69,18 @@ const workers = {};
 // Initialize all queues
 export async function initializeQueues() {
   logger.info('Starting queue initialization...');
-  
+
   try {
     await initBullMQ();
     logger.info('BullMQ imports initialized successfully');
-    
+
     for (const [name, config] of Object.entries(QUEUE_CONFIG)) {
       logger.info(`Initializing queue: ${config.name}`);
       const queue = new Queue(config.name, { connection: redis });
-      queues[name] = queue;
+      queues[config.name] = queue;
       logger.info(`Queue ${config.name} initialized successfully`);
     }
-    
+
     logger.info('All queues initialized successfully. Queue count:', Object.keys(queues).length);
   } catch (error) {
     logger.error('Failed to initialize queues:', error);
@@ -91,19 +91,19 @@ export async function initializeQueues() {
 // Start all workers
 export async function startQueues() {
   logger.info('Starting queue workers...');
-  
+
   try {
     await initBullMQ();
     logger.info('BullMQ imports verified for worker startup');
-    
+
     for (const [name, config] of Object.entries(QUEUE_CONFIG)) {
       logger.info(`Starting worker for queue: ${config.name} with concurrency ${config.concurrency}`);
-      
+
       const worker = new Worker(config.name, async (job) => {
         logger.info({ jobId: job.id, queue: name }, 'Processing job');
-        
+
         try {
-          const result = await processJob(job.name, job.data);
+          const result = await processJob(job.name, job);
           logger.info({ jobId: job.id, queue: name }, 'Job completed successfully');
           return result;
         } catch (error) {
@@ -117,10 +117,10 @@ export async function startQueues() {
 
       setupWorkerEvents(worker, name);
       workers[name] = worker;
-      
+
       logger.info(`Worker for ${name} started successfully with concurrency ${config.concurrency}`);
     }
-    
+
     logger.info('All workers started successfully. Worker count:', Object.keys(workers).length);
   } catch (error) {
     logger.error('Failed to start queue workers:', error);
@@ -134,7 +134,7 @@ export async function stopQueues() {
     await worker.close();
     logger.info(`Worker ${name} stopped`);
   }
-  
+
   await redis.quit();
   logger.info('All queues stopped');
 }
@@ -143,7 +143,7 @@ export async function stopQueues() {
 function setupWorkerEvents(worker, workerName) {
   worker.on('completed', (job, result) => {
     logger.info({ jobId: job.id, worker: workerName }, 'Job completed successfully');
-    
+
     // Broadcast job completion
     broadcastJobUpdate({
       jobId: job.id,
@@ -151,7 +151,7 @@ function setupWorkerEvents(worker, workerName) {
       worker: workerName,
       result,
     });
-    
+
     // Broadcast updated queue status
     getQueueStatus().then((status) => {
       broadcastQueueStatus({ queues: status });
@@ -160,7 +160,7 @@ function setupWorkerEvents(worker, workerName) {
 
   worker.on('failed', (job, err) => {
     logger.error({ jobId: job.id, worker: workerName, error: err.message }, 'Job failed');
-    
+
     // Broadcast job failure
     broadcastJobUpdate({
       jobId: job.id,
@@ -168,7 +168,7 @@ function setupWorkerEvents(worker, workerName) {
       worker: workerName,
       error: err.message,
     });
-    
+
     // Broadcast updated queue status
     getQueueStatus().then((status) => {
       broadcastQueueStatus({ queues: status });
@@ -177,7 +177,7 @@ function setupWorkerEvents(worker, workerName) {
 
   worker.on('error', (err) => {
     logger.error({ worker: workerName, error: err.message }, 'Worker error');
-    
+
     // Broadcast worker error
     broadcastJobUpdate({
       status: 'error',
@@ -188,14 +188,14 @@ function setupWorkerEvents(worker, workerName) {
 
   worker.on('active', (job) => {
     logger.info({ jobId: job.id, worker: workerName }, 'Job started processing');
-    
+
     // Broadcast job started
     broadcastJobUpdate({
       jobId: job.id,
       status: 'active',
       worker: workerName,
     });
-    
+
     // Broadcast updated queue status
     getQueueStatus().then((status) => {
       broadcastQueueStatus({ queues: status });
@@ -204,14 +204,14 @@ function setupWorkerEvents(worker, workerName) {
 
   worker.on('waiting', (job) => {
     logger.info({ jobId: job.id, worker: workerName }, 'Job waiting to be processed');
-    
+
     // Broadcast job waiting
     broadcastJobUpdate({
       jobId: job.id,
       status: 'waiting',
       worker: workerName,
     });
-    
+
     // Broadcast updated queue status
     getQueueStatus().then((status) => {
       broadcastQueueStatus({ queues: status });
@@ -220,18 +220,18 @@ function setupWorkerEvents(worker, workerName) {
 }
 
 // Process different job types
-async function processJob(jobType, jobData) {
+async function processJob(jobType, jobOrData) {
   switch (jobType) {
     case 'show-processing':
-      return await processShowJob(jobData);
+      return await processShowJob(jobOrData);
     case 'audio-extraction':
-      return await processAudioExtraction(jobData);
+      return await processAudioExtraction(jobOrData);
     case 'fingerprinting':
-      return await processFingerprinting(jobData);
+      return await processFingerprinting(jobOrData);
     case 'detection':
-      return await processDetection(jobData);
+      return await processDetection(jobOrData);
     case 'trimming':
-      return await processTrimming(jobData);
+      return await processTrimming(jobOrData);
     default:
       throw new Error(`Unknown job type: ${jobType}`);
   }
@@ -241,28 +241,28 @@ async function processJob(jobType, jobData) {
 async function processAudioExtraction(jobData) {
   logger.info({ jobData }, 'Processing audio extraction');
   // Simulate audio extraction
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  await new Promise((resolve) => setTimeout(resolve, 2000));
   return { message: 'Audio extracted successfully', duration: 120.5 };
 }
 
 async function processFingerprinting(jobData) {
   logger.info({ jobData }, 'Processing fingerprinting');
   // Simulate fingerprinting
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  await new Promise((resolve) => setTimeout(resolve, 1500));
   return { message: 'Fingerprint generated', fingerprint: 'abc123...' };
 }
 
 async function processDetection(jobData) {
   logger.info({ jobData }, 'Processing detection');
   // Simulate detection
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await new Promise((resolve) => setTimeout(resolve, 1000));
   return { message: 'Segments detected', segments: 5 };
 }
 
 async function processTrimming(jobData) {
   logger.info({ jobData }, 'Processing trimming');
   // Simulate trimming
-  await new Promise(resolve => setTimeout(resolve, 3000));
+  await new Promise((resolve) => setTimeout(resolve, 3000));
   return { message: 'Video trimmed successfully', clips: 3 };
 }
 
@@ -270,7 +270,7 @@ async function processTrimming(jobData) {
 export async function enqueueShowProcessing(showIds) {
   // Ensure queues are initialized
   await ensureQueuesInitialized();
-  
+
   const queue = queues['show-processing'];
   if (!queue) {
     const debugState = debugQueueState();
@@ -278,17 +278,28 @@ export async function enqueueShowProcessing(showIds) {
     throw new Error('Show processing queue not initialized');
   }
 
-  const job = await queue.add('show-processing', { showIds }, {
-    priority: 10,
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 5000,
-    },
-  });
-  
-  logger.info({ jobId: job.id, showIds }, 'Show processing job enqueued');
-  return job.id;
+  logger.info('enqueueShowProcessing called with showIds:', showIds);
+
+  // Enqueue one job per valid showId
+  const jobIds = [];
+  for (const showId of showIds) {
+    if (!showId) {
+      logger.warn('Skipping invalid showId:', showId);
+      continue;
+    }
+    const job = await queue.add('show-processing', { showId }, {
+      priority: 10,
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000,
+      },
+    });
+    logger.info({ jobId: job.id, showId }, 'Show processing job enqueued');
+    logger.info('Full job object:', job);
+    jobIds.push(job.id);
+  }
+  return jobIds;
 }
 
 // Enqueue audio extraction job
@@ -306,7 +317,7 @@ export async function enqueueAudioExtraction(jobData) {
       delay: 3000,
     },
   });
-  
+
   logger.info({ jobId: job.id, jobData }, 'Audio extraction job enqueued');
   return job.id;
 }
@@ -326,7 +337,7 @@ export async function enqueueFingerprinting(jobData) {
       delay: 2000,
     },
   });
-  
+
   logger.info({ jobId: job.id, jobData }, 'Fingerprinting job enqueued');
   return job.id;
 }
@@ -346,7 +357,7 @@ export async function enqueueDetection(jobData) {
       delay: 1000,
     },
   });
-  
+
   logger.info({ jobId: job.id, jobData }, 'Detection job enqueued');
   return job.id;
 }
@@ -366,7 +377,7 @@ export async function enqueueTrimming(jobData) {
       delay: 1000,
     },
   });
-  
+
   logger.info({ jobId: job.id, jobData }, 'Trimming job enqueued');
   return job.id;
 }
@@ -381,7 +392,7 @@ export async function getQueueStatus() {
       queue.getCompleted(),
       queue.getFailed(),
     ]);
-    
+
     status[name] = {
       name,
       waiting: waiting.length,
@@ -416,7 +427,7 @@ async function ensureQueuesInitialized() {
   logger.info('Current workers object:', workers);
   logger.info('Queues object keys:', Object.keys(queues));
   logger.info('Queues object length:', Object.keys(queues).length);
-  
+
   // Check if the show-processing queue specifically exists
   if (!queues['show-processing']) {
     logger.warn('Show processing queue not found, attempting to initialize queues...');
@@ -431,4 +442,4 @@ async function ensureQueuesInitialized() {
   } else {
     logger.info('Show processing queue already exists');
   }
-} 
+}

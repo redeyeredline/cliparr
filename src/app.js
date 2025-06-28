@@ -40,5 +40,16 @@ export function createApp({ db, logger, wss }) {
   app.use('/hardware', hardwareRoutes);
   app.use('/api/processing', processingRoutes);
 
+  app.use((req, res, next) => {
+    console.log('INCOMING:', req.method, req.url, req.query);
+    next();
+  });
+
+  // Catch-all unmatched route logger
+  app.use((req, res, next) => {
+    console.error('UNMATCHED ROUTE:', req.method, req.url);
+    res.status(404).json({ error: 'Not found' });
+  });
+
   return app;
 }

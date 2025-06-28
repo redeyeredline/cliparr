@@ -100,19 +100,19 @@ router.post('/scan', async (req, res) => {
     const scannedCount = createProcessingJobsForShows(db, showIds);
 
     // Enqueue show processing jobs (as a batch)
-    const enqueuedJobId = await enqueueShowProcessing(showIds);
+    const enqueuedJobIds = await enqueueShowProcessing(showIds);
 
     logger.info({
       showIds,
       scannedCount,
-      enqueuedJobId,
+      enqueuedJobIds,
     }, 'Shows scanned and enqueued for processing');
 
     res.json({
       success: true,
       scanned: scannedCount,
-      enqueued: 1,
-      message: `Enqueued ${showIds.length} shows for processing`,
+      enqueued: enqueuedJobIds.length,
+      message: `Enqueued ${enqueuedJobIds.length} shows for processing`,
     });
   } catch (error) {
     console.error('Failed to scan shows:', error);

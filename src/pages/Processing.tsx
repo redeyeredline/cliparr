@@ -16,6 +16,7 @@ import BatchProcessor from '../components/processing/BatchProcessor';
 import QueueStatus from '../components/processing/QueueStatus';
 import { wsClient } from '../services/websocket.frontend.js';
 import { useToast } from '../components/ToastContext';
+import { Trash2 } from 'lucide-react';
 
 export default function Processing() {
   const [jobs, setJobs] = useState<ProcessingJob[]>([]);
@@ -25,6 +26,8 @@ export default function Processing() {
   const [activeProcesses, setActiveProcesses] = useState<ProcessingJob[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [queueStatus, setQueueStatus] = useState<any>(null);
+  const [selected, setSelected] = useState<(string | number)[]>([]);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
   const toast = useToast();
 
   const loadData = async () => {
@@ -168,12 +171,38 @@ export default function Processing() {
 
   const stats = getProcessingStats();
 
+  // Update handleDeleteJob to use selected
+  const handleDeleteJob = async (jobId: string | number) => {
+    try {
+      await ProcessingJobEntity.delete(jobId);
+      setSelected((ids) => ids.filter((id) => id !== jobId));
+      await loadData();
+      toast({ type: 'success', message: 'Job deleted' });
+    } catch (error) {
+      toast({ type: 'error', message: 'Failed to delete job' });
+    }
+  };
+
+  // Bulk delete for selected jobs
+  const handleBulkDelete = async () => {
+    setBulkDeleteLoading(true);
+    try {
+      await Promise.all(selected.map((id) => ProcessingJobEntity.delete(id)));
+      setSelected([]);
+      await loadData();
+      toast({ type: 'success', message: 'Selected jobs deleted' });
+    } catch (error) {
+      toast({ type: 'error', message: 'Failed to delete selected jobs' });
+    } finally {
+      setBulkDeleteLoading(false);
+    }
+  };
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6 min-h-screen overflow-y-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-white">Processing</h1>
       </div>
-
       {/* Queue Status Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -199,7 +228,7 @@ export default function Processing() {
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-white font-medium">
-                          {process.media_file?.title || 'Unknown'}
+                          {mediaFiles.find((f) => f.id === process.media_file_id)?.file_name || 'Unknown'}
                         </span>
                         <span className="text-xs text-slate-400">
                           {process.status}
@@ -224,7 +253,7 @@ export default function Processing() {
         </div>
       </div>
 
-      <Tabs defaultValue="queue" className="space-y-6">
+      <Tabs defaultValue="queue" className="space-y-6 h-full">
         <TabsList className="grid w-full grid-cols-4 bg-slate-800/90 backdrop-blur-md border border-slate-700">
           <TabsTrigger value="queue" className="text-white">Queue</TabsTrigger>
           <TabsTrigger value="monitor" className="text-white">Monitor</TabsTrigger>
@@ -232,21 +261,25 @@ export default function Processing() {
           <TabsTrigger value="batch" className="text-white">Batch</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="queue" className="space-y-6">
+        <TabsContent value="queue" className="space-y-6 h-100 pb-32">
           <ProcessingQueue
             jobs={jobs}
             mediaFiles={mediaFiles}
-            onRefresh={loadData}
+            profiles={profiles}
+            onStopProcessing={stopProcessing}
             isLoading={isLoading}
+            onDeleteJob={handleDeleteJob}
+            selected={selected}
+            setSelected={setSelected}
+            onBulkDelete={handleBulkDelete}
+            bulkDeleteLoading={bulkDeleteLoading}
           />
         </TabsContent>
 
         <TabsContent value="monitor" className="space-y-6">
           <ProcessingMonitor
-            jobs={jobs}
+            activeProcesses={activeProcesses}
             mediaFiles={mediaFiles}
-            onRefresh={loadData}
-            isLoading={isLoading}
           />
         </TabsContent>
 
@@ -255,7 +288,6 @@ export default function Processing() {
             audioAnalyses={audioAnalyses}
             mediaFiles={mediaFiles}
             onRefresh={loadData}
-            isLoading={isLoading}
           />
         </TabsContent>
 
@@ -264,11 +296,32 @@ export default function Processing() {
             jobs={jobs}
             mediaFiles={mediaFiles}
             profiles={profiles}
-            onRefresh={loadData}
-            isLoading={isLoading}
+            onStartBatch={startBatchProcessing}
           />
         </TabsContent>
       </Tabs>
+      {/* Fixed bottom bar for deletion */}
+      {selected.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className="bg-gray-800/90 backdrop-blur-lg border border-gray-700/50 rounded-2xl shadow-2xl p-4 flex items-center space-x-4">
+            <div className="flex items-center space-x-2 text-gray-300">
+              <span className="font-medium">{selected.length} selected</span>
+            </div>
+            <button
+              onClick={handleBulkDelete}
+              className="bg-red-500/90 hover:bg-red-500 text-white font-semibold py-2 px-6 rounded-xl shadow-lg shadow-red-500/25 transition-all duration-200 hover:shadow-red-500/40 hover:scale-105 flex items-center space-x-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              aria-label={`Delete ${selected.length} selected jobs`}
+              disabled={bulkDeleteLoading}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>{bulkDeleteLoading ? 'Deleting...' : 'Delete'}</span>
+              {bulkDeleteLoading && (
+                <svg className="animate-spin ml-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

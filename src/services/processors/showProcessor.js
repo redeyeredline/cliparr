@@ -2,18 +2,19 @@
 // extract audio → window & fingerprint → detect → trim → report
 
 import { logger } from '../logger.js';
-import { getDb } from '../../database/Db_Operations.js';
+import { getDb, updateProcessingJob } from '../../database/Db_Operations.js';
 import {
   enqueueAudioExtraction,
   enqueueFingerprinting,
   enqueueDetection,
   enqueueTrimming,
 } from '../queue.js';
-import { updateProcessingJob } from '../../database/Db_Operations.js';
 import path from 'path';
 import fs from 'fs/promises';
 
 export async function processShowJob(job) {
+  console.log('processShowJob received job:', job);
+  console.log('processShowJob received job.data:', job && job.data);
   const { showId } = job.data;
   const db = await getDb();
 

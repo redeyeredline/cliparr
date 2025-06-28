@@ -511,6 +511,15 @@ function findShowByTitleAndPath(db, title, path) {
   return timedQuery(db, sql, [title, path], 'get');
 }
 
+function deleteProcessingJob(db, jobId) {
+  if (!jobId) {
+    return 0;
+  }
+  const sql = 'DELETE FROM processing_jobs WHERE id = ?';
+  const result = timedQuery(db, sql, [jobId], 'run');
+  return result.changes;
+}
+
 export {
   getDb,
   insertShow,
@@ -539,4 +548,5 @@ export {
   findShowByTitleAndPath,
   getShowWithDetails,
   getEpisodeFiles,
+  deleteProcessingJob,
 };

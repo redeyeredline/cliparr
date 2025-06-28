@@ -12,6 +12,8 @@ import { initializeQueues, startQueues, stopQueues } from '../services/queue.js'
 let serverInstance, dbInstance, importTaskManager;
 
 export async function startServer() {
+  console.log('🚀 Starting server initialization...');
+
   // Prevent double-start
   if (serverInstance?.listening) {
     logger.info('Server already running, skipping initialization');
@@ -19,18 +21,22 @@ export async function startServer() {
   }
 
   // --- 1) Verify Redis is running ---
+  console.log('🔍 Checking Redis connection...');
   try {
     const Redis = (await import('ioredis')).default;
     const redis = new Redis({ host: 'localhost', port: 6379 });
     await redis.ping();
     await redis.quit();
     logger.info('✅ Redis connection verified');
+    console.log('✅ Redis connection verified');
   } catch (error) {
     logger.error('❌ Redis connection failed. Please ensure Redis is running: sudo systemctl start redis-server');
+    console.error('❌ Redis connection failed:', error.message);
     throw new Error('Redis not available');
   }
 
   // --- 2) Tear down any old server/task instances ---
+  console.log('🧹 Cleaning up old instances...');
   if (importTaskManager) {
     await importTaskManager.stop();
     importTaskManager = null;
@@ -46,37 +52,51 @@ export async function startServer() {
   }
 
   // --- 3) Ensure the HTTP port is free ---
+  console.log(`🔍 Checking if port ${config.port} is available...`);
   if (await isPortInUse(config.port)) {
     throw new Error(`Port ${config.port} in use`);
   }
+  console.log(`✅ Port ${config.port} is available`);
 
   try {
     // Initialize DB
+    console.log('🗄️ Initializing database...');
     dbInstance = await getDatabaseSingleton(config.db.path);
+    console.log('✅ Database initialized');
 
     // Create Express app
+    console.log('🌐 Creating Express app...');
     const app = createApp({ db: dbInstance, logger, wss: null });
+    console.log('✅ Express app created');
 
     // HTTP & WebSocket
+    console.log('🔌 Setting up HTTP server and WebSocket...');
     serverInstance = http.createServer(app);
     setupWebSocket(serverInstance, config.ws);
     const wss = getWebSocketServer();
     app.set('wss', wss);
+    console.log('✅ HTTP server and WebSocket setup complete');
 
     // Import tasks
+    console.log('📋 Initializing import task manager...');
     importTaskManager = new ImportTaskManager(wss);
     app.set('importTaskManager', importTaskManager);
     await importTaskManager.start();
+    console.log('✅ Import task manager started');
 
     // Job queue (BullMQ will connect to localhost:6379)
+    console.log('🔄 Initializing job queues...');
     await initializeQueues();
     await startQueues();
     logger.info('Job queue system initialized and started');
+    console.log('✅ Job queues initialized and started');
 
     // Start listening
-    serverInstance.listen(config.port, config.host, () =>
-      logger.info(`Listening on ${config.host}:${config.port}`),
-    );
+    console.log(`🎧 Starting to listen on ${config.host}:${config.port}...`);
+    serverInstance.listen(config.port, config.host, () => {
+      logger.info(`Listening on ${config.host}:${config.port}`);
+      console.log(`🎉 Server is now listening on ${config.host}:${config.port}`);
+    });
 
     // Graceful shutdown
     registerGracefulShutdown(async () => {
@@ -117,6 +137,15 @@ export async function startServer() {
     return serverInstance;
   } catch (err) {
     logger.error('Failed to start server:', err);
+    console.error('❌ Failed to start server:', err);
     throw err;
   }
+}
+
+// Start the server if this file is run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startServer().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
 }

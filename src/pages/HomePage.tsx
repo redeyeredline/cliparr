@@ -408,26 +408,20 @@ function HomePage() {
     }
   };
 
-  const handleDelete = useCallback(async () => {
-    try {
-      const result = await apiClient.deleteShows(selected);
-      toast({ type: 'success', message: `${result.deleted} shows deleted` });
-      handleSelectAll();
-      fetchShows();
-    } catch {
-      toast({ type: 'error', message: 'Failed to delete shows' });
-    }
-  }, [selected, toast, handleSelectAll, fetchShows]);
-
   const handleScan = useCallback(async () => {
+    if (!selected || selected.length === 0) {
+      toast({ type: 'error', message: 'No shows selected for scanning' });
+      return;
+    }
+    console.log('Submitting selected shows for scan:', selected);
     try {
       const result = await apiClient.scanShows(selected);
-      toast({ type: 'success', message: `Scanning ${result.scanned} shows` });
-      handleSelectAll();
+      toast({ type: 'success', message: `Submitted ${result.enqueued} shows for processing` });
+      deselectAll();
     } catch {
       toast({ type: 'error', message: 'Failed to scan shows' });
     }
-  }, [selected, toast, handleSelectAll]);
+  }, [selected, toast, deselectAll]);
 
   const handleScanAll = useCallback(async () => {
     try {
@@ -437,6 +431,17 @@ function HomePage() {
       toast({ type: 'error', message: 'Failed to scan all shows' });
     }
   }, [shows, toast]);
+
+  const handleDelete = useCallback(async () => {
+    try {
+      const result = await apiClient.deleteShows(selected);
+      toast({ type: 'success', message: `${result.deleted} shows deleted` });
+      deselectAll();
+      fetchShows();
+    } catch {
+      toast({ type: 'error', message: 'Failed to delete shows' });
+    }
+  }, [selected, toast, deselectAll, fetchShows]);
 
   // Global Enter key handler for delete
   useEffect(() => {
