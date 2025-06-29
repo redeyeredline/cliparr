@@ -222,14 +222,15 @@ function HomePage() {
 
     const handleImportProgress = async (data: ImportProgressEvent) => {
       if (data.type === 'import_progress') {
-        if (data.status === 'completed') {
-          toast({ type: 'success', message: 'Import completed successfully' });
-          fetchShows();
-        } else if (data.status === 'failed') {
-          toast({ type: 'error', message: 'Import failed' });
-        } else {
-          toast({ type: 'info', message: `Import: ${data.status}` });
-        }
+        // Remove per-show import toasts
+        // toast({ type: 'success', message: 'Import completed successfully' });
+        // toast({ type: 'error', message: 'Import failed' });
+        // toast({ type: 'info', message: `Import: ${data.status}` });
+        // Only keep batch toasts like:
+        // toast({ type: 'success', message: `Submitted ${result.enqueued} shows for processing` });
+        // toast({ type: 'success', message: `Scanning all ${result.scanned} shows` });
+        // toast({ type: 'success', message: `${result.deleted} shows deleted` });
+        fetchShows();
       }
     };
 
