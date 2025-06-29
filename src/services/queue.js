@@ -10,6 +10,8 @@ import {
   detectAudioSegments,
   processEpisodeFile,
 } from './processors/showProcessor.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 // Import BullMQ using dynamic import to avoid ESM issues
 let Queue, Worker;
@@ -59,30 +61,35 @@ async function updateQueueConfig() {
       concurrency: limits.cpu, // Allow up to N episodes in parallel
       retries: 3,
       backoff: 5000,
+      timeout: 300000, // 5 minutes timeout
     },
     audioExtraction: {
       name: 'audio-extraction',
       concurrency: limits.cpu, // CPU-intensive
       retries: 2,
       backoff: 3000,
+      timeout: 120000, // 2 minutes timeout
     },
     fingerprinting: {
       name: 'fingerprinting',
       concurrency: limits.cpu, // CPU-intensive
       retries: 2,
       backoff: 2000,
+      timeout: 180000, // 3 minutes timeout
     },
     detection: {
       name: 'detection',
       concurrency: Math.min(limits.cpu, 4), // CPU-intensive but can be limited
       retries: 1,
       backoff: 1000,
+      timeout: 60000, // 1 minute timeout
     },
     trimming: {
       name: 'trimming',
       concurrency: limits.gpu, // GPU-accelerated when available
       retries: 1,
       backoff: 1000,
+      timeout: 120000, // 2 minutes timeout
     },
   };
 
@@ -134,8 +141,19 @@ export async function startQueues() {
 
       const worker = new Worker(config.name, async (job) => {
         try {
-          const result = await processJob(job.name, job);
-          return result;
+          // Update job progress periodically
+          const progressInterval = setInterval(() => {
+            job.updateProgress(50); // Keep job alive
+          }, 30000); // Every 30 seconds
+
+          try {
+            const result = await processJob(job.name, job);
+            clearInterval(progressInterval);
+            return result;
+          } catch (error) {
+            clearInterval(progressInterval);
+            throw error;
+          }
         } catch (error) {
           logger.error({ jobId: job.id, queue: name, error: error.message }, 'Job failed');
           throw error;
@@ -143,6 +161,8 @@ export async function startQueues() {
       }, {
         connection: redis,
         concurrency: config.concurrency,
+        stalledInterval: 60000, // Check for stalled jobs every minute
+        maxStalledCount: 2, // Allow 2 stalls before failing
       });
 
       logger.info(`Worker instance created for ${name} with concurrency: ${config.concurrency}`);
@@ -324,7 +344,6 @@ export async function enqueueEpisodeProcessing(episodeFileIds) {
         delay: 5000,
       },
     });
-    logger.info({ jobId: job.id, episodeFileId }, 'Episode processing job enqueued');
     jobIds.push(job.id);
   }
   return jobIds;
@@ -538,19 +557,190 @@ export async function cleanAllQueues() {
 export async function removeJobFromAllQueues(jobId) {
   await initBullMQ();
   let removed = false;
-  for (const queue of Object.values(queues)) {
+
+  // First, kill any associated processes immediately
+  await killJobProcesses(jobId);
+
+  for (const [queueName, queue] of Object.entries(queues)) {
     try {
       const job = await queue.getJob(jobId);
       if (job) {
-        await job.remove();
+        // Check if job is currently active (being processed)
+        const isActive = job.processedOn !== undefined && job.finishedOn === undefined;
+
+        if (isActive) {
+          // For active jobs, we need to be more aggressive
+          logger.info({ jobId, queue: queueName }, 'Removing active job - this may take a moment');
+
+          // Pause the worker FIRST to stop it from processing more jobs
+          const worker = workers[queueName];
+          if (worker && typeof worker.pause === 'function') {
+            await worker.pause(true); // true = do not process active jobs
+            logger.info({ jobId, queue: queueName }, 'Paused worker to stop job processing');
+          }
+
+          // Kill processes again after pausing
+          await killJobProcesses(jobId);
+
+          // Remove from Redis directly to ensure it's gone
+          const redisClient = queue.client;
+          const jobKey = `bull:${queueName}:${jobId}`;
+          const activeKey = `bull:${queueName}:active`;
+          const processedKey = `bull:${queueName}:processed`;
+          const failedKey = `bull:${queueName}:failed`;
+          const delayedKey = `bull:${queueName}:delayed`;
+          const waitingKey = `bull:${queueName}:waiting`;
+
+          // Remove job data from Redis completely
+          await redisClient.del(jobKey);
+          await redisClient.zrem(activeKey, jobId);
+          await redisClient.zrem(processedKey, jobId);
+          await redisClient.zrem(failedKey, jobId);
+          await redisClient.zrem(delayedKey, jobId);
+          await redisClient.zrem(waitingKey, jobId);
+
+          // Also try to remove the job normally
+          try {
+            await job.remove();
+          } catch (removeErr) {
+            logger.warn({ jobId, queue: queueName, error: removeErr.message }, 'Normal job removal failed, but Redis cleanup succeeded');
+          }
+
+          // Resume the worker
+          if (worker && typeof worker.resume === 'function') {
+            await worker.resume();
+            logger.info({ jobId, queue: queueName }, 'Resumed worker after job removal');
+          }
+
+          logger.info({ jobId, queue: queueName }, 'Active job forcefully removed from Redis');
+        } else {
+          // For non-active jobs, normal removal is fine
+          await job.remove();
+          logger.info({ jobId, queue: queueName }, 'Removed job from queue');
+        }
+
         removed = true;
-        logger.info({ jobId, queue: queue.name }, 'Removed job from queue');
       }
     } catch (err) {
-      logger.warn({ jobId, queue: queue.name, error: err.message }, 'Failed to remove job from queue');
+      logger.warn({ jobId, queue: queueName, error: err.message }, 'Failed to remove job from queue');
     }
   }
+
   // Clean queues after job removal
   await cleanAllQueues();
   return removed;
+}
+
+// Clear all jobs from all queues (one-time emergency stop)
+export async function clearAllQueues() {
+  await initBullMQ();
+  logger.info('Clearing all jobs from all queues...');
+
+  for (const [name, queue] of Object.entries(queues)) {
+    try {
+      // Get all jobs in the queue
+      const waiting = await queue.getWaiting();
+      const active = await queue.getActive();
+      const delayed = await queue.getDelayed();
+
+      // Remove all jobs
+      for (const job of [...waiting, ...active, ...delayed]) {
+        await job.remove();
+      }
+
+      logger.info({
+        queue: name,
+        waiting: waiting.length,
+        active: active.length,
+        delayed: delayed.length,
+      }, 'Cleared all jobs from queue');
+
+    } catch (err) {
+      logger.error({ queue: name, error: err.message }, 'Failed to clear queue');
+    }
+  }
+
+  logger.info('All queues cleared successfully');
+}
+
+const execAsync = promisify(exec);
+
+// Kill any ffmpeg/fpcalc processes associated with a specific job
+async function killJobProcesses(jobId) {
+  try {
+    // Kill any ffmpeg processes that might be running for this job
+    await execAsync('pkill -9 -f "ffmpeg.*cliprr"');
+    // Kill any fpcalc processes
+    await execAsync('pkill -9 -f "fpcalc"');
+    // Also kill any ffmpeg processes that might be extracting audio
+    await execAsync('pkill -9 -f "ffmpeg.*-vn.*-acodec pcm_s16le"');
+    // Kill any chunk extraction processes
+    await execAsync('pkill -9 -f "ffmpeg.*-ss.*-t.*chunk_"');
+    // Kill any ffmpeg processes that might be processing audio
+    await execAsync('pkill -9 -f "ffmpeg.*audio"');
+    // Kill any ffmpeg processes that might be processing video
+    await execAsync('pkill -9 -f "ffmpeg.*video"');
+    // Kill any ffmpeg processes that might be processing temp files
+    await execAsync('pkill -9 -f "ffmpeg.*temp"');
+    // Kill any ffmpeg processes that might be processing wav files
+    await execAsync('pkill -9 -f "ffmpeg.*wav"');
+    // Kill any ffmpeg processes that might be processing mp4 files
+    await execAsync('pkill -9 -f "ffmpeg.*mp4"');
+
+    logger.info({ jobId }, 'Killed all associated audio processing processes');
+  } catch (error) {
+    // It's okay if no processes were found to kill - don't log this as debug
+    // logger.debug({ jobId, error: error.message }, 'No audio processes to kill');
+  }
+}
+
+// Remove fingerprint data from database for a specific episode file
+async function removeFingerprintData(episodeFileId) {
+  try {
+    const db = await getDb();
+
+    // Remove from episode_fingerprints table
+    const fingerprintResult = db.prepare(`
+      DELETE FROM episode_fingerprints 
+      WHERE episode_file_id = ?
+    `).run(episodeFileId);
+
+    // Remove from detection_results table
+    const detectionResult = db.prepare(`
+      DELETE FROM detection_results 
+      WHERE episode_file_id = ?
+    `).run(episodeFileId);
+
+    if (fingerprintResult.changes > 0 || detectionResult.changes > 0) {
+      logger.info({
+        episodeFileId,
+        fingerprintsRemoved: fingerprintResult.changes,
+        detectionsRemoved: detectionResult.changes,
+      }, 'Removed fingerprint data from database');
+    }
+  } catch (error) {
+    logger.warn({ episodeFileId, error: error.message }, 'Failed to remove fingerprint data');
+  }
+}
+
+// Remove detection results from database for a specific episode file (keep fingerprints)
+async function removeDetectionData(episodeFileId) {
+  try {
+    const db = await getDb();
+
+    // Only remove from detection_results table, keep fingerprints
+    const detectionResult = db.prepare(`
+      DELETE FROM detection_results 
+      WHERE episode_file_id = ?
+    `).run(episodeFileId);
+
+    if (detectionResult.changes > 0) {
+      logger.info({
+        episodeFileId,
+        detectionsRemoved: detectionResult.changes,
+      }, 'Removed detection results from database (fingerprints preserved)');
+    }
+  } catch (error) {
+    logger.warn({ episodeFileId, error: error.message }, 'Failed to remove detection data');
+  }
 }

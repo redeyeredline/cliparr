@@ -16,6 +16,7 @@ const defaultSettings = {
   min_confidence_threshold: 0.8,
   backup_originals: true,
   auto_process_verified: false,
+  auto_process_detections: false,
   import_mode: 'none',
   polling_interval: 900,
   temp_dir: '',
@@ -57,6 +58,8 @@ const Settings2Page = () => {
           backup_originals: data.backup_originals === '1' || data.backup_originals === true,
           auto_process_verified:
             data.auto_process_verified === '1' || data.auto_process_verified === true,
+          auto_process_detections:
+            data.auto_process_detections === '1' || data.auto_process_detections === true,
           min_confidence_threshold: parseFloat(data.min_confidence_threshold) || 0.8,
           polling_interval: parseInt(data.polling_interval, 10) || 900,
           temp_dir: data.temp_dir || '',
@@ -69,6 +72,8 @@ const Settings2Page = () => {
           backup_originals: data.backup_originals === '1' || data.backup_originals === true,
           auto_process_verified:
             data.auto_process_verified === '1' || data.auto_process_verified === true,
+          auto_process_detections:
+            data.auto_process_detections === '1' || data.auto_process_detections === true,
           min_confidence_threshold: parseFloat(data.min_confidence_threshold) || 0.8,
           polling_interval: parseInt(data.polling_interval, 10) || 900,
           temp_dir: data.temp_dir || '',
@@ -124,6 +129,7 @@ const Settings2Page = () => {
         ...settingsToSave,
         backup_originals: pending.backup_originals ? 1 : 0,
         auto_process_verified: pending.auto_process_verified ? 1 : 0,
+        auto_process_detections: pending.auto_process_detections ? 1 : 0,
       });
       setSettings({ ...pending });
       setApiKeyEdited(false);
@@ -371,6 +377,21 @@ const Settings2Page = () => {
               </div>
               <span className="text-sm text-gray-400 mb-4 block">
                 Automatically process files after manual verification
+              </span>
+              <div className="flex items-center">
+                <input
+                  id="auto_process_detections"
+                  type="checkbox"
+                  checked={pending.auto_process_detections}
+                  onChange={(e) => handleChange('auto_process_detections', e.target.checked)}
+                  className="mr-2 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="auto_process_detections" className="font-semibold text-gray-200">
+                  Auto-Process High Confidence Detections
+                </label>
+              </div>
+              <span className="text-sm text-gray-400 mb-4 block">
+                Automatically approve and process files when confidence score meets threshold
               </span>
             </CardContent>
           </Card>

@@ -17,6 +17,7 @@ import { broadcastJobUpdate } from '../websocket.js';
 import { Semaphore } from 'redis-semaphore';
 import Redis from 'ioredis';
 import os from 'os';
+import { processEpisodeAndTriggerSeasonDetection } from '../fingerprintPipeline.js';
 
 // Setup Redis and global ffmpeg semaphore
 const redis = new Redis({ host: 'localhost', port: 6379 });
@@ -114,38 +115,114 @@ export async function processShowJob(job) {
 
 async function processEpisodeFile(jobId, file) {
   try {
-    // logger.info({ jobId, filePath: file.file_path }, 'Processing episode file');
+    // Broadcast initial progress
+    broadcastJobUpdate({
+      jobId,
+      status: 'processing',
+      progress: 10,
+      currentFile: {
+        fileId: file.id,
+        filePath: file.file_path,
+        episode: file.episode_title,
+        season: file.season_number,
+        show: file.show_title,
+      },
+      message: 'Starting episode processing...',
+    });
 
-    // Step 1: Extract audio
-    const audioPath = await extractAudioFromFile(file.file_path);
+    // Use the new robust fingerprint pipeline
+    const result = await processEpisodeAndTriggerSeasonDetection(file.id, {
+      chunkLength: 10,
+      overlap: 5,
+      thresholdPercent: 0.5, // Lowered threshold
+      marginSec: 5,
+    });
 
-    // Step 2: Generate fingerprint
-    const fingerprint = await generateAudioFingerprint(audioPath);
+    if (!result.success) {
+      throw new Error(`Pipeline failed: ${result.reason || 'Unknown error'}`);
+    }
 
-    // Step 3: Detect segments
-    const segments = await detectAudioSegments(fingerprint, audioPath);
+    // Broadcast completion progress
+    broadcastJobUpdate({
+      jobId,
+      status: 'processing',
+      progress: 90,
+      currentFile: {
+        fileId: file.id,
+        filePath: file.file_path,
+        episode: file.episode_title,
+        season: file.season_number,
+        show: file.show_title,
+      },
+      message: 'Processing complete, updating database...',
+    });
 
-    // Step 4: Store detection results only (do NOT trim or clean up yet)
+    // Extract detection results from the season detection
+    const seasonDetection = result.seasonDetection;
+    const segments = {
+      intro: seasonDetection.intro,
+      credits: seasonDetection.credits,
+      confidence: seasonDetection.confidence_score,
+    };
+
+    // Update processing job with results
     await updateProcessingResults(file.id, {
       intro_start: segments.intro?.start,
       intro_end: segments.intro?.end,
       credits_start: segments.credits?.start,
       credits_end: segments.credits?.end,
       confidence_score: segments.confidence || 0.0,
-      status: 'detected',
-      processing_notes: `Detection complete. Intro: ${segments.intro ? 'Yes' : 'No'}, Credits: ${segments.credits ? 'Yes' : 'No'}`,
+      status: seasonDetection.approval_status === 'auto_approved' ? 'verified' : 'detected',
+      processing_notes: `Robust pipeline detection complete. Method: ${seasonDetection.detection_method}, Confidence: ${(segments.confidence * 100).toFixed(2)}%, Approval: ${seasonDetection.approval_status}. Intro: ${segments.intro ? 'Yes' : 'No'}, Credits: ${segments.credits ? 'Yes' : 'No'}`,
     });
 
-    // logger.info({ jobId, filePath: file.file_path }, 'Episode file detection completed and ready for review');
+    // Broadcast final completion
+    broadcastJobUpdate({
+      jobId,
+      status: 'completed',
+      progress: 100,
+      currentFile: {
+        fileId: file.id,
+        filePath: file.file_path,
+        episode: file.episode_title,
+        season: file.season_number,
+        show: file.show_title,
+      },
+      message: `Processing completed. Confidence: ${(segments.confidence * 100).toFixed(2)}%`,
+    });
+
+    logger.info({
+      jobId,
+      filePath: file.file_path,
+      confidence: segments.confidence,
+      method: seasonDetection.detection_method,
+      approvalStatus: seasonDetection.approval_status,
+    }, 'Episode file processing completed with robust pipeline');
 
     return {
       fileId: file.id,
       success: true,
       segments,
+      seasonDetection,
     };
 
   } catch (error) {
     logger.error({ jobId, filePath: file.file_path, error: error.message }, 'Episode file processing failed');
+
+    // Broadcast failure
+    broadcastJobUpdate({
+      jobId,
+      status: 'failed',
+      progress: 0,
+      currentFile: {
+        fileId: file.id,
+        filePath: file.file_path,
+        episode: file.episode_title,
+        season: file.season_number,
+        show: file.show_title,
+      },
+      message: `Processing failed: ${error.message}`,
+    });
 
     // Update database with failure
     await updateProcessingResults(file.id, {
@@ -380,6 +457,52 @@ async function cleanupTempFile(filePath) {
   } catch (error) {
     logger.warn({ filePath, error: error.message }, 'Failed to cleanup temporary file');
   }
+}
+
+/**
+ * Splits a WAV file into overlapping windows and fingerprints each chunk.
+ * @param {string} filePath - Path to the WAV file.
+ * @param {number} chunkLength - Length of each chunk in seconds (default 10).
+ * @param {number} overlap - Overlap between chunks in seconds (default 5).
+ * @returns {Promise<Array<{start: number, fingerprint: string}>>}
+ */
+export async function fingerprintEpisodeChunks(filePath, chunkLength = 10, overlap = 5) {
+  const getAudioDuration = async (file) => {
+    return new Promise((resolve, reject) => {
+      execFile('ffprobe', [
+        '-v', 'error',
+        '-show_entries', 'format=duration',
+        '-of', 'default=noprint_wrappers=1:nokey=1',
+        file,
+      ], (err, stdout) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(parseFloat(stdout));
+      });
+    });
+  };
+
+  const duration = await getAudioDuration(filePath);
+  const results = [];
+  for (let start = 0; start < duration; start += (chunkLength - overlap)) {
+    const args = ['-json', '-length', String(chunkLength), '-offset', String(start), filePath];
+    const fp = await new Promise((resolve, reject) => {
+      execFile('fpcalc', args, (err, stdout) => {
+        if (err) {
+          return reject(err);
+        }
+        try {
+          const { fingerprint } = JSON.parse(stdout);
+          resolve(fingerprint);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    results.push({ start, fingerprint: fp });
+  }
+  return results;
 }
 
 export { processEpisodeFile };

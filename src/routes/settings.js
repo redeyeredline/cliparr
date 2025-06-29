@@ -125,6 +125,7 @@ router.get('/all', async (req, res) => {
       'min_confidence_threshold',
       'backup_originals',
       'auto_process_verified',
+      'auto_process_detections',
       'import_mode',
       'polling_interval',
       'temp_dir',
@@ -163,6 +164,7 @@ router.post('/all', async (req, res) => {
     min_confidence_threshold,
     backup_originals,
     auto_process_verified,
+    auto_process_detections,
     import_mode,
     polling_interval,
     temp_dir,
@@ -181,6 +183,7 @@ router.post('/all', async (req, res) => {
       min_confidence_threshold !== undefined ? String(min_confidence_threshold) : '0.8');
     setSetting(db, 'backup_originals', backup_originals ? '1' : '0');
     setSetting(db, 'auto_process_verified', auto_process_verified ? '1' : '0');
+    setSetting(db, 'auto_process_detections', auto_process_detections ? '1' : '0');
     if (import_mode) {
       setImportMode(db, import_mode);
     }

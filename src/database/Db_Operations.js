@@ -560,7 +560,7 @@ function getEpisodeFileIdsForShows(db, showIds) {
      ORDER BY sh.title, s.season_number, e.episode_number`,
     showIds,
     'all',
-  ).map(row => row.id);
+  ).map((row) => row.id);
 }
 
 export {

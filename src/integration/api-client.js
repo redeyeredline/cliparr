@@ -145,6 +145,11 @@ class ApiClient {
     return response.data;
   }
 
+  async rescanShows(showIds) {
+    const response = await api.post('/shows/rescan', { showIds });
+    return response.data;
+  }
+
   // Hardware endpoints
   async detectHardware() {
     const response = await api.post('/hardware/detect');
@@ -194,7 +199,7 @@ class ApiClient {
   }
 
   async cleanupTempFiles() {
-    const response = await api.post('/api/processing/cleanup-temp-files');
+    const response = await api.post('/processing/cleanup-temp-files');
     return response.data;
   }
 }

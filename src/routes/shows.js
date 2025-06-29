@@ -105,13 +105,6 @@ router.post('/scan', async (req, res) => {
     // Enqueue episode processing jobs with episode file IDs
     const enqueuedJobIds = await enqueueEpisodeProcessing(episodeFileIds);
 
-    logger.info({
-      showIds,
-      scannedCount,
-      episodeFileIds,
-      enqueuedJobIds,
-    }, 'Shows scanned and enqueued for processing');
-
     res.json({
       success: true,
       scanned: scannedCount,
@@ -122,6 +115,90 @@ router.post('/scan', async (req, res) => {
     console.error('Failed to scan shows:', error);
     logger.error('Failed to scan shows:', error, error && error.stack ? error.stack : '');
     res.status(500).json({ error: 'Failed to scan shows', details: error && error.message });
+  }
+});
+
+// Rescan shows with fingerprint data invalidation
+router.post('/rescan', async (req, res) => {
+  const db = req.app.get('db');
+  const logger = req.app.get('logger');
+  const { showIds } = req.body;
+
+  if (!Array.isArray(showIds) || showIds.length === 0) {
+    return res.status(400).json({ error: 'showIds must be a non-empty array' });
+  }
+
+  try {
+    // Import the fingerprint pipeline functions
+    const { invalidateFingerprintData } = await import('../services/fingerprintPipeline.js');
+
+    // Invalidate fingerprint data for each show
+    let invalidatedCount = 0;
+    for (const showId of showIds) {
+      const count = await invalidateFingerprintData(showId);
+      invalidatedCount += count;
+    }
+
+    // Create processing jobs for the files
+    const scannedCount = createProcessingJobsForShows(db, showIds);
+
+    // Get episode file IDs for the shows
+    const episodeFileIds = getEpisodeFileIdsForShows(db, showIds);
+
+    // Enqueue episode processing jobs with episode file IDs
+    const enqueuedJobIds = await enqueueEpisodeProcessing(episodeFileIds);
+
+    logger.info({
+      showIds,
+      invalidatedCount,
+      scannedCount,
+      episodeFileIds,
+      enqueuedJobIds,
+    }, 'Shows rescanned with fingerprint invalidation');
+
+    res.json({
+      success: true,
+      invalidated: invalidatedCount,
+      scanned: scannedCount,
+      enqueued: enqueuedJobIds.length,
+      message: `Invalidated ${invalidatedCount} fingerprint records and enqueued ${enqueuedJobIds.length} episodes for processing`,
+    });
+  } catch (error) {
+    console.error('Failed to rescan shows:', error);
+    logger.error('Failed to rescan shows:', error, error && error.stack ? error.stack : '');
+    res.status(500).json({ error: 'Failed to rescan shows', details: error && error.message });
+  }
+});
+
+// Get detection statistics for a show
+router.get('/:showId/detection-stats', async (req, res) => {
+  const logger = req.app.get('logger');
+  const { showId } = req.params;
+
+  if (!showId || isNaN(parseInt(showId))) {
+    return res.status(400).json({ error: 'Invalid show ID' });
+  }
+
+  try {
+    // Import the fingerprint pipeline functions
+    const { getDetectionStats } = await import('../services/fingerprintPipeline.js');
+
+    const stats = await getDetectionStats(parseInt(showId));
+
+    logger.info({
+      showId,
+      statsCount: stats.length,
+    }, 'Retrieved detection statistics for show');
+
+    res.json({
+      success: true,
+      showId: parseInt(showId),
+      stats,
+    });
+  } catch (error) {
+    console.error('Failed to get detection stats:', error);
+    logger.error('Failed to get detection stats:', error, error && error.stack ? error.stack : '');
+    res.status(500).json({ error: 'Failed to get detection stats', details: error && error.message });
   }
 });
 

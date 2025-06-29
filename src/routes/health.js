@@ -26,16 +26,14 @@ router.get('/db-test', (req, res) => {
 
   try {
     const testResult = db.transaction(() => {
-      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-        .run('test_key', 'test_value');
-
-      const result = db.prepare('SELECT value FROM settings WHERE key = ?')
-        .get('test_key');
+      // Just test a simple query without modifying settings
+      const result = db.prepare('SELECT COUNT(*) as count FROM settings')
+        .get();
 
       return {
         success: true,
         message: 'Database test successful',
-        testValue: result?.value,
+        settingsCount: result?.count,
         timestamp: new Date().toISOString(),
       };
     })();

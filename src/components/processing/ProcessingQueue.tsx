@@ -48,8 +48,8 @@ export default function ProcessingQueue({
   const [filter, setFilter] = useState<string>('all');
   const [selectAllLoading, setSelectAllLoading] = useState(false);
   const [allJobIds, setAllJobIds] = useState<(string | number)[]>([]);
-  const jobsWithId = jobs.filter(job => job.id !== undefined && job.id !== null);
-  console.log('Job IDs in queue:', jobsWithId.map(j => j.id));
+  const jobsWithId = jobs.filter((job) => job.id !== undefined && job.id !== null);
+  console.log('Job IDs in queue:', jobsWithId.map((j) => j.id));
   const filteredJobs = jobsWithId.filter((job) => filter === 'all' || job.status === filter);
   const [cpuLimit, setCpuLimit] = useState<number>(2);
   const [gpuLimit, setGpuLimit] = useState<number>(1);
@@ -127,12 +127,14 @@ export default function ProcessingQueue({
     if (allSelected) {
       setSelected([]);
     } else {
-      setSelected([...allJobIds.filter(id => id !== undefined && id !== null)]);
+      setSelected([...allJobIds.filter((id) => id !== undefined && id !== null)]);
     }
   };
 
   const handleRowSelect = (jobId: string | number) => {
-    if (jobId === undefined || jobId === null) return;
+    if (jobId === undefined || jobId === null) {
+      return;
+    }
     if (selected.includes(jobId)) {
       setSelected(selected.filter((id) => id !== jobId));
     } else {

@@ -9,6 +9,7 @@ import sonarrRoutes from './routes/sonarr.js';
 import settingsRoutes from './routes/settings.js';
 import hardwareRoutes from './routes/hardware.js';
 import processingRoutes from './routes/processing.js';
+import { initializeFingerprintSchema } from './services/fingerprintPipeline.js';
 
 /**
  * Assemble and return an Express application.
@@ -20,6 +21,11 @@ import processingRoutes from './routes/processing.js';
  */
 export function createApp({ db, logger, wss }) {
   const app = express();
+
+  // Initialize fingerprint schema
+  initializeFingerprintSchema().catch((err) => {
+    logger.error('Failed to initialize fingerprint schema:', err);
+  });
 
   // make shared services available via app.get(...)
   app.set('db', db);

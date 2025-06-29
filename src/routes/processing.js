@@ -1,5 +1,5 @@
 process.on('unhandledRejection', (reason, promise) => {
-  // eslint-disable-next-line no-console
+
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
@@ -20,6 +20,7 @@ import { getDatabaseSingleton } from '../database/Auto_DB_Setup.js';
 import path from 'path';
 import fs from 'fs/promises';
 import config from '../config/index.js';
+import { activeFfmpegJobs } from '../services/fingerprintPipeline.js';
 
 const router = express.Router();
 
@@ -261,16 +262,23 @@ router.get('/media-files', async (req, res) => {
 
 // Bulk delete jobs endpoint
 router.post('/jobs/bulk-delete', async (req, res) => {
-  console.log('--- BULK DELETE ROUTE HIT ---', new Date().toISOString());
+  // console.log('--- BULK DELETE ROUTE HIT ---', new Date().toISOString());
   try {
     const db = req.app.get('db');
     const logger = req.app.get('logger');
     const { jobIds, all } = req.body;
     logger.info('Bulk delete request body:', { jobIds, all });
     let deletedCount = 0;
-    let failed = [];
+    const failed = [];
+
+    // Pause all workers first to prevent new jobs from starting
+    logger.info('Pausing all workers before bulk delete');
+    await pauseAllWorkers();
 
     if (all) {
+      logger.info('Fetching all jobs for cleanup before DB delete');
+      // Fetch all jobs with full details before deleting from DB
+      const jobs = getProcessingJobs(db, { limit: 10000 });
       logger.info('Starting DB delete for all jobs');
       try {
         db.prepare('DELETE FROM processing_jobs').run();
@@ -279,45 +287,64 @@ router.post('/jobs/bulk-delete', async (req, res) => {
         logger.error('DB error during bulk delete:', dbErr, typeof dbErr, JSON.stringify(dbErr));
         throw dbErr;
       }
-      logger.info('Starting BullMQ queue obliteration');
-      try {
-        const queueModule = await import('../services/queue.js');
-        const { queues } = queueModule;
-        logger.info('Loaded queues for obliteration:', Object.keys(queues));
-        for (const queue of Object.values(queues)) {
-          try {
-            logger.info('Obliterating queue:', queue.name);
-            await queue.obliterate({ force: true });
-            logger.info('Obliterated queue:', queue.name);
-          } catch (oblErr) {
-            logger.error('Failed to obliterate queue:', queue.name, oblErr, typeof oblErr, JSON.stringify(oblErr));
+      logger.info('Starting BullMQ and temp file cleanup for all jobs');
+      for (const job of jobs) {
+        try {
+          await removeJobFromAllQueues(job.id);
+          // Clean up temp files (audio and trimmed)
+          const tempFiles = [];
+          if (job.file_path) {
+            const audioFileName = path.basename(job.file_path, path.extname(job.file_path)) + '.wav';
+            const audioPath = path.join(config.tempDir, 'audio', audioFileName);
+            tempFiles.push(audioPath);
+            tempFiles.push(
+              path.join(config.tempDir, 'trimmed', `intro_${job.id}.mp4`),
+              path.join(config.tempDir, 'trimmed', `credits_${job.id}.mp4`),
+            );
           }
+          for (const file of tempFiles) {
+            try {
+              await fs.unlink(file);
+              // logger.info({ file }, 'Deleted temp file on bulk job deletion');
+            } catch (err) {
+              if (err.code !== 'ENOENT') {
+                logger.warn({ file, error: err.message }, 'Failed to delete temp file on bulk job deletion');
+              }
+            }
+          }
+        } catch (err) {
+          failed.push(job.id);
         }
-      } catch (importErr) {
-        logger.error('Error during BullMQ queue obliteration:', importErr, typeof importErr, JSON.stringify(importErr));
-        throw importErr;
       }
       logger.info('Bulk delete all jobs complete');
-      return res.json({ success: true, all: true, deletedCount: 'all', failed: [] });
+      // Resume all workers
+      logger.info('Resuming all workers after bulk delete');
+      await resumeAllWorkers();
+      return res.json({ success: true, all: true, deletedCount: jobs.length, failed });
     }
     if (!Array.isArray(jobIds) || jobIds.length === 0) {
       logger.warn('No job IDs provided for bulk delete');
+      // Resume workers even if no jobs to delete
+      await resumeAllWorkers();
       return res.status(400).json({ error: 'No job IDs provided' });
     }
-    logger.info('Starting DB delete for selected jobs');
-    logger.info('jobIds:', jobIds);
+    logger.info('Fetching selected jobs for cleanup before DB delete');
+    // Fetch full job objects before deleting from DB
     const toDelete = jobIds.map((id) => parseInt(id)).filter((id) => !isNaN(id));
-    logger.info('toDelete:', toDelete);
     if (toDelete.length === 0) {
       logger.warn('No valid job IDs to delete');
+      // Resume workers even if no valid jobs to delete
+      await resumeAllWorkers();
       return res.status(400).json({ error: 'No valid job IDs to delete' });
     }
     let jobs;
     try {
-      jobs = db.prepare(`SELECT id FROM processing_jobs WHERE id IN (${toDelete.map(() => '?').join(',')})`).all(...toDelete);
+      jobs = db.prepare(`SELECT pj.*, ef.file_path FROM processing_jobs pj JOIN episode_files ef ON pj.media_file_id = ef.id WHERE pj.id IN (${toDelete.map(() => '?').join(',')})`).all(...toDelete);
       db.prepare(`DELETE FROM processing_jobs WHERE id IN (${toDelete.map(() => '?').join(',')})`).run(...toDelete);
     } catch (dbErr) {
       logger.error('DB error during selected jobs bulk delete:', dbErr, 'SQL:', `SELECT id FROM processing_jobs WHERE id IN (${toDelete.map(() => '?').join(',')})`, 'Params:', toDelete);
+      // Resume workers even if DB error
+      await resumeAllWorkers();
       throw dbErr;
     }
     deletedCount = jobs.length;
@@ -340,7 +367,7 @@ router.post('/jobs/bulk-delete', async (req, res) => {
         for (const file of tempFiles) {
           try {
             await fs.unlink(file);
-            logger.info({ file }, 'Deleted temp file on bulk job deletion');
+            // logger.info({ file }, 'Deleted temp file on bulk job deletion');
           } catch (err) {
             if (err.code !== 'ENOENT') {
               logger.warn({ file, error: err.message }, 'Failed to delete temp file on bulk job deletion');
@@ -352,9 +379,18 @@ router.post('/jobs/bulk-delete', async (req, res) => {
       }
     }
     logger.info('Bulk delete for selected jobs complete');
+    // Resume all workers
+    logger.info('Resuming all workers after bulk delete');
+    await resumeAllWorkers();
     res.json({ success: true, deletedCount, failed });
   } catch (err) {
     console.error('UNHANDLED ERROR in /jobs/bulk-delete:', err && (err.stack || err.message || err));
+    // Resume workers even if error
+    try {
+      await resumeAllWorkers();
+    } catch (resumeErr) {
+      console.error('Failed to resume workers after error:', resumeErr);
+    }
     res.status(500).json({ error: 'Unhandled error in /jobs/bulk-delete', details: err && (err.stack || err.message || err) });
   }
 });
@@ -382,6 +418,43 @@ router.post('/cleanup-temp-files', (req, res) => {
   });
 
   res.json({ success: true, message: 'Temp file cleanup started' });
+});
+
+// Helper function to pause all workers
+async function pauseAllWorkers() {
+  try {
+    const queueModule = await import('../services/queue.js');
+    const { workers } = queueModule;
+    for (const [name, worker] of Object.entries(workers)) {
+      if (worker && typeof worker.pause === 'function') {
+        await worker.pause(true);
+        // console.log(`Paused worker: ${name}`);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to pause workers:', error);
+  }
+}
+
+// Helper function to resume all workers
+async function resumeAllWorkers() {
+  try {
+    const queueModule = await import('../services/queue.js');
+    const { workers } = queueModule;
+    for (const [name, worker] of Object.entries(workers)) {
+      if (worker && typeof worker.resume === 'function') {
+        await worker.resume();
+        // console.log(`Resumed worker: ${name}`);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to resume workers:', error);
+  }
+}
+
+// GET /api/processing/active-ffmpeg
+router.get('/active-ffmpeg', (req, res) => {
+  res.json({ active: activeFfmpegJobs });
 });
 
 export default router;
