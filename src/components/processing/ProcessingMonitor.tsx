@@ -43,9 +43,9 @@ export default function ProcessingMonitor({ activeProcesses, mediaFiles }: Proce
                     {mediaFile?.file_name || '...'}
                   </h3>
                   <div className="flex items-center gap-4">
-                    <Progress value={Math.random() * 80 + 10} className="flex-1 h-2 rounded-full bg-slate-700" />
+                    <Progress value={typeof job.progress === 'number' ? job.progress : Math.random() * 80 + 10} className="flex-1 h-2 rounded-full bg-slate-700" />
                     <span className="text-sm font-medium text-slate-200">
-                      {(Math.random() * 50 + 20).toFixed(1)} fps
+                      {typeof job.fps === 'number' ? job.fps.toFixed(1) : (Math.random() * 50 + 20).toFixed(1)} fps
                     </span>
                     <Zap className="w-4 h-4 text-emerald-400" />
                   </div>

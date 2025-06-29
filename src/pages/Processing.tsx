@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ProcessingJob,
   ProcessingJobEntity,
@@ -16,7 +16,8 @@ import BatchProcessor from '../components/processing/BatchProcessor';
 import QueueStatus from '../components/processing/QueueStatus';
 import { wsClient } from '../services/websocket.frontend.js';
 import { useToast } from '../components/ToastContext';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Loader2, CheckCircle2 } from 'lucide-react';
+import { apiClient } from '../integration/api-client';
 
 export default function Processing() {
   const [jobs, setJobs] = useState<ProcessingJob[]>([]);
@@ -29,6 +30,10 @@ export default function Processing() {
   const [selected, setSelected] = useState<(string | number)[]>([]);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
   const toast = useToast();
+  const [cpuLimit, setCpuLimit] = useState<number>(2);
+  const [gpuLimit, setGpuLimit] = useState<number>(1);
+  const [workerSaving, setWorkerSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [jobProgress, setJobProgress] = useState<Record<string, { progress: number, fps: number, currentFile: any, updated: number }>>({});
 
   const loadData = async () => {
     if (isLoading) {
@@ -60,6 +65,26 @@ export default function Processing() {
   useEffect(() => {
     const handleJobUpdate = (data: any) => {
       if (data.type === 'job_update') {
+        // Track real-time progress/fps for processing jobs
+        if (data.status === 'processing' && data.progress !== undefined) {
+          setJobProgress((prev) => ({
+            ...prev,
+            [data.jobId]: {
+              progress: data.progress,
+              fps: data.fps,
+              currentFile: data.currentFile,
+              updated: Date.now(),
+            },
+          }));
+        }
+        // Remove progress for jobs that are completed/failed
+        if (['completed', 'failed'].includes(data.status)) {
+          setJobProgress((prev) => {
+            const copy = { ...prev };
+            delete copy[data.jobId];
+            return copy;
+          });
+        }
         // Update the specific job in the state
         setJobs((prevJobs) => {
           return prevJobs.map((job) => {
@@ -185,23 +210,70 @@ export default function Processing() {
 
   // Bulk delete for selected jobs
   const handleBulkDelete = async () => {
-    setBulkDeleteLoading(true);
-    try {
-      await Promise.all(selected.map((id) => ProcessingJobEntity.delete(id)));
+    console.log('Selected jobs at delete:', selected);
+    if (selected.length === jobs.length && jobs.length > 0) {
+      console.log('Sending { all: true } to bulkDelete');
+      await ProcessingJobEntity.bulkDelete({ all: true });
+      setSelected([]);
+      await loadData();
+      toast({ type: 'success', message: 'All jobs deleted' });
+      // Trigger background temp file cleanup
+      try {
+        await apiClient.cleanupTempFiles();
+      } catch (cleanupErr) {
+        // Ignore cleanup errors, just log
+        console.error('Temp file cleanup error:', cleanupErr);
+      }
+    } else {
+      console.log('Sending jobIds to bulkDelete:', selected);
+      await ProcessingJobEntity.bulkDelete({ jobIds: selected });
       setSelected([]);
       await loadData();
       toast({ type: 'success', message: 'Selected jobs deleted' });
-    } catch (error) {
-      toast({ type: 'error', message: 'Failed to delete selected jobs' });
-    } finally {
-      setBulkDeleteLoading(false);
     }
   };
+
+  // Fetch worker limits on mount
+  useEffect(() => {
+    const fetchWorkerLimits = async () => {
+      try {
+        const settings = await apiClient.getAllSettings();
+        setCpuLimit(parseInt(settings.cpu_worker_limit, 10) || 2);
+        setGpuLimit(parseInt(settings.gpu_worker_limit, 10) || 1);
+      } catch (err) {
+        // ignore
+      }
+    };
+    fetchWorkerLimits();
+  }, []);
+
+  // Save worker limits
+  const saveWorkerLimits = async (cpu: number, gpu: number) => {
+    setWorkerSaving('saving');
+    try {
+      await apiClient.setAllSettings({ cpu_worker_limit: cpu, gpu_worker_limit: gpu });
+      setWorkerSaving('saved');
+      setTimeout(() => setWorkerSaving('idle'), 1200);
+      toast({ type: 'success', message: 'Worker limits updated' });
+    } catch (err) {
+      setWorkerSaving('idle');
+      toast({ type: 'error', message: 'Failed to update worker limits' });
+    }
+  };
+
+  // Only show jobs with status 'processing' and a recent progress update (last 30s)
+  const now = Date.now();
+  const activeJobs = jobs.filter((j) => {
+    const id = j.id;
+    return (id !== undefined && jobProgress[id as string | number] && now - jobProgress[id as string | number].updated < 30000);
+  });
 
   return (
     <div className="container mx-auto p-6 space-y-6 min-h-screen overflow-y-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Processing</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold text-white">Processing</h1>
+        </div>
       </div>
       {/* Queue Status Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -278,7 +350,7 @@ export default function Processing() {
 
         <TabsContent value="monitor" className="space-y-6">
           <ProcessingMonitor
-            activeProcesses={activeProcesses}
+            activeProcesses={activeJobs.map((j) => ({ ...j, ...jobProgress[j.id as string | number] }))}
             mediaFiles={mediaFiles}
           />
         </TabsContent>

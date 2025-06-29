@@ -165,6 +165,38 @@ class ApiClient {
     const response = await api.post('/hardware/benchmark', {}, { timeout: 300000 }); // 5 minutes
     return response.data;
   }
+
+  // Worker pause/resume endpoints
+  async pauseCpuWorkers() {
+    const response = await api.post('/settings/queue/pause-cpu');
+    return response.data;
+  }
+
+  async resumeCpuWorkers() {
+    const response = await api.post('/settings/queue/resume-cpu');
+    return response.data;
+  }
+
+  async pauseGpuWorkers() {
+    const response = await api.post('/settings/queue/pause-gpu');
+    return response.data;
+  }
+
+  async resumeGpuWorkers() {
+    const response = await api.post('/settings/queue/resume-gpu');
+    return response.data;
+  }
+
+  // Validate temp directory
+  async validateTempDir(temp_dir) {
+    const response = await api.post('/settings/validate-temp-dir', { temp_dir });
+    return response.data;
+  }
+
+  async cleanupTempFiles() {
+    const response = await api.post('/api/processing/cleanup-temp-files');
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();

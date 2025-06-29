@@ -1,9 +1,15 @@
 // BullMQ-based job queue system for processing shows
 // Handles job orchestration, scaling, and progress tracking
 import { logger } from './logger.js';
-import { processShowJob } from './processors/showProcessor.js';
-import { getDb } from '../database/Db_Operations.js';
+import { getDb, getSetting, getProcessingJobById, getEpisodeFileById } from '../database/Db_Operations.js';
 import { broadcastJobUpdate, broadcastQueueStatus } from './websocket.js';
+import {
+  processShowJob,
+  extractAudioFromFile,
+  generateAudioFingerprint,
+  detectAudioSegments,
+  processEpisodeFile,
+} from './processors/showProcessor.js';
 
 // Import BullMQ using dynamic import to avoid ESM issues
 let Queue, Worker;
@@ -28,39 +34,60 @@ const redis = new Redis({
   enableReadyCheck: false,
 });
 
-// Queue configuration
-const QUEUE_CONFIG = {
-  showProcessing: {
-    name: 'show-processing',
-    concurrency: 2,
-    retries: 3,
-    backoff: 5000,
-  },
-  audioExtraction: {
-    name: 'audio-extraction',
-    concurrency: 3,
-    retries: 2,
-    backoff: 3000,
-  },
-  fingerprinting: {
-    name: 'fingerprinting',
-    concurrency: 4,
-    retries: 2,
-    backoff: 2000,
-  },
-  detection: {
-    name: 'detection',
-    concurrency: 2,
-    retries: 1,
-    backoff: 1000,
-  },
-  trimming: {
-    name: 'trimming',
-    concurrency: 2,
-    retries: 1,
-    backoff: 1000,
-  },
-};
+// Get worker limits from settings
+async function getWorkerLimits() {
+  const db = await getDb();
+  return {
+    cpu: parseInt(getSetting(db, 'cpu_worker_limit', '2'), 10),
+    gpu: parseInt(getSetting(db, 'gpu_worker_limit', '1'), 10),
+  };
+}
+
+// Queue configuration - will be updated dynamically
+let QUEUE_CONFIG = {};
+
+// Update queue configuration based on current settings
+async function updateQueueConfig() {
+  const limits = await getWorkerLimits();
+
+  // Log the worker limits being used
+  logger.info('Worker limits from DB:', limits);
+
+  QUEUE_CONFIG = {
+    episodeProcessing: {
+      name: 'episode-processing',
+      concurrency: limits.cpu, // Allow up to N episodes in parallel
+      retries: 3,
+      backoff: 5000,
+    },
+    audioExtraction: {
+      name: 'audio-extraction',
+      concurrency: limits.cpu, // CPU-intensive
+      retries: 2,
+      backoff: 3000,
+    },
+    fingerprinting: {
+      name: 'fingerprinting',
+      concurrency: limits.cpu, // CPU-intensive
+      retries: 2,
+      backoff: 2000,
+    },
+    detection: {
+      name: 'detection',
+      concurrency: Math.min(limits.cpu, 4), // CPU-intensive but can be limited
+      retries: 1,
+      backoff: 1000,
+    },
+    trimming: {
+      name: 'trimming',
+      concurrency: limits.gpu, // GPU-accelerated when available
+      retries: 1,
+      backoff: 1000,
+    },
+  };
+
+  logger.info('Queue configuration updated:', QUEUE_CONFIG);
+}
 
 // Queue instances
 const queues = {};
@@ -73,6 +100,9 @@ export async function initializeQueues() {
   try {
     await initBullMQ();
     logger.info('BullMQ imports initialized successfully');
+
+    // Update queue configuration from settings
+    await updateQueueConfig();
 
     for (const [name, config] of Object.entries(QUEUE_CONFIG)) {
       logger.info(`Initializing queue: ${config.name}`);
@@ -96,15 +126,15 @@ export async function startQueues() {
     await initBullMQ();
     logger.info('BullMQ imports verified for worker startup');
 
+    // Update queue configuration from settings
+    await updateQueueConfig();
+
     for (const [name, config] of Object.entries(QUEUE_CONFIG)) {
       logger.info(`Starting worker for queue: ${config.name} with concurrency ${config.concurrency}`);
 
       const worker = new Worker(config.name, async (job) => {
-        logger.info({ jobId: job.id, queue: name }, 'Processing job');
-
         try {
           const result = await processJob(job.name, job);
-          logger.info({ jobId: job.id, queue: name }, 'Job completed successfully');
           return result;
         } catch (error) {
           logger.error({ jobId: job.id, queue: name, error: error.message }, 'Job failed');
@@ -114,6 +144,8 @@ export async function startQueues() {
         connection: redis,
         concurrency: config.concurrency,
       });
+
+      logger.info(`Worker instance created for ${name} with concurrency: ${config.concurrency}`);
 
       setupWorkerEvents(worker, name);
       workers[name] = worker;
@@ -139,11 +171,36 @@ export async function stopQueues() {
   logger.info('All queues stopped');
 }
 
+// Update worker limits and restart workers with new settings
+export async function updateWorkerLimits() {
+  logger.info('Updating worker limits from settings...');
+
+  try {
+    // Stop existing workers
+    for (const [name, worker] of Object.entries(workers)) {
+      await worker.close();
+      logger.info(`Worker ${name} stopped for reconfiguration`);
+    }
+
+    // Clear workers object
+    Object.keys(workers).forEach((key) => delete workers[key]);
+
+    // Update queue configuration
+    await updateQueueConfig();
+
+    // Restart workers with new settings
+    await startQueues();
+
+    logger.info('Worker limits updated and workers restarted successfully');
+  } catch (error) {
+    logger.error('Failed to update worker limits:', error);
+    throw error;
+  }
+}
+
 // Setup worker event handlers
 function setupWorkerEvents(worker, workerName) {
   worker.on('completed', (job, result) => {
-    logger.info({ jobId: job.id, worker: workerName }, 'Job completed successfully');
-
     // Broadcast job completion
     broadcastJobUpdate({
       jobId: job.id,
@@ -185,45 +242,22 @@ function setupWorkerEvents(worker, workerName) {
       error: err.message,
     });
   });
-
-  worker.on('active', (job) => {
-    logger.info({ jobId: job.id, worker: workerName }, 'Job started processing');
-
-    // Broadcast job started
-    broadcastJobUpdate({
-      jobId: job.id,
-      status: 'active',
-      worker: workerName,
-    });
-
-    // Broadcast updated queue status
-    getQueueStatus().then((status) => {
-      broadcastQueueStatus({ queues: status });
-    });
-  });
-
-  worker.on('waiting', (job) => {
-    logger.info({ jobId: job.id, worker: workerName }, 'Job waiting to be processed');
-
-    // Broadcast job waiting
-    broadcastJobUpdate({
-      jobId: job.id,
-      status: 'waiting',
-      worker: workerName,
-    });
-
-    // Broadcast updated queue status
-    getQueueStatus().then((status) => {
-      broadcastQueueStatus({ queues: status });
-    });
-  });
 }
 
 // Process different job types
 async function processJob(jobType, jobOrData) {
   switch (jobType) {
-    case 'show-processing':
-      return await processShowJob(jobOrData);
+    case 'episode-processing': {
+      const db = await getDb();
+      const episodeFileId = jobOrData.data.episodeFileId;
+      // Fetch the episode file record by its ID
+      const file = await getEpisodeFileById(db, episodeFileId);
+      if (!file) {
+        logger.error(`Episode file not found for ID: ${episodeFileId}`);
+        throw new Error(`Episode file not found for ID: ${episodeFileId}`);
+      }
+      return await processEpisodeFile(jobOrData.id, file);
+    }
     case 'audio-extraction':
       return await processAudioExtraction(jobOrData);
     case 'fingerprinting':
@@ -240,23 +274,23 @@ async function processJob(jobType, jobOrData) {
 // Placeholder worker functions
 async function processAudioExtraction(jobData) {
   logger.info({ jobData }, 'Processing audio extraction');
-  // Simulate audio extraction
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-  return { message: 'Audio extracted successfully', duration: 120.5 };
+  // Use the real audio extraction logic
+  const audioPath = await extractAudioFromFile(jobData.filePath);
+  return { message: 'Audio extracted successfully', audioPath };
 }
 
 async function processFingerprinting(jobData) {
   logger.info({ jobData }, 'Processing fingerprinting');
-  // Simulate fingerprinting
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-  return { message: 'Fingerprint generated', fingerprint: 'abc123...' };
+  // Use the real fingerprinting logic
+  const fingerprint = await generateAudioFingerprint(jobData.audioPath);
+  return { message: 'Fingerprint generated', fingerprint };
 }
 
 async function processDetection(jobData) {
   logger.info({ jobData }, 'Processing detection');
-  // Simulate detection
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  return { message: 'Segments detected', segments: 5 };
+  // Use the real detection logic
+  const segments = await detectAudioSegments(jobData.fingerprint, jobData.audioPath);
+  return { message: 'Segments detected', segments };
 }
 
 async function processTrimming(jobData) {
@@ -267,27 +301,22 @@ async function processTrimming(jobData) {
 }
 
 // Enqueue a show processing job
-export async function enqueueShowProcessing(showIds) {
-  // Ensure queues are initialized
+export async function enqueueEpisodeProcessing(episodeFileIds) {
   await ensureQueuesInitialized();
-
-  const queue = queues['show-processing'];
+  const queue = queues['episode-processing'];
   if (!queue) {
     const debugState = debugQueueState();
-    logger.error('Show processing queue not found. Debug state:', debugState);
-    throw new Error('Show processing queue not initialized');
+    logger.error('Episode processing queue not found. Debug state:', debugState);
+    throw new Error('Episode processing queue not initialized');
   }
-
-  logger.info('enqueueShowProcessing called with showIds:', showIds);
-
-  // Enqueue one job per valid showId
+  logger.info('enqueueEpisodeProcessing called with episodeFileIds:', episodeFileIds);
   const jobIds = [];
-  for (const showId of showIds) {
-    if (!showId) {
-      logger.warn('Skipping invalid showId:', showId);
+  for (const episodeFileId of episodeFileIds) {
+    if (!episodeFileId) {
+      logger.warn('Skipping invalid episodeFileId:', episodeFileId);
       continue;
     }
-    const job = await queue.add('show-processing', { showId }, {
+    const job = await queue.add('episode-processing', { episodeFileId }, {
       priority: 10,
       attempts: 3,
       backoff: {
@@ -295,8 +324,7 @@ export async function enqueueShowProcessing(showIds) {
         delay: 5000,
       },
     });
-    logger.info({ jobId: job.id, showId }, 'Show processing job enqueued');
-    logger.info('Full job object:', job);
+    logger.info({ jobId: job.id, episodeFileId }, 'Episode processing job enqueued');
     jobIds.push(job.id);
   }
   return jobIds;
@@ -416,7 +444,7 @@ export function debugQueueState() {
     workers: Object.keys(workers),
     queueCount: Object.keys(queues).length,
     workerCount: Object.keys(workers).length,
-    showProcessingQueue: !!queues['show-processing'],
+    showProcessingQueue: !!queues['episode-processing'],
   };
 }
 
@@ -428,9 +456,9 @@ async function ensureQueuesInitialized() {
   logger.info('Queues object keys:', Object.keys(queues));
   logger.info('Queues object length:', Object.keys(queues).length);
 
-  // Check if the show-processing queue specifically exists
-  if (!queues['show-processing']) {
-    logger.warn('Show processing queue not found, attempting to initialize queues...');
+  // Check if the episode-processing queue specifically exists
+  if (!queues['episode-processing']) {
+    logger.warn('Episode processing queue not found, attempting to initialize queues...');
     try {
       await initializeQueues();
       await startQueues();
@@ -440,6 +468,89 @@ async function ensureQueuesInitialized() {
       throw error;
     }
   } else {
-    logger.info('Show processing queue already exists');
+    logger.info('Episode processing queue already exists');
   }
+}
+
+// Pause/resume logic for CPU and GPU workers
+export async function pauseCpuWorkers() {
+  for (const [name, worker] of Object.entries(workers)) {
+    if (['audio-extraction', 'fingerprinting', 'detection', 'episode-processing'].includes(name)) {
+      if (worker && typeof worker.pause === 'function') {
+        await worker.pause(true); // true = do not process active jobs
+        logger.info(`CPU worker ${name} paused`);
+      }
+    }
+  }
+}
+
+export async function resumeCpuWorkers() {
+  for (const [name, worker] of Object.entries(workers)) {
+    if (['audio-extraction', 'fingerprinting', 'detection', 'episode-processing'].includes(name)) {
+      if (worker && typeof worker.resume === 'function') {
+        await worker.resume();
+        logger.info(`CPU worker ${name} resumed`);
+      }
+    }
+  }
+}
+
+export async function pauseGpuWorkers() {
+  for (const [name, worker] of Object.entries(workers)) {
+    if (['trimming'].includes(name)) {
+      if (worker && typeof worker.pause === 'function') {
+        await worker.pause(true);
+        logger.info(`GPU worker ${name} paused`);
+      }
+    }
+  }
+}
+
+export async function resumeGpuWorkers() {
+  for (const [name, worker] of Object.entries(workers)) {
+    if (['trimming'].includes(name)) {
+      if (worker && typeof worker.resume === 'function') {
+        await worker.resume();
+        logger.info(`GPU worker ${name} resumed`);
+      }
+    }
+  }
+}
+
+// Regularly clean BullMQ queues to prevent buildup of completed/failed jobs
+export async function cleanAllQueues() {
+  await initBullMQ();
+  for (const queue of Object.values(queues)) {
+    try {
+      // Remove completed jobs older than 1 minute
+      await queue.clean(60 * 1000, 'completed');
+      // Remove failed jobs older than 1 minute
+      await queue.clean(60 * 1000, 'failed');
+      // Optionally, obliterate queue if needed (use with caution)
+      // await queue.obliterate({ force: true });
+    } catch (err) {
+      logger.warn({ queue: queue.name, error: err.message }, 'Failed to clean BullMQ queue');
+    }
+  }
+}
+
+// After job deletion, clean queues
+export async function removeJobFromAllQueues(jobId) {
+  await initBullMQ();
+  let removed = false;
+  for (const queue of Object.values(queues)) {
+    try {
+      const job = await queue.getJob(jobId);
+      if (job) {
+        await job.remove();
+        removed = true;
+        logger.info({ jobId, queue: queue.name }, 'Removed job from queue');
+      }
+    } catch (err) {
+      logger.warn({ jobId, queue: queue.name, error: err.message }, 'Failed to remove job from queue');
+    }
+  }
+  // Clean queues after job removal
+  await cleanAllQueues();
+  return removed;
 }

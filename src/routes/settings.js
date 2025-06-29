@@ -2,7 +2,6 @@
 // Handles CRUD operations for Sonarr configuration, processing settings, and system preferences.
 
 import express from 'express';
-const router = express.Router();
 import {
   getDb,
   getImportMode,
@@ -12,7 +11,13 @@ import {
   getSetting,
   setSetting,
 } from '../database/Db_Operations.js';
+import { updateWorkerLimits, pauseCpuWorkers, resumeCpuWorkers, pauseGpuWorkers, resumeGpuWorkers } from '../services/queue.js';
 import { logger } from '../services/logger.js';
+import os from 'os';
+import path from 'path';
+import fs from 'fs/promises';
+
+const router = express.Router();
 
 // GET current import mode
 router.get('/import-mode', async (req, res) => {
@@ -122,10 +127,24 @@ router.get('/all', async (req, res) => {
       'auto_process_verified',
       'import_mode',
       'polling_interval',
+      'temp_dir',
+      'cpu_worker_limit',
+      'gpu_worker_limit',
     ];
     const settings = {};
     for (const key of keys) {
       settings[key] = getSetting(db, key, null);
+    }
+    // Default temp_dir if not set
+    if (!settings.temp_dir) {
+      settings.temp_dir = path.join(os.tmpdir(), 'cliprr');
+    }
+    // Default worker limits if not set
+    if (!settings.cpu_worker_limit) {
+      settings.cpu_worker_limit = '2';
+    }
+    if (!settings.gpu_worker_limit) {
+      settings.gpu_worker_limit = '1';
     }
     res.json(settings);
   } catch (error) {
@@ -146,10 +165,17 @@ router.post('/all', async (req, res) => {
     auto_process_verified,
     import_mode,
     polling_interval,
+    temp_dir,
+    cpu_worker_limit,
+    gpu_worker_limit,
   } = req.body;
   try {
-    setSetting(db, 'sonarr_url', sonarr_url || '');
-    setSetting(db, 'sonarr_api_key', sonarr_api_key || '');
+    if (sonarr_url) {
+      setSetting(db, 'sonarr_url', sonarr_url);
+    }
+    if (sonarr_api_key && !sonarr_api_key.includes('*')) {
+      setSetting(db, 'sonarr_api_key', sonarr_api_key);
+    }
     setSetting(db, 'output_directory', output_directory || '');
     setSetting(db, 'min_confidence_threshold',
       min_confidence_threshold !== undefined ? String(min_confidence_threshold) : '0.8');
@@ -161,10 +187,111 @@ router.post('/all', async (req, res) => {
     if (polling_interval) {
       setPollingInterval(db, parseInt(polling_interval, 10));
     }
+    if (temp_dir) {
+      setSetting(db, 'temp_dir', temp_dir);
+    }
+    // Only update worker limits if present and valid
+    if (cpu_worker_limit !== undefined && !isNaN(cpu_worker_limit)) {
+      setSetting(db, 'cpu_worker_limit', String(Math.max(1, Math.min(16, parseInt(cpu_worker_limit, 10)))));
+    }
+    if (gpu_worker_limit !== undefined && !isNaN(gpu_worker_limit)) {
+      setSetting(db, 'gpu_worker_limit', String(Math.max(1, Math.min(8, parseInt(gpu_worker_limit, 10)))));
+    }
+
+    // Update worker limits if CPU or GPU limits were changed
+    if ((cpu_worker_limit !== undefined && !isNaN(cpu_worker_limit)) || (gpu_worker_limit !== undefined && !isNaN(gpu_worker_limit))) {
+      try {
+        await updateWorkerLimits();
+        logger.info('Worker limits updated successfully');
+      } catch (error) {
+        logger.error('Failed to update worker limits:', error);
+        // Don't fail the entire request, just log the error
+      }
+    }
+
     res.json({ status: 'ok' });
   } catch (error) {
     logger.error('Failed to update all settings:', error);
     res.status(500).json({ error: 'Failed to update all settings' });
+  }
+});
+
+// List subfolders for a given path (default /media)
+router.get('/filesystem/list', async (req, res) => {
+  let basePath = req.query.path || '/media';
+  try {
+    // Prevent navigation above root
+    basePath = path.resolve('/', basePath);
+    const entries = await fs.readdir(basePath, { withFileTypes: true });
+    const folders = entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({ name: entry.name, path: path.join(basePath, entry.name) }));
+    // Optionally, sort folders alphabetically
+    folders.sort((a, b) => a.name.localeCompare(b.name));
+    res.json({ folders, parent: basePath === '/' ? null : path.dirname(basePath) });
+  } catch (error) {
+    console.error('Failed to list folders:', basePath, error);
+    res.status(500).json({ error: 'Failed to list folders', details: error.message });
+  }
+});
+
+// POST pause CPU workers
+router.post('/queue/pause-cpu', async (req, res) => {
+  try {
+    await pauseCpuWorkers();
+    res.json({ status: 'ok' });
+  } catch (error) {
+    logger.error('Failed to pause CPU workers:', error);
+    res.status(500).json({ error: 'Failed to pause CPU workers' });
+  }
+});
+
+// POST resume CPU workers
+router.post('/queue/resume-cpu', async (req, res) => {
+  try {
+    await resumeCpuWorkers();
+    res.json({ status: 'ok' });
+  } catch (error) {
+    logger.error('Failed to resume CPU workers:', error);
+    res.status(500).json({ error: 'Failed to resume CPU workers' });
+  }
+});
+
+// POST pause GPU workers
+router.post('/queue/pause-gpu', async (req, res) => {
+  try {
+    await pauseGpuWorkers();
+    res.json({ status: 'ok' });
+  } catch (error) {
+    logger.error('Failed to pause GPU workers:', error);
+    res.status(500).json({ error: 'Failed to pause GPU workers' });
+  }
+});
+
+// POST resume GPU workers
+router.post('/queue/resume-gpu', async (req, res) => {
+  try {
+    await resumeGpuWorkers();
+    res.json({ status: 'ok' });
+  } catch (error) {
+    logger.error('Failed to resume GPU workers:', error);
+    res.status(500).json({ error: 'Failed to resume GPU workers' });
+  }
+});
+
+// Validate temp directory (try to create a test file/folder)
+router.post('/validate-temp-dir', async (req, res) => {
+  const { temp_dir } = req.body;
+  const pathToTest = path.join(temp_dir, 'cliprr_test');
+  try {
+    await fs.mkdir(pathToTest, { recursive: true });
+    const testFile = path.join(pathToTest, 'test.txt');
+    await fs.writeFile(testFile, 'ok');
+    await fs.unlink(testFile);
+    await fs.rmdir(pathToTest);
+    res.json({ valid: true });
+  } catch (err) {
+    res.json({ valid: false, error: err.message });
   }
 });
 

@@ -7,6 +7,7 @@ import PollingIntervalControl from '../components/PollingIntervalControl';
 import { useToast } from '../components/ToastContext';
 import { apiClient } from '../integration/api-client';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
+import FolderPickerModal from '../components/FolderPickerModal';
 
 const defaultSettings = {
   sonarr_url: '',
@@ -17,6 +18,9 @@ const defaultSettings = {
   auto_process_verified: false,
   import_mode: 'none',
   polling_interval: 900,
+  temp_dir: '',
+  cpu_worker_limit: 2,
+  gpu_worker_limit: 1,
 };
 
 const maskApiKey = (key) => {
@@ -38,6 +42,10 @@ const Settings2Page = () => {
   const toast = useToast();
   const [apiKeyFocused, setApiKeyFocused] = useState(false);
   const [apiKeyEdited, setApiKeyEdited] = useState(false);
+  const [showTempDirPicker, setShowTempDirPicker] = useState(false);
+  const [showOutputDirPicker, setShowOutputDirPicker] = useState(false);
+  const [tempDirValid, setTempDirValid] = useState(true);
+  const [tempDirError, setTempDirError] = useState('');
 
   useEffect(() => {
     const fetch = async () => {
@@ -51,6 +59,9 @@ const Settings2Page = () => {
             data.auto_process_verified === '1' || data.auto_process_verified === true,
           min_confidence_threshold: parseFloat(data.min_confidence_threshold) || 0.8,
           polling_interval: parseInt(data.polling_interval, 10) || 900,
+          temp_dir: data.temp_dir || '',
+          cpu_worker_limit: parseInt(data.cpu_worker_limit, 10) || 2,
+          gpu_worker_limit: parseInt(data.gpu_worker_limit, 10) || 1,
         });
         setPending({
           ...defaultSettings,
@@ -60,6 +71,9 @@ const Settings2Page = () => {
             data.auto_process_verified === '1' || data.auto_process_verified === true,
           min_confidence_threshold: parseFloat(data.min_confidence_threshold) || 0.8,
           polling_interval: parseInt(data.polling_interval, 10) || 900,
+          temp_dir: data.temp_dir || '',
+          cpu_worker_limit: parseInt(data.cpu_worker_limit, 10) || 2,
+          gpu_worker_limit: parseInt(data.gpu_worker_limit, 10) || 1,
         });
       } catch (err) {
         toast({ type: 'error', message: 'Failed to load settings' });
@@ -68,6 +82,26 @@ const Settings2Page = () => {
     fetch();
   }, [toast]);
 
+  // Validate temp_dir automatically when it changes
+  useEffect(() => {
+    if (!pending.temp_dir) {
+      setTempDirValid(true);
+      setTempDirError('');
+      return;
+    }
+    let cancelled = false;
+    apiClient.validateTempDir(pending.temp_dir).then((result) => {
+      if (cancelled) {
+        return;
+      }
+      setTempDirValid(result.valid);
+      setTempDirError(result.valid ? '' : result.error || 'Invalid temp directory');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pending.temp_dir]);
+
   const hasChanges = JSON.stringify(settings) !== JSON.stringify(pending);
 
   const handleChange = (key, value) => {
@@ -75,23 +109,31 @@ const Settings2Page = () => {
   };
 
   const handleSave = useCallback(async () => {
+    if (!tempDirValid) {
+      toast({ type: 'error', message: 'Please fix the temp directory before saving.' });
+      return;
+    }
     setSaving(true);
     try {
+      // Only send the real API key if it is not masked
+      const settingsToSave = { ...pending };
+      if (!settingsToSave.sonarr_api_key || settingsToSave.sonarr_api_key.includes('*')) {
+        delete settingsToSave.sonarr_api_key;
+      }
       await apiClient.setAllSettings({
-        ...pending,
+        ...settingsToSave,
         backup_originals: pending.backup_originals ? 1 : 0,
         auto_process_verified: pending.auto_process_verified ? 1 : 0,
       });
       setSettings({ ...pending });
       setApiKeyEdited(false);
-      setPending((prev) => ({ ...prev, sonarr_api_key: '' }));
       toast({ type: 'success', message: 'Settings saved successfully' });
     } catch (err) {
       toast({ type: 'error', message: 'Failed to save settings' });
     } finally {
       setSaving(false);
     }
-  }, [pending, toast]);
+  }, [pending, toast, tempDirValid]);
 
   const handleApiKeyFocus = () => setApiKeyFocused(true);
   const handleApiKeyBlur = () => {
@@ -107,9 +149,17 @@ const Settings2Page = () => {
   const handleTestSonarr = async () => {
     setTestingSonarr(true);
     setSonarrTestResult(null);
+    // Always use the raw, currently visible values from the input fields
+    const url = (pending.sonarr_url || 'http://localhost:8989').replace(/\/$/, '');
+    const apiKey = pending.sonarr_api_key;
+    // If the API key is masked (contains *), fail immediately
+    if (!apiKey || apiKey.includes('*')) {
+      setSonarrTestResult('fail');
+      toast({ type: 'error', message: 'Please enter your real Sonarr API key to test connection.' });
+      setTestingSonarr(false);
+      return;
+    }
     try {
-      const url = (pending.sonarr_url || 'http://localhost:8989').replace(/\/$/, '');
-      const apiKey = pending.sonarr_api_key;
       const res = await fetch(`${url}/api/v3/system/status`, {
         headers: { 'X-Api-Key': apiKey },
       });
@@ -137,8 +187,7 @@ const Settings2Page = () => {
         e.key === 'Enter' &&
         hasChanges &&
         !saving &&
-        document.activeElement.tagName !== 'INPUT' &&
-        document.activeElement.tagName !== 'TEXTAREA'
+        (document.activeElement.tagName !== 'TEXTAREA')
       ) {
         e.preventDefault();
         handleSaveRef.current();
@@ -149,12 +198,12 @@ const Settings2Page = () => {
   }, [hasChanges, saving]);
 
   const apiKeyInputValue = (
-    settings.sonarr_api_key &&
-    !apiKeyEdited &&
-    (!pending.sonarr_api_key || pending.sonarr_api_key === settings.sonarr_api_key)
-  )
-    ? maskApiKey(settings.sonarr_api_key)
-    : (pending.sonarr_api_key || '');
+    apiKeyEdited
+      ? pending.sonarr_api_key
+      : (settings.sonarr_api_key && (!pending.sonarr_api_key || pending.sonarr_api_key === settings.sonarr_api_key)
+        ? maskApiKey(settings.sonarr_api_key)
+        : (pending.sonarr_api_key || ''))
+  );
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -218,17 +267,66 @@ const Settings2Page = () => {
             <CardContent>
               <div className="mb-2">
                 <label className="block font-semibold text-gray-200 mb-1">Output Directory</label>
-                <input
-                  className="w-full rounded-lg px-3 py-2 bg-gray-900 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  type="text"
-                  placeholder="/media/processed"
-                  value={pending.output_directory}
-                  onChange={(e) => handleChange('output_directory', e.target.value)}
-                  maxLength={100}
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    className="w-full rounded-lg px-3 py-2 bg-gray-900 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    type="text"
+                    placeholder="/media/processed"
+                    value={pending.output_directory}
+                    onChange={(e) => handleChange('output_directory', e.target.value)}
+                    maxLength={100}
+                  />
+                  <button
+                    type="button"
+                    className="bg-blue-500/90 hover:bg-blue-500 text-white rounded-lg px-3 py-2"
+                    onClick={() => setShowOutputDirPicker(true)}
+                    tabIndex={-1}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h3.172a2 2 0 011.414.586l1.828 1.828A2 2 0 0012.828 8H19a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
+                  </button>
+                </div>
                 <span className="text-sm text-gray-400">
                   Directory where processed files will be saved
                 </span>
+                <FolderPickerModal
+                  isOpen={showOutputDirPicker}
+                  onClose={() => setShowOutputDirPicker(false)}
+                  onSelect={(folder) => handleChange('output_directory', folder)}
+                  initialPath={pending.output_directory || '/'}
+                />
+              </div>
+              <div className="mb-2">
+                <label className="block font-semibold text-gray-200 mb-1">Temporary Directory</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    className="w-full rounded-lg px-3 py-2 bg-gray-900 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    type="text"
+                    placeholder="/tmp/cliprr"
+                    value={pending.temp_dir}
+                    onChange={(e) => handleChange('temp_dir', e.target.value)}
+                    maxLength={100}
+                  />
+                  <button
+                    type="button"
+                    className="bg-blue-500/90 hover:bg-blue-500 text-white rounded-lg px-3 py-2"
+                    onClick={() => setShowTempDirPicker(true)}
+                    tabIndex={-1}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h3.172a2 2 0 011.414.586l1.828 1.828A2 2 0 0012.828 8H19a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
+                  </button>
+                </div>
+                <span className="text-sm text-gray-400">
+                  Directory for temporary files (default: system temp dir, e.g. /tmp/cliprr). Change only if you want to use a custom location.
+                </span>
+                {!tempDirValid && (
+                  <div className="text-sm text-red-400 mt-1">{tempDirError || 'Invalid temp directory'}</div>
+                )}
+                <FolderPickerModal
+                  isOpen={showTempDirPicker}
+                  onClose={() => setShowTempDirPicker(false)}
+                  onSelect={(folder) => handleChange('temp_dir', folder)}
+                  initialPath={pending.temp_dir || '/'}
+                />
               </div>
               <div className="mb-2">
                 <label className="block font-semibold text-gray-200 mb-1">Minimum Confidence Threshold</label>

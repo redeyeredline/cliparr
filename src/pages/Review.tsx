@@ -3,6 +3,7 @@ import {
   ProcessingJob,
   ProcessingJobEntity,
   MediaFile,
+  MediaFileEntity,
 } from '@/components/entities/all';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,11 +27,23 @@ export default function Review() {
     try {
       const [jobsData, filesData] = await Promise.all([
         ProcessingJobEntity.list('-created_date'),
-        // TODO: Implement MediaFileEntity.list() or similar when available
-        [],
+        MediaFileEntity.list('-created_date'),
       ]);
       setJobs(jobsData);
       setMediaFiles(filesData);
+
+      // Debug: Log job status distribution
+      const statusCounts = jobsData.reduce((acc, job) => {
+        acc[job.status] = (acc[job.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log('Review page loaded jobs:', {
+        total: jobsData.length,
+        statusCounts,
+        pending: jobsData.filter((j) => j.status === 'detected' && !j.manual_verified).length,
+        verified: jobsData.filter((j) => j.manual_verified && j.status !== 'completed').length,
+        completed: jobsData.filter((j) => j.status === 'completed').length,
+      });
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {

@@ -520,6 +520,49 @@ function deleteProcessingJob(db, jobId) {
   return result.changes;
 }
 
+// Get a single episode file by its ID (with joined info)
+function getEpisodeFileById(db, fileId) {
+  return timedQuery(
+    db,
+    `SELECT 
+       ef.id,
+       ef.file_path,
+       ef.size,
+       e.title as episode_title,
+       e.episode_number,
+       s.season_number,
+       sh.title as show_title
+     FROM episode_files ef
+     JOIN episodes e ON ef.episode_id = e.id
+     JOIN seasons s ON e.season_id = s.id
+     JOIN shows sh ON s.show_id = sh.id
+     WHERE ef.id = ?`,
+    [fileId],
+    'get',
+  );
+}
+
+// Get episode file IDs for specific shows
+function getEpisodeFileIdsForShows(db, showIds) {
+  if (!Array.isArray(showIds) || showIds.length === 0) {
+    return [];
+  }
+
+  const placeholders = showIds.map(() => '?').join(',');
+  return timedQuery(
+    db,
+    `SELECT ef.id
+     FROM episode_files ef
+     JOIN episodes e ON ef.episode_id = e.id
+     JOIN seasons s ON e.season_id = s.id
+     JOIN shows sh ON s.show_id = sh.id
+     WHERE sh.id IN (${placeholders})
+     ORDER BY sh.title, s.season_number, e.episode_number`,
+    showIds,
+    'all',
+  ).map(row => row.id);
+}
+
 export {
   getDb,
   insertShow,
@@ -548,5 +591,7 @@ export {
   findShowByTitleAndPath,
   getShowWithDetails,
   getEpisodeFiles,
+  getEpisodeFileById,
+  getEpisodeFileIdsForShows,
   deleteProcessingJob,
 };

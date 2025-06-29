@@ -28,6 +28,7 @@ export default function ReviewQueue({
 
   const getJobsForTab = (tab: string) => {
     switch (tab) {
+      case 'processing': return jobs.filter((j) => j.status === 'processing' || j.status === 'scanning');
       case 'pending': return jobs.filter((j) => j.status === 'detected' && !j.manual_verified);
       case 'verified': return jobs.filter((j) => j.manual_verified && j.status !== 'completed');
       case 'completed': return jobs.filter((j) => j.status === 'completed');
@@ -100,14 +101,18 @@ export default function ReviewQueue({
   };
 
   return (
-    <Tabs defaultValue="pending" className="flex-1 flex flex-col">
+    <Tabs defaultValue="processing" className="flex-1 flex flex-col">
       <div className="px-4 pt-2">
-        <TabsList className="grid w-full grid-cols-3 bg-gray-900/80 rounded-xl">
+        <TabsList className="grid w-full grid-cols-4 bg-gray-900/80 rounded-xl">
+          <TabsTrigger value="processing" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg">Processing</TabsTrigger>
           <TabsTrigger value="pending" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg">Pending</TabsTrigger>
           <TabsTrigger value="verified" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg">Verified</TabsTrigger>
           <TabsTrigger value="completed" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg">Done</TabsTrigger>
         </TabsList>
       </div>
+      <TabsContent value="processing" className="flex-1 overflow-y-auto mt-0">
+        {renderTabContent('processing')}
+      </TabsContent>
       <TabsContent value="pending" className="flex-1 overflow-y-auto mt-0">
         {renderTabContent('pending')}
       </TabsContent>

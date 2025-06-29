@@ -56,6 +56,8 @@ export async function getDatabaseSingleton(dbPath) {
         const defaultSettings = [
           { key: 'import_mode', value: 'none' },
           { key: 'polling_interval', value: '900' },
+          { key: 'cpu_worker_limit', value: '2' },
+          { key: 'gpu_worker_limit', value: '1' },
         ];
 
         const insertStmt = dbInstance.prepare(

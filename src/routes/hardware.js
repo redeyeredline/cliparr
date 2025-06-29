@@ -7,6 +7,7 @@ import os from 'os';
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
+import config from '../config/index.js';
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -183,7 +184,7 @@ async function runHardwareBenchmark(sendProgress) {
 async function benchmarkCPU() {
   try {
     // Create a temporary test file for CPU-intensive operations
-    const testFile = path.join(os.tmpdir(), `cpu_benchmark_${Date.now()}.txt`);
+    const testFile = path.join(config.tempDir, `cpu_benchmark_${Date.now()}.txt`);
 
     // Generate a large amount of data for processing
     const testData = 'A'.repeat(1000000); // 1MB of data
@@ -231,7 +232,7 @@ async function benchmarkGPU() {
     }
 
     // Test GPU encoding speed with a small test video
-    const testFile = path.join(os.tmpdir(), `gpu_benchmark_${Date.now()}.mp4`);
+    const testFile = path.join(config.tempDir, `gpu_benchmark_${Date.now()}.mp4`);
 
     const startTime = process.hrtime.bigint();
 
@@ -329,7 +330,7 @@ async function benchmarkEncoding(sendProgress) {
   const timeout = 30000;
 
   async function runFfmpegTest(codec, encoder, resLabel, resSize) {
-    const testFile = path.join(os.tmpdir(), `encoding_benchmark_${codec}_${resLabel}_${Date.now()}.mp4`);
+    const testFile = path.join(config.tempDir, `encoding_benchmark_${codec}_${resLabel}_${Date.now()}.mp4`);
     try {
       const startTime = process.hrtime.bigint();
       const { stderr } = await execAsync(

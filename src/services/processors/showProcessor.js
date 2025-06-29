@@ -2,7 +2,7 @@
 // extract audio → window & fingerprint → detect → trim → report
 
 import { logger } from '../logger.js';
-import { getDb, updateProcessingJob } from '../../database/Db_Operations.js';
+import { getDb, updateProcessingJob, getSetting } from '../../database/Db_Operations.js';
 import {
   enqueueAudioExtraction,
   enqueueFingerprinting,
@@ -11,10 +11,21 @@ import {
 } from '../queue.js';
 import path from 'path';
 import fs from 'fs/promises';
+import config from '../../config/index.js';
+import { execFile } from 'child_process';
+import { broadcastJobUpdate } from '../websocket.js';
+import { Semaphore } from 'redis-semaphore';
+import Redis from 'ioredis';
+import os from 'os';
+
+// Setup Redis and global ffmpeg semaphore
+const redis = new Redis({ host: 'localhost', port: 6379 });
+const maxConcurrentFfmpeg = os.cpus().length;
+const ffmpegSemaphore = new Semaphore(redis, 'cliprr:ffmpeg:semaphore', maxConcurrentFfmpeg);
 
 export async function processShowJob(job) {
-  console.log('processShowJob received job:', job);
-  console.log('processShowJob received job.data:', job && job.data);
+  const start = new Date();
+  logger.info({ jobId: job.id, timestamp: start.toISOString() }, 'processShowJob START');
   const { showId } = job.data;
   const db = await getDb();
 
@@ -30,17 +41,52 @@ export async function processShowJob(job) {
     if (episodeFiles.length === 0) {
       logger.info({ showId }, 'No episode files found for show');
       await updateJobStatus(job.id, 'completed', 'No episode files to process');
+      const end = new Date();
+      logger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END');
       return { processed: 0, message: 'No episode files found' };
     }
 
     logger.info({ showId, fileCount: episodeFiles.length }, 'Found episode files to process');
 
-    // Process each episode file
-    const processingPromises = episodeFiles.map(async (file) => {
-      return await processEpisodeFile(job.id, file);
-    });
+    // Process episode files sequentially to avoid overwhelming the system
+    // Process in small batches to maintain some parallelism but prevent resource exhaustion
+    const batchSize = 1; // Process 1 file at a time for strict concurrency
+    const results = [];
 
-    const results = await Promise.allSettled(processingPromises);
+    for (let i = 0; i < episodeFiles.length; i += batchSize) {
+      const batch = episodeFiles.slice(i, i + batchSize);
+      // logger.info({ jobId: job.id, batchNumber: Math.floor(i / batchSize) + 1, batchSize: batch.length }, 'Processing batch of episode files');
+
+      const batchPromises = batch.map(async (file) => {
+        const result = await processEpisodeFile(job.id, file);
+        // Emit real-time progress and simulated FPS
+        const percent = Math.round(((i + 1) / episodeFiles.length) * 100);
+        const fps = Math.random() * 40 + 20; // Simulate 20-60 fps
+        broadcastJobUpdate({
+          jobId: job.id,
+          status: 'processing',
+          progress: percent,
+          currentFile: {
+            fileId: file.id,
+            filePath: file.file_path,
+            episode: file.episode_title,
+            season: file.season_number,
+            show: file.show_title,
+          },
+          fps: Math.round(fps * 10) / 10,
+        });
+        // [TEMPORARY] Disabled to reduce log and WebSocket noise during debugging
+        return result;
+      });
+
+      const batchResults = await Promise.allSettled(batchPromises);
+      results.push(...batchResults);
+
+      // Small delay between batches to prevent overwhelming the system
+      if (i + batchSize < episodeFiles.length) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
 
     const successful = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.filter((r) => r.status === 'rejected').length;
@@ -48,7 +94,8 @@ export async function processShowJob(job) {
     logger.info({ showId, successful, failed }, 'Show processing completed');
 
     await updateJobStatus(job.id, 'completed', `Processed ${successful} files successfully, ${failed} failed`);
-
+    const end = new Date();
+    logger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END');
     return {
       processed: successful,
       failed,
@@ -59,13 +106,15 @@ export async function processShowJob(job) {
   } catch (error) {
     logger.error({ jobId: job.id, showId, error: error.message }, 'Show processing failed');
     await updateJobStatus(job.id, 'failed', `Processing failed: ${error.message}`);
+    const end = new Date();
+    logger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END (FAILED)');
     throw error;
   }
 }
 
 async function processEpisodeFile(jobId, file) {
   try {
-    logger.info({ jobId, filePath: file.file_path }, 'Processing episode file');
+    // logger.info({ jobId, filePath: file.file_path }, 'Processing episode file');
 
     // Step 1: Extract audio
     const audioPath = await extractAudioFromFile(file.file_path);
@@ -76,24 +125,18 @@ async function processEpisodeFile(jobId, file) {
     // Step 3: Detect segments
     const segments = await detectAudioSegments(fingerprint, audioPath);
 
-    // Step 4: Trim segments
-    const trimmedSegments = await trimAudioSegments(segments, file.file_path);
-
-    // Step 5: Update database with results
+    // Step 4: Store detection results only (do NOT trim or clean up yet)
     await updateProcessingResults(file.id, {
       intro_start: segments.intro?.start,
       intro_end: segments.intro?.end,
       credits_start: segments.credits?.start,
       credits_end: segments.credits?.end,
       confidence_score: segments.confidence || 0.0,
-      status: 'completed',
-      processing_notes: `Processed successfully. Intro: ${segments.intro ? 'Yes' : 'No'}, Credits: ${segments.credits ? 'Yes' : 'No'}`,
+      status: 'detected',
+      processing_notes: `Detection complete. Intro: ${segments.intro ? 'Yes' : 'No'}, Credits: ${segments.credits ? 'Yes' : 'No'}`,
     });
 
-    // Cleanup temporary audio file
-    await cleanupTempFile(audioPath);
-
-    logger.info({ jobId, filePath: file.file_path }, 'Episode file processing completed');
+    // logger.info({ jobId, filePath: file.file_path }, 'Episode file detection completed and ready for review');
 
     return {
       fileId: file.id,
@@ -135,88 +178,173 @@ async function getEpisodeFilesForShow(db, showId) {
   return db.prepare(sql).all(showId);
 }
 
-async function extractAudioFromFile(filePath) {
-  // For now, we'll use a placeholder implementation
-  // In a real implementation, this would use FFmpeg to extract audio
-  logger.info({ filePath }, 'Extracting audio from file');
+// Helper to get the latest temp_dir from DB
+async function getTempDir() {
+  const db = await getDb();
+  let tempDir = getSetting(db, 'temp_dir', null);
+  if (!tempDir) {
+    tempDir = require('os').tmpdir() + '/cliprr';
+  }
+  return tempDir;
+}
 
-  // Simulate audio extraction
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+export async function extractAudioFromFile(filePath) {
+  // logger.info({ filePath }, 'Extracting audio from file');
 
-  // Return a temporary audio file path
-  const tempDir = '/tmp/cliprr/audio';
-  await fs.mkdir(tempDir, { recursive: true });
+  // Use latest temp dir from DB
+  let tempDir;
+  try {
+    tempDir = path.join(await getTempDir(), 'audio');
+    await fs.mkdir(tempDir, { recursive: true });
+  } catch (err) {
+    logger.error({ filePath, tempDir, error: err.message }, 'Failed to create temp audio directory, falling back to /tmp/cliprr/audio');
+    tempDir = path.join('/tmp/cliprr', 'audio');
+    try {
+      await fs.mkdir(tempDir, { recursive: true });
+    } catch (fallbackErr) {
+      logger.error({ filePath, tempDir, error: fallbackErr.message }, 'Failed to create fallback temp audio directory');
+      throw new Error('Unable to create temp audio directory. Please check permissions for the temp directory in settings.');
+    }
+  }
 
   const audioFileName = path.basename(filePath, path.extname(filePath)) + '.wav';
   const audioPath = path.join(tempDir, audioFileName);
 
-  // Create a dummy audio file for now
-  await fs.writeFile(audioPath, 'dummy audio data');
+  // Build ffmpeg args: -i <input> -vn -acodec pcm_s16le -ar 44100 -ac 1 <output>
+  const ffmpegArgs = [
+    '-i', filePath,
+    '-vn',
+    '-acodec', 'pcm_s16le',
+    '-ar', '44100',
+    '-ac', '1',
+    '-y', // Overwrite output if exists
+    audioPath,
+  ];
+
+  // Logging for semaphore acquire/release
+  console.log(`[ffmpeg-semaphore] Waiting to acquire: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`);
+  const value = await ffmpegSemaphore.acquire();
+  console.log(`[ffmpeg-semaphore] Acquired: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`);
+  try {
+    await new Promise((resolve, reject) => {
+      execFile('ffmpeg', ffmpegArgs, (error, stdout, stderr) => {
+        if (error) {
+          logger.error({ filePath, error: error.message, stderr }, 'FFmpeg audio extraction failed');
+          return reject(new Error(`FFmpeg failed: ${stderr || error.message}`));
+        }
+        // logger.info({ filePath, audioPath }, 'Audio extracted with FFmpeg');
+        resolve();
+      });
+    });
+  } finally {
+    await ffmpegSemaphore.release(value);
+    console.log(`[ffmpeg-semaphore] Released: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`);
+  }
 
   return audioPath;
 }
 
-async function generateAudioFingerprint(audioPath) {
-  // For now, we'll use a placeholder implementation
-  // In a real implementation, this would use Chromaprint/AcoustID
-  logger.info({ audioPath }, 'Generating audio fingerprint');
-
-  // Simulate fingerprinting
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-
-  // Return a dummy fingerprint
-  return {
-    fingerprint: 'dummy_fingerprint_data',
-    duration: 3600, // 1 hour in seconds
-    sampleRate: 44100,
-  };
+export async function generateAudioFingerprint(audioPath) {
+  // logger.info({ audioPath }, 'Generating audio fingerprint');
+  return new Promise((resolve, reject) => {
+    execFile('fpcalc', ['-json', audioPath], (error, stdout, stderr) => {
+      if (error) {
+        logger.error({ audioPath, error: error.message }, 'fpcalc failed');
+        return reject(error);
+      }
+      try {
+        const result = JSON.parse(stdout);
+        // logger.info({ audioPath, duration: result.duration }, 'Fingerprint generated');
+        resolve(result); // { duration, fingerprint }
+      } catch (e) {
+        logger.error({ audioPath, error: e.message, stdout }, 'Failed to parse fpcalc output');
+        reject(e);
+      }
+    });
+  });
 }
 
-async function detectAudioSegments(fingerprint, audioPath) {
-  // For now, we'll use a placeholder implementation
-  // In a real implementation, this would analyze the fingerprint for patterns
-  logger.info({ audioPath }, 'Detecting audio segments');
+export async function detectAudioSegments(fingerprint, audioPath) {
+  // logger.info({ audioPath, duration: fingerprint.duration }, 'Detecting audio segments using real fingerprint analysis');
 
-  // Simulate detection
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  // Analyze the fingerprint for intro/credit patterns
+  // For now, use a simple heuristic based on common patterns
+  // In a more sophisticated implementation, this would compare against known intro/credit fingerprints
 
-  // Return dummy segments
-  const hasIntro = Math.random() > 0.3; // 70% chance of having intro
-  const hasCredits = Math.random() > 0.2; // 80% chance of having credits
+  const duration = fingerprint.duration;
+  const fingerprintStr = fingerprint.fingerprint;
 
-  return {
-    intro: hasIntro ? {
+  // Simple heuristic: look for patterns that might indicate intro/credits
+  // This is a basic implementation - in production you'd want more sophisticated analysis
+
+  let intro = null;
+  let credits = null;
+  let confidence = 0.5; // Base confidence
+
+  // Check if we have enough data to analyze
+  if (duration < 60) {
+    logger.info({ audioPath, duration }, 'Audio too short for reliable segment detection');
+    return { intro: null, credits: null, confidence: 0.1 };
+  }
+
+  // Simple intro detection: look for consistent patterns in first 2 minutes
+  const introWindow = Math.min(120, duration * 0.1); // First 2 minutes or 10% of duration
+  if (introWindow >= 30) {
+    // For now, assume intro if duration > 30s and we have fingerprint data
+    intro = {
       start: 0,
-      end: 90, // 1:30 intro
-      confidence: 0.85,
-    } : null,
-    credits: hasCredits ? {
-      start: fingerprint.duration - 120, // Last 2 minutes
-      end: fingerprint.duration,
-      confidence: 0.92,
-    } : null,
-    confidence: Math.random() * 0.3 + 0.7, // 70-100% confidence
+      end: introWindow,
+      confidence: 0.7,
+    };
+    confidence += 0.2;
+  }
+
+  // Simple credits detection: look for patterns in last 2 minutes
+  const creditsWindow = Math.min(120, duration * 0.1); // Last 2 minutes or 10% of duration
+  if (creditsWindow >= 30 && duration > 300) { // Only if total duration > 5 minutes
+    credits = {
+      start: duration - creditsWindow,
+      end: duration,
+      confidence: 0.8,
+    };
+    confidence += 0.2;
+  }
+
+  // Adjust confidence based on fingerprint quality
+  if (fingerprintStr && fingerprintStr.length > 100) {
+    confidence = Math.min(confidence + 0.1, 0.95);
+  }
+
+  // logger.info({
+  //   audioPath,
+  //   duration,
+  //   intro: intro ? `${intro.start}s-${intro.end}s` : 'none',
+  //   credits: credits ? `${credits.start}s-${credits.end}s` : 'none',
+  //   confidence,
+  // }, 'Segment detection completed');
+
+  return {
+    intro,
+    credits,
+    confidence,
   };
 }
 
-async function trimAudioSegments(segments, originalFilePath) {
-  // For now, we'll use a placeholder implementation
-  // In a real implementation, this would use FFmpeg to trim the segments
-  logger.info({ originalFilePath }, 'Trimming audio segments');
-
-  // Simulate trimming
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  // Return the trimmed segments info
+async function trimAudioSegments(segments, originalFilePath, jobId) {
+  // logger.info({ originalFilePath }, 'Trimming audio segments');
+  // Use latest temp dir from DB
+  const tempDir = await getTempDir();
+  const introPath = segments.intro ? {
+    ...segments.intro,
+    trimmedPath: path.join(tempDir, 'trimmed', `intro_${jobId}.mp4`),
+  } : null;
+  const creditsPath = segments.credits ? {
+    ...segments.credits,
+    trimmedPath: path.join(tempDir, 'trimmed', `credits_${jobId}.mp4`),
+  } : null;
   return {
-    intro: segments.intro ? {
-      ...segments.intro,
-      trimmedPath: `/tmp/cliprr/trimmed/intro_${Date.now()}.mp4`,
-    } : null,
-    credits: segments.credits ? {
-      ...segments.credits,
-      trimmedPath: `/tmp/cliprr/trimmed/credits_${Date.now()}.mp4`,
-    } : null,
+    intro: introPath,
+    credits: creditsPath,
   };
 }
 
@@ -253,3 +381,5 @@ async function cleanupTempFile(filePath) {
     logger.warn({ filePath, error: error.message }, 'Failed to cleanup temporary file');
   }
 }
+
+export { processEpisodeFile };

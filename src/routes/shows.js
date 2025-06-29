@@ -2,8 +2,8 @@
 // Provides endpoints for show data retrieval and episode file management from the database.
 
 import express from 'express';
-import { getImportedShows, getShowById, deleteShowsByIds, getShowWithDetails, getEpisodeFiles, createProcessingJobsForShows } from '../database/Db_Operations.js';
-import { enqueueShowProcessing } from '../services/queue.js';
+import { getImportedShows, getShowById, deleteShowsByIds, getShowWithDetails, getEpisodeFiles, createProcessingJobsForShows, getEpisodeFileIdsForShows } from '../database/Db_Operations.js';
+import { enqueueEpisodeProcessing } from '../services/queue.js';
 
 const router = express.Router();
 
@@ -99,12 +99,16 @@ router.post('/scan', async (req, res) => {
     // Create processing jobs for the files
     const scannedCount = createProcessingJobsForShows(db, showIds);
 
-    // Enqueue show processing jobs (as a batch)
-    const enqueuedJobIds = await enqueueShowProcessing(showIds);
+    // Get episode file IDs for the shows
+    const episodeFileIds = getEpisodeFileIdsForShows(db, showIds);
+
+    // Enqueue episode processing jobs with episode file IDs
+    const enqueuedJobIds = await enqueueEpisodeProcessing(episodeFileIds);
 
     logger.info({
       showIds,
       scannedCount,
+      episodeFileIds,
       enqueuedJobIds,
     }, 'Shows scanned and enqueued for processing');
 
@@ -112,7 +116,7 @@ router.post('/scan', async (req, res) => {
       success: true,
       scanned: scannedCount,
       enqueued: enqueuedJobIds.length,
-      message: `Enqueued ${enqueuedJobIds.length} shows for processing`,
+      message: `Enqueued ${enqueuedJobIds.length} episodes for processing`,
     });
   } catch (error) {
     console.error('Failed to scan shows:', error);
