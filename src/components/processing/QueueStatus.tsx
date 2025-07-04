@@ -9,7 +9,10 @@ interface QueueStatusProps {
 }
 
 export default function QueueStatus({ queueStatus }: QueueStatusProps) {
-  if (!queueStatus) {
+  // Always treat queueStatus as an array
+  const queues = Array.isArray(queueStatus) ? queueStatus : [];
+
+  if (!queues.length) {
     return (
       <Card className="border-0 rounded-2xl shadow-lg bg-slate-800/90 backdrop-blur-md">
         <CardHeader>
@@ -28,10 +31,10 @@ export default function QueueStatus({ queueStatus }: QueueStatusProps) {
     );
   }
 
-  const totalActive = queueStatus.reduce((sum, queue) => sum + queue.active, 0);
-  const totalWaiting = queueStatus.reduce((sum, queue) => sum + queue.waiting, 0);
-  const totalCompleted = queueStatus.reduce((sum, queue) => sum + queue.completed, 0);
-  const totalFailed = queueStatus.reduce((sum, queue) => sum + queue.failed, 0);
+  const totalActive = queues.reduce((sum, queue) => sum + queue.active, 0);
+  const totalWaiting = queues.reduce((sum, queue) => sum + queue.waiting, 0);
+  const totalCompleted = queues.reduce((sum, queue) => sum + queue.completed, 0);
+  const totalFailed = queues.reduce((sum, queue) => sum + queue.failed, 0);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -96,7 +99,7 @@ export default function QueueStatus({ queueStatus }: QueueStatusProps) {
         <div className="space-y-3">
           <h3 className="text-lg font-semibold text-white">Queue Details</h3>
           <AnimatePresence>
-            {queueStatus.map((queue, index) => (
+            {queues.map((queue, index) => (
               <motion.div
                 key={queue.name}
                 initial={{ opacity: 0, y: 20 }}

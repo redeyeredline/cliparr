@@ -2,9 +2,12 @@
 // Provides connection management, heartbeat monitoring, and message broadcasting capabilities.
 // src/services/websocket.js
 import { WebSocketServer } from 'ws';
-import { logger } from './logger.js';
+import { websocketLogger } from './logger.js';
+import fs from 'fs';
 
 let wsServer;
+const wsLogStream = fs.createWriteStream('websocket.log', { flags: 'a' });
+let messageQueue = [];
 
 /**
  * Initialize and attach a WebSocketServer to an existing HTTP(S) server.
@@ -17,13 +20,22 @@ export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}
   wsServer = new WebSocketServer({ server, path });
 
   wsServer.on('connection', (ws) => {
+    websocketLogger.info('WebSocket client connected');
     ws.isAlive = true;
+
+    // Flush any queued messages
+    if (messageQueue.length > 0) {
+      websocketLogger.info({ count: messageQueue.length }, 'Flushing queued messages to new client');
+      messageQueue.forEach((payload) => {
+        ws.send(payload);
+      });
+      messageQueue = [];
+    }
 
     // heartbeat
     ws.on('pong', () => (ws.isAlive = true));
 
     ws.on('message', (raw) => {
-      // echo
       ws.send(JSON.stringify({
         type: 'echo',
         data: raw.toString(),
@@ -32,19 +44,32 @@ export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}
     });
 
     ws.on('error', (err) => {
-      logger.error({ err }, 'WebSocket error');
+      websocketLogger.error({ err }, 'WebSocket error');
     });
 
     ws.on('close', () => {
-      // Connection closed
+      websocketLogger.info('WebSocket client disconnected');
     });
 
-    // welcome payload
     ws.send(JSON.stringify({
       type: 'welcome',
       message: 'Connected to Cliparr backend',
       timestamp: new Date().toISOString(),
     }));
+
+    setTimeout(() => {
+      websocketLogger.info({ clientCount: wsServer.clients.size }, 'Clients after welcome');
+      wsServer.clients.forEach((client) => {
+        websocketLogger.info({
+          clientReadyState: client.readyState,
+          isOpen: client.readyState === 1,
+        }, 'Client state after welcome');
+      });
+    }, 1000);
+
+    setTimeout(() => {
+      ws.send(JSON.stringify({ type: 'test_broadcast', message: 'This is a test broadcast from backend' }));
+    }, 2000);
   });
 
   // ping‐pong to drop dead connections
@@ -60,7 +85,7 @@ export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}
 
   wsServer.on('close', () => clearInterval(interval));
 
-  logger.info('✅ WebSocket initialized');
+  websocketLogger.info('✅ WebSocket initialized');
 }
 
 /** Get the running WebSocketServer instance */
@@ -74,7 +99,7 @@ export function getWebSocketServer() {
  */
 export function broadcastMessage(message) {
   if (!wsServer) {
-    logger.warn('WebSocket server not initialized');
+    websocketLogger.warn('WebSocket server not initialized');
     return;
   }
 
@@ -83,11 +108,26 @@ export function broadcastMessage(message) {
     timestamp: new Date().toISOString(),
   });
 
+  // Write to websocket.log
+  wsLogStream.write(`[WebSocket OUT] ${payload}\n`);
+
+  websocketLogger.info({ clientCount: wsServer.clients.size, payload }, 'Broadcasting message to clients');
+
+  let sent = false;
   wsServer.clients.forEach((client) => {
-    if (client.readyState === WebSocketServer.OPEN) {
+    websocketLogger.info({
+      clientReadyState: client.readyState,
+      isOpen: client.readyState === 1,
+    }, 'Client state during broadcast');
+    if (client.readyState === 1) {
       client.send(payload);
+      sent = true;
     }
   });
+  if (!sent) {
+    websocketLogger.warn('No open clients during broadcast, queuing message');
+    messageQueue.push(payload);
+  }
 }
 
 /**
@@ -95,10 +135,7 @@ export function broadcastMessage(message) {
  * @param {object} update - The job update data
  */
 export function broadcastJobUpdate(update) {
-  broadcastMessage({
-    type: 'job_update',
-    ...update,
-  });
+  broadcastMessage(update);
 }
 
 /**

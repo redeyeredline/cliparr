@@ -2,8 +2,9 @@
 // Provides endpoints for show data retrieval and episode file management from the database.
 
 import express from 'express';
-import { getImportedShows, getShowById, deleteShowsByIds, getShowWithDetails, getEpisodeFiles, createProcessingJobsForShows, getEpisodeFileIdsForShows } from '../database/Db_Operations.js';
+import { getImportedShows, getShowById, deleteShowsByIds, getShowWithDetails, getEpisodeFiles, createProcessingJobsForShows, getEpisodeFileIdAndJobIdForShows } from '../database/Db_Operations.js';
 import { enqueueEpisodeProcessing } from '../services/queue.js';
+import { appLogger } from '../services/logger.js';
 
 const router = express.Router();
 
@@ -80,7 +81,7 @@ router.post('/delete', (req, res) => {
     const deletedCount = deleteShowsByIds(db, ids);
     res.json({ success: true, deleted: deletedCount });
   } catch (error) {
-    logger.error('Failed to cascade delete shows:', error);
+    appLogger.error('Failed to cascade delete shows:', error);
     res.status(500).json({ error: 'Failed to cascade delete shows' });
   }
 });
@@ -88,22 +89,58 @@ router.post('/delete', (req, res) => {
 // Scan shows for file processing
 router.post('/scan', async (req, res) => {
   const db = req.app.get('db');
-  const logger = req.app.get('logger');
   const { showIds } = req.body;
 
+  appLogger.info('Scan request received:', { showIds, type: typeof showIds, length: Array.isArray(showIds) ? showIds.length : undefined });
+
   if (!Array.isArray(showIds) || showIds.length === 0) {
+    appLogger.warn('Invalid showIds:', { showIds });
     return res.status(400).json({ error: 'showIds must be a non-empty array' });
   }
 
   try {
-    // Create processing jobs for the files
+    appLogger.info('Creating processing jobs for shows...', { showIds });
     const scannedCount = createProcessingJobsForShows(db, showIds);
+    appLogger.info('Processing jobs created:', { scannedCount });
 
-    // Get episode file IDs for the shows
-    const episodeFileIds = getEpisodeFileIdsForShows(db, showIds);
+    appLogger.info('Getting episode file IDs and job IDs...');
+    let episodeFileAndJobIds = getEpisodeFileIdAndJobIdForShows(db, showIds);
+    appLogger.info('Episode file and job IDs retrieved:', { count: episodeFileAndJobIds.length, data: episodeFileAndJobIds.map((e) => ({ ...e, dbJobIdType: typeof e.dbJobId, episodeFileIdType: typeof e.episodeFileId })) });
 
-    // Enqueue episode processing jobs with episode file IDs
-    const enqueuedJobIds = await enqueueEpisodeProcessing(episodeFileIds);
+    // Enhanced filtering and validation
+    episodeFileAndJobIds = episodeFileAndJobIds.filter((e) => {
+      const isValid = e.dbJobId !== null && e.episodeFileId !== null;
+      if (!isValid) {
+        appLogger.warn('Filtering out invalid entry:', { episodeFileId: e.episodeFileId, dbJobId: e.dbJobId });
+      }
+      return isValid;
+    });
+    appLogger.info('Filtered episode file and job IDs:', { count: episodeFileAndJobIds.length, data: episodeFileAndJobIds });
+
+    if (episodeFileAndJobIds.length === 0) {
+      appLogger.warn('No valid processing jobs found for selected shows', { showIds });
+      return res.status(400).json({ error: 'No valid processing jobs found for selected shows.' });
+    }
+
+    // Additional validation before enqueuing
+    const validEntries = episodeFileAndJobIds.filter((e) => {
+      const episodeFileId = Number(e.episodeFileId);
+      const dbJobId = Number(e.dbJobId);
+      const isValid = !isNaN(episodeFileId) && !isNaN(dbJobId) && episodeFileId > 0 && dbJobId > 0;
+      if (!isValid) {
+        appLogger.warn('Filtering out non-numeric or zero IDs:', { episodeFileId: e.episodeFileId, dbJobId: e.dbJobId, numericEpisodeFileId: episodeFileId, numericDbJobId: dbJobId });
+      }
+      return isValid;
+    });
+
+    if (validEntries.length === 0) {
+      appLogger.warn('No valid numeric processing jobs found for selected shows', { showIds });
+      return res.status(400).json({ error: 'No valid numeric processing jobs found for selected shows.' });
+    }
+
+    appLogger.info('Enqueuing episode processing jobs...', { validEntries });
+    const enqueuedJobIds = await enqueueEpisodeProcessing(validEntries);
+    appLogger.info('Episode processing jobs enqueued:', { enqueuedJobIds });
 
     res.json({
       success: true,
@@ -111,17 +148,27 @@ router.post('/scan', async (req, res) => {
       enqueued: enqueuedJobIds.length,
       message: `Enqueued ${enqueuedJobIds.length} episodes for processing`,
     });
-  } catch (error) {
-    console.error('Failed to scan shows:', error);
-    logger.error('Failed to scan shows:', error, error && error.stack ? error.stack : '');
-    res.status(500).json({ error: 'Failed to scan shows', details: error && error.message });
+  } catch (err) {
+    let errorDetails = {};
+    try {
+      errorDetails = Object.getOwnPropertyNames(err).reduce((acc, key) => {
+        acc[key] = err[key]; return acc;
+      }, {});
+    } catch (e) {}
+    appLogger.error('Failed to scan shows:', {
+      error: err.message,
+      stack: err.stack,
+      showIds,
+      errorType: err.constructor ? err.constructor.name : undefined,
+      errorDetails: JSON.stringify(errorDetails),
+    });
+    res.status(500).json({ error: err && err.message ? err.message : 'Unknown error', stack: err && err.stack ? err.stack : undefined });
   }
 });
 
 // Rescan shows with fingerprint data invalidation
 router.post('/rescan', async (req, res) => {
   const db = req.app.get('db');
-  const logger = req.app.get('logger');
   const { showIds } = req.body;
 
   if (!Array.isArray(showIds) || showIds.length === 0) {
@@ -143,12 +190,12 @@ router.post('/rescan', async (req, res) => {
     const scannedCount = createProcessingJobsForShows(db, showIds);
 
     // Get episode file IDs for the shows
-    const episodeFileIds = getEpisodeFileIdsForShows(db, showIds);
+    const episodeFileIds = getEpisodeFileIdAndJobIdForShows(db, showIds);
 
     // Enqueue episode processing jobs with episode file IDs
     const enqueuedJobIds = await enqueueEpisodeProcessing(episodeFileIds);
 
-    logger.info({
+    appLogger.info({
       showIds,
       invalidatedCount,
       scannedCount,
@@ -165,14 +212,13 @@ router.post('/rescan', async (req, res) => {
     });
   } catch (error) {
     console.error('Failed to rescan shows:', error);
-    logger.error('Failed to rescan shows:', error, error && error.stack ? error.stack : '');
+    appLogger.error('Failed to rescan shows:', error, error && error.stack ? error.stack : '');
     res.status(500).json({ error: 'Failed to rescan shows', details: error && error.message });
   }
 });
 
 // Get detection statistics for a show
 router.get('/:showId/detection-stats', async (req, res) => {
-  const logger = req.app.get('logger');
   const { showId } = req.params;
 
   if (!showId || isNaN(parseInt(showId))) {
@@ -185,7 +231,7 @@ router.get('/:showId/detection-stats', async (req, res) => {
 
     const stats = await getDetectionStats(parseInt(showId));
 
-    logger.info({
+    appLogger.info({
       showId,
       statsCount: stats.length,
     }, 'Retrieved detection statistics for show');
@@ -197,8 +243,74 @@ router.get('/:showId/detection-stats', async (req, res) => {
     });
   } catch (error) {
     console.error('Failed to get detection stats:', error);
-    logger.error('Failed to get detection stats:', error, error && error.stack ? error.stack : '');
+    appLogger.error('Failed to get detection stats:', error, error && error.stack ? error.stack : '');
     res.status(500).json({ error: 'Failed to get detection stats', details: error && error.message });
+  }
+});
+
+// Get detailed segment information for a show/season
+router.get('/:showId/segments', async (req, res) => {
+  const { showId } = req.params;
+  const { season } = req.query;
+
+  if (!showId || isNaN(parseInt(showId))) {
+    return res.status(400).json({ error: 'Invalid show ID' });
+  }
+
+  try {
+    const db = req.app.get('db');
+
+    let sql = `
+      SELECT
+        season_number,
+        episode_number,
+        intro_start, intro_end,
+        credits_start, credits_end,
+        stingers_data, segments_data,
+        confidence_score,
+        detection_method,
+        approval_status,
+        processing_notes
+      FROM detection_results
+      WHERE show_id = ?
+    `;
+
+    const params = [parseInt(showId)];
+
+    if (season && !isNaN(parseInt(season))) {
+      sql += ' AND season_number = ?';
+      params.push(parseInt(season));
+    }
+
+    sql += ' ORDER BY season_number, episode_number';
+
+    const results = db.prepare(sql).all(...params);
+
+    // Parse JSON data for stingers and segments
+    const processedResults = results.map((row) => ({
+      ...row,
+      stingers: row.stingers_data ? JSON.parse(row.stingers_data) : [],
+      segments: row.segments_data ? JSON.parse(row.segments_data) : [],
+      stingers_data: undefined, // Remove raw data
+      segments_data: undefined, // Remove raw data
+    }));
+
+    appLogger.info({
+      showId,
+      season,
+      resultCount: processedResults.length,
+    }, 'Retrieved detailed segment information');
+
+    res.json({
+      success: true,
+      showId: parseInt(showId),
+      season: season ? parseInt(season) : null,
+      segments: processedResults,
+    });
+  } catch (error) {
+    console.error('Failed to get segment information:', error);
+    appLogger.error('Failed to get segment information:', error, error && error.stack ? error.stack : '');
+    res.status(500).json({ error: 'Failed to get segment information', details: error && error.message });
   }
 });
 

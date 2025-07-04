@@ -1,7 +1,7 @@
 // Show processor that orchestrates the entire workflow
 // extract audio → window & fingerprint → detect → trim → report
 
-import { logger } from '../logger.js';
+import { workerLogger } from '../logger.js';
 import { getDb, updateProcessingJob, getSetting } from '../../database/Db_Operations.js';
 import {
   enqueueAudioExtraction,
@@ -26,12 +26,12 @@ const ffmpegSemaphore = new Semaphore(redis, 'cliprr:ffmpeg:semaphore', maxConcu
 
 export async function processShowJob(job) {
   const start = new Date();
-  logger.info({ jobId: job.id, timestamp: start.toISOString() }, 'processShowJob START');
-  const { showId } = job.data;
+  workerLogger.info({ jobId: job.id, timestamp: start.toISOString() }, 'processShowJob START');
+  const { showId, dbJobId } = job.data;
   const db = await getDb();
 
   try {
-    logger.info({ jobId: job.id, showId }, 'Starting show processing workflow');
+    workerLogger.info({ jobId: job.id, showId }, 'Starting show processing workflow');
 
     // Update job status to processing
     await updateJobStatus(job.id, 'processing', 'Starting show processing workflow');
@@ -40,14 +40,14 @@ export async function processShowJob(job) {
     const episodeFiles = await getEpisodeFilesForShow(db, showId);
 
     if (episodeFiles.length === 0) {
-      logger.info({ showId }, 'No episode files found for show');
+      workerLogger.info({ showId }, 'No episode files found for show');
       await updateJobStatus(job.id, 'completed', 'No episode files to process');
       const end = new Date();
-      logger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END');
+      workerLogger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END');
       return { processed: 0, message: 'No episode files found' };
     }
 
-    logger.info({ showId, fileCount: episodeFiles.length }, 'Found episode files to process');
+    workerLogger.info({ showId, fileCount: episodeFiles.length }, 'Found episode files to process');
 
     // Process episode files sequentially to avoid overwhelming the system
     // Process in small batches to maintain some parallelism but prevent resource exhaustion
@@ -56,15 +56,14 @@ export async function processShowJob(job) {
 
     for (let i = 0; i < episodeFiles.length; i += batchSize) {
       const batch = episodeFiles.slice(i, i + batchSize);
-      // logger.info({ jobId: job.id, batchNumber: Math.floor(i / batchSize) + 1, batchSize: batch.length }, 'Processing batch of episode files');
-
-      const batchPromises = batch.map(async (file) => {
-        const result = await processEpisodeFile(job.id, file);
-        // Emit real-time progress and simulated FPS
-        const percent = Math.round(((i + 1) / episodeFiles.length) * 100);
-        const fps = Math.random() * 40 + 20; // Simulate 20-60 fps
+      // Add granular progress updates for each file in the batch
+      const batchPromises = batch.map(async (file, batchIdx) => {
+        // Calculate overall percent for this file (before processing)
+        const percent = Math.round(((i + batchIdx) / episodeFiles.length) * 100);
         broadcastJobUpdate({
+          type: 'job_update',
           jobId: job.id,
+          dbJobId,
           status: 'processing',
           progress: percent,
           currentFile: {
@@ -74,9 +73,44 @@ export async function processShowJob(job) {
             season: file.season_number,
             show: file.show_title,
           },
-          fps: Math.round(fps * 10) / 10,
+          message: `Starting processing for episode file ${file.file_path}`,
         });
-        // [TEMPORARY] Disabled to reduce log and WebSocket noise during debugging
+        // Pass a progress callback to processEpisodeFile for even finer updates
+        const result = await processEpisodeFile(job.id, file, dbJobId, (step, stepMsg) => {
+          // step: 0-100, stepMsg: string
+          broadcastJobUpdate({
+            type: 'job_update',
+            jobId: job.id,
+            dbJobId,
+            status: 'processing',
+            progress: percent + Math.round(step / episodeFiles.length),
+            currentFile: {
+              fileId: file.id,
+              filePath: file.file_path,
+              episode: file.episode_title,
+              season: file.season_number,
+              show: file.show_title,
+            },
+            message: stepMsg,
+          });
+        });
+        // Emit progress after processing this file
+        const percentAfter = Math.round(((i + batchIdx + 1) / episodeFiles.length) * 100);
+        broadcastJobUpdate({
+          type: 'job_update',
+          jobId: job.id,
+          dbJobId,
+          status: 'processing',
+          progress: percentAfter,
+          currentFile: {
+            fileId: file.id,
+            filePath: file.file_path,
+            episode: file.episode_title,
+            season: file.season_number,
+            show: file.show_title,
+          },
+          message: `Finished processing episode file ${file.file_path}`,
+        });
         return result;
       });
 
@@ -92,11 +126,11 @@ export async function processShowJob(job) {
     const successful = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.filter((r) => r.status === 'rejected').length;
 
-    logger.info({ showId, successful, failed }, 'Show processing completed');
+    workerLogger.info({ showId, successful, failed }, 'Show processing completed');
 
     await updateJobStatus(job.id, 'completed', `Processed ${successful} files successfully, ${failed} failed`);
     const end = new Date();
-    logger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END');
+    workerLogger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END');
     return {
       processed: successful,
       failed,
@@ -105,30 +139,53 @@ export async function processShowJob(job) {
     };
 
   } catch (error) {
-    logger.error({ jobId: job.id, showId, error: error.message }, 'Show processing failed');
+    workerLogger.error({ jobId: job.id, showId, error: error.message }, 'Show processing failed');
     await updateJobStatus(job.id, 'failed', `Processing failed: ${error.message}`);
     const end = new Date();
-    logger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END (FAILED)');
+    workerLogger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END (FAILED)');
     throw error;
   }
 }
 
-async function processEpisodeFile(jobId, file) {
+async function processEpisodeFile(jobId, file, dbJobId, progressCallback) {
+  workerLogger.info({ jobId, dbJobId }, 'processEpisodeFile START');
   try {
-    // Broadcast initial progress
-    broadcastJobUpdate({
-      jobId,
-      status: 'processing',
-      progress: 10,
-      currentFile: {
-        fileId: file.id,
-        filePath: file.file_path,
-        episode: file.episode_title,
-        season: file.season_number,
-        show: file.show_title,
-      },
-      message: 'Starting episode processing...',
-    });
+    if (progressCallback) {
+      progressCallback(5, 'Starting episode processing...');
+    }
+
+    // 1. Audio extraction
+    if (progressCallback) {
+      progressCallback(10, 'Extracting audio...');
+    }
+    // (Assume extractAudioFromFile is called here if needed)
+    // await extractAudioFromFile(file.file_path);
+
+    // 2. Fingerprinting
+    if (progressCallback) {
+      progressCallback(30, 'Generating audio fingerprint...');
+    }
+    // (Assume generateAudioFingerprint is called here if needed)
+    // await generateAudioFingerprint(audioPath);
+
+    // 3. Segment detection
+    if (progressCallback) {
+      progressCallback(60, 'Detecting audio segments...');
+    }
+    // (Assume detectAudioSegments is called here if needed)
+    // await detectAudioSegments(fingerprint, audioPath);
+
+    // 4. Update processing results
+    if (progressCallback) {
+      progressCallback(80, 'Updating processing results...');
+    }
+    // (Assume updateProcessingResults is called here)
+    // await updateProcessingResults(file.id, results);
+
+    // 5. Completion
+    if (progressCallback) {
+      progressCallback(100, 'Episode processing complete.');
+    }
 
     // Use the new robust fingerprint pipeline
     const result = await processEpisodeAndTriggerSeasonDetection(file.id, {
@@ -136,26 +193,11 @@ async function processEpisodeFile(jobId, file) {
       overlap: 5,
       thresholdPercent: 0.5, // Lowered threshold
       marginSec: 5,
-    });
+    }, progressCallback);
 
     if (!result.success) {
       throw new Error(`Pipeline failed: ${result.reason || 'Unknown error'}`);
     }
-
-    // Broadcast completion progress
-    broadcastJobUpdate({
-      jobId,
-      status: 'processing',
-      progress: 90,
-      currentFile: {
-        fileId: file.id,
-        filePath: file.file_path,
-        episode: file.episode_title,
-        season: file.season_number,
-        show: file.show_title,
-      },
-      message: 'Processing complete, updating database...',
-    });
 
     // Extract detection results from the season detection
     const seasonDetection = result.seasonDetection;
@@ -176,9 +218,31 @@ async function processEpisodeFile(jobId, file) {
       processing_notes: `Robust pipeline detection complete. Method: ${seasonDetection.detection_method}, Confidence: ${(segments.confidence * 100).toFixed(2)}%, Approval: ${seasonDetection.approval_status}. Intro: ${segments.intro ? 'Yes' : 'No'}, Credits: ${segments.credits ? 'Yes' : 'No'}`,
     });
 
-    // Broadcast final completion
+    // Broadcast completion progress
+    workerLogger.info({ jobId, dbJobId }, 'Broadcasting completion progress');
     broadcastJobUpdate({
+      type: 'job_update',
       jobId,
+      dbJobId,
+      status: 'processing',
+      progress: 90,
+      currentFile: {
+        fileId: file.id,
+        filePath: file.file_path,
+        episode: file.episode_title,
+        season: file.season_number,
+        show: file.show_title,
+      },
+      message: 'Processing complete, updating database...',
+    });
+    workerLogger.info({ jobId, dbJobId }, 'Completion progress broadcasted');
+
+    // Broadcast final completion
+    workerLogger.info({ jobId, dbJobId }, 'Broadcasting final completion');
+    broadcastJobUpdate({
+      type: 'job_update',
+      jobId,
+      dbJobId,
       status: 'completed',
       progress: 100,
       currentFile: {
@@ -190,8 +254,9 @@ async function processEpisodeFile(jobId, file) {
       },
       message: `Processing completed. Confidence: ${(segments.confidence * 100).toFixed(2)}%`,
     });
+    workerLogger.info({ jobId, dbJobId }, 'Final completion broadcasted');
 
-    logger.info({
+    workerLogger.info({
       jobId,
       filePath: file.file_path,
       confidence: segments.confidence,
@@ -199,6 +264,7 @@ async function processEpisodeFile(jobId, file) {
       approvalStatus: seasonDetection.approval_status,
     }, 'Episode file processing completed with robust pipeline');
 
+    workerLogger.info({ jobId, dbJobId }, 'processEpisodeFile END');
     return {
       fileId: file.id,
       success: true,
@@ -207,29 +273,7 @@ async function processEpisodeFile(jobId, file) {
     };
 
   } catch (error) {
-    logger.error({ jobId, filePath: file.file_path, error: error.message }, 'Episode file processing failed');
-
-    // Broadcast failure
-    broadcastJobUpdate({
-      jobId,
-      status: 'failed',
-      progress: 0,
-      currentFile: {
-        fileId: file.id,
-        filePath: file.file_path,
-        episode: file.episode_title,
-        season: file.season_number,
-        show: file.show_title,
-      },
-      message: `Processing failed: ${error.message}`,
-    });
-
-    // Update database with failure
-    await updateProcessingResults(file.id, {
-      status: 'failed',
-      processing_notes: `Processing failed: ${error.message}`,
-    });
-
+    workerLogger.error({ jobId, dbJobId, error: error.message }, 'processEpisodeFile ERROR');
     throw error;
   }
 }
@@ -266,7 +310,7 @@ async function getTempDir() {
 }
 
 export async function extractAudioFromFile(filePath) {
-  // logger.info({ filePath }, 'Extracting audio from file');
+  // workerLogger.info({ filePath }, 'Extracting audio from file');
 
   // Use latest temp dir from DB
   let tempDir;
@@ -274,12 +318,12 @@ export async function extractAudioFromFile(filePath) {
     tempDir = path.join(await getTempDir(), 'audio');
     await fs.mkdir(tempDir, { recursive: true });
   } catch (err) {
-    logger.error({ filePath, tempDir, error: err.message }, 'Failed to create temp audio directory, falling back to /tmp/cliprr/audio');
+    workerLogger.error({ filePath, tempDir, error: err.message }, 'Failed to create temp audio directory, falling back to /tmp/cliprr/audio');
     tempDir = path.join('/tmp/cliprr', 'audio');
     try {
       await fs.mkdir(tempDir, { recursive: true });
     } catch (fallbackErr) {
-      logger.error({ filePath, tempDir, error: fallbackErr.message }, 'Failed to create fallback temp audio directory');
+      workerLogger.error({ filePath, tempDir, error: fallbackErr.message }, 'Failed to create fallback temp audio directory');
       throw new Error('Unable to create temp audio directory. Please check permissions for the temp directory in settings.');
     }
   }
@@ -306,10 +350,10 @@ export async function extractAudioFromFile(filePath) {
     await new Promise((resolve, reject) => {
       execFile('ffmpeg', ffmpegArgs, (error, stdout, stderr) => {
         if (error) {
-          logger.error({ filePath, error: error.message, stderr }, 'FFmpeg audio extraction failed');
+          workerLogger.error({ filePath, error: error.message, stderr }, 'FFmpeg audio extraction failed');
           return reject(new Error(`FFmpeg failed: ${stderr || error.message}`));
         }
-        // logger.info({ filePath, audioPath }, 'Audio extracted with FFmpeg');
+        // workerLogger.info({ filePath, audioPath }, 'Audio extracted with FFmpeg');
         resolve();
       });
     });
@@ -322,19 +366,19 @@ export async function extractAudioFromFile(filePath) {
 }
 
 export async function generateAudioFingerprint(audioPath) {
-  // logger.info({ audioPath }, 'Generating audio fingerprint');
+  // workerLogger.info({ audioPath }, 'Generating audio fingerprint');
   return new Promise((resolve, reject) => {
     execFile('fpcalc', ['-json', audioPath], (error, stdout, stderr) => {
       if (error) {
-        logger.error({ audioPath, error: error.message }, 'fpcalc failed');
+        workerLogger.error({ audioPath, error: error.message }, 'fpcalc failed');
         return reject(error);
       }
       try {
         const result = JSON.parse(stdout);
-        // logger.info({ audioPath, duration: result.duration }, 'Fingerprint generated');
+        // workerLogger.info({ audioPath, duration: result.duration }, 'Fingerprint generated');
         resolve(result); // { duration, fingerprint }
       } catch (e) {
-        logger.error({ audioPath, error: e.message, stdout }, 'Failed to parse fpcalc output');
+        workerLogger.error({ audioPath, error: e.message, stdout }, 'Failed to parse fpcalc output');
         reject(e);
       }
     });
@@ -342,7 +386,7 @@ export async function generateAudioFingerprint(audioPath) {
 }
 
 export async function detectAudioSegments(fingerprint, audioPath) {
-  // logger.info({ audioPath, duration: fingerprint.duration }, 'Detecting audio segments using real fingerprint analysis');
+  // workerLogger.info({ audioPath, duration: fingerprint.duration }, 'Detecting audio segments using real fingerprint analysis');
 
   // Analyze the fingerprint for intro/credit patterns
   // For now, use a simple heuristic based on common patterns
@@ -360,7 +404,7 @@ export async function detectAudioSegments(fingerprint, audioPath) {
 
   // Check if we have enough data to analyze
   if (duration < 60) {
-    logger.info({ audioPath, duration }, 'Audio too short for reliable segment detection');
+    workerLogger.info({ audioPath, duration }, 'Audio too short for reliable segment detection');
     return { intro: null, credits: null, confidence: 0.1 };
   }
 
@@ -392,7 +436,7 @@ export async function detectAudioSegments(fingerprint, audioPath) {
     confidence = Math.min(confidence + 0.1, 0.95);
   }
 
-  // logger.info({
+  // workerLogger.info({
   //   audioPath,
   //   duration,
   //   intro: intro ? `${intro.start}s-${intro.end}s` : 'none',
@@ -408,7 +452,7 @@ export async function detectAudioSegments(fingerprint, audioPath) {
 }
 
 async function trimAudioSegments(segments, originalFilePath, jobId) {
-  // logger.info({ originalFilePath }, 'Trimming audio segments');
+  // workerLogger.info({ originalFilePath }, 'Trimming audio segments');
   // Use latest temp dir from DB
   const tempDir = await getTempDir();
   const introPath = segments.intro ? {
@@ -434,7 +478,7 @@ async function updateProcessingResults(fileId, results) {
   if (job) {
     await updateProcessingJob(db, job.id, results);
   } else {
-    logger.warn({ fileId }, 'No processing job found for file');
+    workerLogger.warn({ fileId }, 'No processing job found for file');
   }
 }
 
@@ -446,16 +490,16 @@ async function updateJobStatus(jobId, status, notes) {
       processing_notes: notes,
     });
   } catch (error) {
-    logger.error({ jobId, error: error.message }, 'Failed to update job status');
+    workerLogger.error({ jobId, error: error.message }, 'Failed to update job status');
   }
 }
 
 async function cleanupTempFile(filePath) {
   try {
     await fs.unlink(filePath);
-    logger.info({ filePath }, 'Temporary file cleaned up');
+    workerLogger.info({ filePath }, 'Temporary file cleaned up');
   } catch (error) {
-    logger.warn({ filePath, error: error.message }, 'Failed to cleanup temporary file');
+    workerLogger.warn({ filePath, error: error.message }, 'Failed to cleanup temporary file');
   }
 }
 

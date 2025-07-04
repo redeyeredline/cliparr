@@ -202,6 +202,28 @@ class ApiClient {
     const response = await api.post('/processing/cleanup-temp-files');
     return response.data;
   }
+
+  // Queue status endpoint
+  async getQueueStatus() {
+    const response = await api.get('/processing/queue/status');
+    return response.data;
+  }
+
+  // Processing status endpoint
+  async getProcessingStatus() {
+    const response = await api.get('/processing/status');
+    return response.data;
+  }
+
+  // Detection segments endpoint
+  async getDetectionSegments(showId, seasonNumber) {
+    let url = `/shows/${showId}/segments`;
+    if (seasonNumber) {
+      url += `?season=${seasonNumber}`;
+    }
+    const response = await api.get(url);
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();

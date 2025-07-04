@@ -31,6 +31,7 @@ interface ProcessingQueueProps {
   setSelected: (ids: (string | number)[]) => void;
   onBulkDelete?: () => Promise<void>;
   bulkDeleteLoading?: boolean;
+  jobProgress?: Record<string, { progress: number; fps: number; currentFile: any; updated: number }>;
 }
 
 export default function ProcessingQueue({
@@ -44,6 +45,7 @@ export default function ProcessingQueue({
   setSelected,
   onBulkDelete,
   bulkDeleteLoading,
+  jobProgress = {},
 }: ProcessingQueueProps) {
   const [filter, setFilter] = useState<string>('all');
   const [selectAllLoading, setSelectAllLoading] = useState(false);

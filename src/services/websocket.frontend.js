@@ -25,6 +25,7 @@ class WebSocketClient {
 
       this.ws.onopen = () => {
         logger.info('WebSocket connected');
+        console.log('[WebSocketClient] Connected to ws://localhost:8485/ws');
         this.reconnectAttempts = 0;
         this.isConnecting = false;
         if (this.lastConnectionState !== 'connected') {
@@ -34,21 +35,39 @@ class WebSocketClient {
       };
 
       this.ws.onmessage = (event) => {
+        console.log('[WebSocketClient] Raw message:', event.data);
         try {
           const data = JSON.parse(event.data);
+          console.log('[WebSocketClient] Parsed message:', data);
+
+          // Log specific message types for debugging
+          if (data.type === 'job_update' || data.dbJobId) {
+            console.log('[WebSocketClient] Job update received:', {
+              type: data.type,
+              jobId: data.jobId,
+              dbJobId: data.dbJobId,
+              status: data.status,
+              progress: data.progress,
+              message: data.message,
+            });
+          }
+
           this.notifyListeners('message', data);
         } catch (error) {
           logger.error('Failed to parse WebSocket message:', error);
+          console.error('[WebSocketClient] Failed to parse message:', event.data, error);
         }
       };
 
       this.ws.onerror = (error) => {
         logger.error('WebSocket error:', error);
+        console.error('[WebSocketClient] WebSocket error:', error);
         this.notifyListeners('error', error);
       };
 
       this.ws.onclose = () => {
         logger.info('WebSocket disconnected');
+        console.log('[WebSocketClient] Disconnected from ws://localhost:8485/ws');
         this.isConnecting = false;
         if (this.lastConnectionState !== 'disconnected') {
           this.lastConnectionState = 'disconnected';
@@ -63,6 +82,7 @@ class WebSocketClient {
       };
     } catch (error) {
       logger.error('Failed to create WebSocket connection:', error);
+      console.error('[WebSocketClient] Failed to create WebSocket connection:', error);
       this.isConnecting = false;
       this.notifyListeners('error', error);
     }
@@ -98,9 +118,11 @@ class WebSocketClient {
 
   send(data) {
     if (this.ws?.readyState === WebSocket.OPEN) {
+      console.log('[WebSocketClient] Sending message:', data);
       this.ws.send(JSON.stringify(data));
     } else {
       logger.warn('WebSocket not connected, cannot send message');
+      console.warn('[WebSocketClient] Cannot send message, not connected:', data);
     }
   }
 }

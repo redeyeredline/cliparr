@@ -18,6 +18,8 @@ import { wsClient } from '../services/websocket.frontend.js';
 import { useToast } from '../components/ToastContext';
 import { Trash2, Loader2, CheckCircle2 } from 'lucide-react';
 import { apiClient } from '../integration/api-client';
+import { logger } from '../services/logger.frontend.js';
+import { Button } from '@/components/ui/button';
 
 export default function Processing() {
   const [jobs, setJobs] = useState<ProcessingJob[]>([]);
@@ -52,6 +54,8 @@ export default function Processing() {
         (j: ProcessingJob) => j.status === 'processing' || j.status === 'scanning',
       );
       setActiveProcesses(processing);
+      console.log('[loadData] jobsData:', jobsData);
+      console.log('[loadData] processing:', processing);
     } catch (error) {
       console.error('Error loading processing data:', error);
     } finally {
@@ -63,13 +67,132 @@ export default function Processing() {
 
   // WebSocket event handlers
   useEffect(() => {
+    logger.info('Monitor tab mounted');
+
+    // Add a simple message logger to debug all incoming messages
+    const handleAllMessages = (data: any) => {
+      console.log('[Processing] ALL WebSocket messages received:', data);
+      logger.info('[Processing] ALL WebSocket messages received:', data);
+    };
+
+    // Helper to normalize job IDs (strip 'epjob-' prefix)
+    const normalizeId = (id: string | number | undefined) => (id ? id.toString().replace(/^epjob-/, '') : '');
+
     const handleJobUpdate = (data: any) => {
+      logger.info('[Processing] WebSocket message received:', data);
+      logger.info('[Processing] Message type check:', {
+        hasJobId: !!data.jobId,
+        hasStatus: !!data.status,
+        hasType: !!data.type,
+        jobId: data.jobId,
+        dbJobId: data.dbJobId,
+        status: data.status,
+      });
+
+      // Handle job updates - these come directly without a 'type' field
+      if (data.dbJobId && data.status) {
+        logger.info('[Processing] Processing direct job update:', { jobId: data.jobId, dbJobId: data.dbJobId, status: data.status });
+
+        // Check if this job exists in our current jobs array (normalize IDs)
+        const existingJob = jobs.find((j) => normalizeId(j.id) === normalizeId(data.dbJobId));
+
+        // If job doesn't exist in our array, reload data to get latest jobs
+        if (!existingJob) {
+          logger.info('[Processing] Job not found in current jobs array, reloading data:', data.dbJobId);
+          loadData();
+          return; // Exit early, let the reload handle the update
+        }
+
+        // Track real-time progress/fps for processing jobs
+        if (data.status === 'processing' && data.progress !== undefined) {
+          logger.info('[Processing] Setting job progress for:', data.dbJobId, { progress: data.progress, currentFile: data.currentFile });
+          setJobProgress((prev) => {
+            const newProgress = {
+              ...prev,
+              [normalizeId(data.dbJobId) || '']: {
+                progress: data.progress,
+                fps: data.fps,
+                currentFile: data.currentFile,
+                updated: Date.now(),
+              },
+            };
+            logger.info('[Processing] Updated jobProgress:', newProgress);
+            return newProgress;
+          });
+        }
+        // Remove progress for jobs that are completed/failed
+        if (['completed', 'failed'].includes(data.status)) {
+          logger.info('[Processing] Removing job progress for:', data.dbJobId);
+          setJobProgress((prev) => {
+            const copy = { ...prev };
+            delete copy[normalizeId(data.dbJobId) || ''];
+            logger.info('[Processing] Updated jobProgress after removal:', copy);
+            return copy;
+          });
+        }
+        // Update the specific job in the state
+        setJobs((prevJobs) => {
+          logger.info('[Processing] Updating job in jobs state:', data.dbJobId);
+          const updated = prevJobs.map((job) => {
+            if (!job) {
+              return job;
+            }
+            if (normalizeId(job.id) === normalizeId(data.dbJobId)) {
+              logger.info('[Processing] Found matching job:', job.id, 'updating status to:', data.status);
+              return {
+                ...job,
+                status: data.status,
+                processing_notes: data.error || data.result?.message || job.processing_notes,
+                updated_date: new Date().toISOString(),
+              };
+            }
+            return job;
+          });
+          console.log('[WebSocket] Updated jobs:', updated);
+          return updated;
+        });
+
+        // Show toast notification for important updates
+        if (data.status === 'completed') {
+          logger.info('[Processing] Job completed:', data.dbJobId);
+          toast({
+            type: 'success',
+            message: `Job ${data.dbJobId} completed successfully`,
+          });
+        } else if (data.status === 'failed') {
+          logger.info('[Processing] Job failed:', data.dbJobId, data.error || data.message);
+          toast({
+            type: 'error',
+            message: `Job ${data.dbJobId} failed: ${data.error || data.message}`,
+          });
+        } else if (data.status === 'active') {
+          logger.info('[Processing] Job started processing:', data.dbJobId);
+          toast({
+            type: 'info',
+            message: `Job ${data.dbJobId} started processing`,
+          });
+        }
+      }
+
+      // Handle legacy job_update type messages (for backward compatibility)
       if (data.type === 'job_update') {
+        logger.info('[Processing] Processing legacy job_update message:', data);
+
+        // Check if this job exists in our current jobs array (normalize IDs)
+        const existingJob = jobs.find((j) => normalizeId(j.id) === normalizeId(data.dbJobId));
+
+        // If job doesn't exist in our array, reload data to get latest jobs
+        if (!existingJob) {
+          logger.info('[Processing] Job not found in current jobs array (legacy), reloading data:', data.dbJobId);
+          loadData();
+          return; // Exit early, let the reload handle the update
+        }
+
         // Track real-time progress/fps for processing jobs
         if (data.status === 'processing' && data.progress !== undefined) {
           setJobProgress((prev) => ({
             ...prev,
-            [data.jobId]: {
+            [normalizeId(data.dbJobId) || '']: {
               progress: data.progress,
               fps: data.fps,
               currentFile: data.currentFile,
@@ -81,14 +204,17 @@ export default function Processing() {
         if (['completed', 'failed'].includes(data.status)) {
           setJobProgress((prev) => {
             const copy = { ...prev };
-            delete copy[data.jobId];
+            delete copy[normalizeId(data.dbJobId) || ''];
             return copy;
           });
         }
         // Update the specific job in the state
         setJobs((prevJobs) => {
           return prevJobs.map((job) => {
-            if (job.id?.toString() === data.jobId?.toString()) {
+            if (!job) {
+              return job;
+            }
+            if (normalizeId(job.id) === normalizeId(data.dbJobId)) {
               return {
                 ...job,
                 status: data.status,
@@ -104,29 +230,31 @@ export default function Processing() {
         if (data.status === 'completed') {
           toast({
             type: 'success',
-            message: `Job ${data.jobId} completed successfully`,
+            message: `Job ${data.dbJobId} completed successfully`,
           });
         } else if (data.status === 'failed') {
           toast({
             type: 'error',
-            message: `Job ${data.jobId} failed: ${data.error}`,
+            message: `Job ${data.dbJobId} failed: ${data.error}`,
           });
         } else if (data.status === 'active') {
           toast({
             type: 'info',
-            message: `Job ${data.jobId} started processing`,
+            message: `Job ${data.dbJobId} started processing`,
           });
         }
       }
     };
 
     const handleQueueStatus = (data: any) => {
+      logger.info('[Processing] Queue status update:', data);
       if (data.type === 'queue_status') {
         setQueueStatus(data.queues);
       }
     };
 
     const handleProcessingStatus = (data: any) => {
+      logger.info('[Processing] Processing status update:', data);
       if (data.type === 'processing_status') {
         // Update processing status
         setQueueStatus(data);
@@ -134,26 +262,31 @@ export default function Processing() {
     };
 
     // Add WebSocket event listeners
+    wsClient.addEventListener('message', handleAllMessages);
     wsClient.addEventListener('message', handleJobUpdate);
     wsClient.addEventListener('message', handleQueueStatus);
     wsClient.addEventListener('message', handleProcessingStatus);
+    wsClient.addEventListener('open', () => logger.info('WebSocket connected'));
+    wsClient.addEventListener('close', () => logger.info('WebSocket disconnected'));
+    wsClient.addEventListener('error', (e: Event) => logger.error('WebSocket error', e));
 
     // Ensure WebSocket is connected
     wsClient.connect();
 
     return () => {
       // Clean up event listeners
+      wsClient.removeEventListener('message', handleAllMessages);
       wsClient.removeEventListener('message', handleJobUpdate);
       wsClient.removeEventListener('message', handleQueueStatus);
       wsClient.removeEventListener('message', handleProcessingStatus);
     };
-  }, [toast]);
+  }, [toast, jobs, loadData]);
 
-  useEffect(() => {
-    loadData();
-    const intervalId = setInterval(loadData, 10000); // Poll every 10 seconds for updates
-    return () => clearInterval(intervalId);
-  }, []);
+  // useEffect(() => {
+  //   loadData();
+  //   const intervalId = setInterval(loadData, 10000); // Poll every 10 seconds for updates
+  //   return () => clearInterval(intervalId);
+  // }, []);
 
   const startBatchProcessing = async (
     jobIds: (string | number)[],
@@ -263,9 +396,15 @@ export default function Processing() {
 
   // Only show jobs with status 'processing' and a recent progress update (last 30s)
   const now = Date.now();
-  const activeJobs = jobs.filter((j) => {
-    const id = j.id;
-    return (id !== undefined && jobProgress[id as string | number] && now - jobProgress[id as string | number].updated < 30000);
+  const activeJobs = Object.keys(jobProgress)
+    .map((id) => jobs.find((j) => j.id?.toString() === id))
+    .filter((j) => j && now - jobProgress[j.id as string | number].updated < 30000);
+
+  console.log('[Processing] ActiveJobs result:', {
+    totalJobs: jobs.length,
+    activeJobsCount: activeJobs.length,
+    jobProgressKeys: Object.keys(jobProgress),
+    activeJobs: activeJobs.map((j) => j ? { id: j.id, status: j.status, progress: jobProgress[j.id as string | number]?.progress } : null),
   });
 
   return (
@@ -273,6 +412,19 @@ export default function Processing() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold text-white">Processing</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => {
+              console.log('[Processing] Sending test WebSocket message');
+              wsClient.send({ type: 'test', message: 'Test from Processing page' });
+            }}
+            variant="outline"
+            size="sm"
+            className="text-white border-slate-600 hover:bg-slate-700"
+          >
+            Test WebSocket
+          </Button>
         </div>
       </div>
       {/* Queue Status Overview */}
@@ -345,13 +497,15 @@ export default function Processing() {
             setSelected={setSelected}
             onBulkDelete={handleBulkDelete}
             bulkDeleteLoading={bulkDeleteLoading}
+            jobProgress={jobProgress}
           />
         </TabsContent>
 
         <TabsContent value="monitor" className="space-y-6">
           <ProcessingMonitor
-            activeProcesses={activeJobs.map((j) => ({ ...j, ...jobProgress[j.id as string | number] }))}
+            activeProcesses={activeProcesses}
             mediaFiles={mediaFiles}
+            jobProgress={jobProgress}
           />
         </TabsContent>
 

@@ -19,7 +19,7 @@ export interface ProcessingJob {
 export class ProcessingJobEntity {
   static async list(sortBy?: string): Promise<ProcessingJob[]> {
     try {
-      const response = await api.get(`/api/processing/jobs?sortBy=${sortBy || '-created_date'}`);
+      const response = await api.get(`/processing/jobs?sortBy=${sortBy || '-created_date'}`);
       return response.data.jobs || [];
     } catch (error) {
       console.error('Error fetching processing jobs:', error);
@@ -29,7 +29,7 @@ export class ProcessingJobEntity {
 
   static async update(id: string | number, data: Partial<ProcessingJob>): Promise<void> {
     try {
-      await api.put(`/api/processing/jobs/${id}`, data);
+      await api.put(`/processing/jobs/${id}`, data);
     } catch (error) {
       console.error('Error updating processing job:', error);
       throw error;
@@ -38,7 +38,7 @@ export class ProcessingJobEntity {
 
   static async getById(id: string | number): Promise<ProcessingJob | null> {
     try {
-      const response = await api.get(`/api/processing/jobs/${id}`);
+      const response = await api.get(`/processing/jobs/${id}`);
       return response.data.job || null;
     } catch (error) {
       console.error('Error fetching processing job:', error);
@@ -48,7 +48,7 @@ export class ProcessingJobEntity {
 
   static async delete(id: string | number): Promise<void> {
     try {
-      await api.delete(`/api/processing/jobs/${id}`);
+      await api.delete(`/processing/jobs/${id}`);
     } catch (error) {
       console.error('Error deleting processing job:', error);
       throw error;
@@ -57,7 +57,7 @@ export class ProcessingJobEntity {
 
   static async getAllIds(status?: string): Promise<(string | number)[]> {
     try {
-      let url = '/api/processing/jobs/ids';
+      let url = '/processing/jobs/ids';
       if (status && status !== 'all') {
         url += `?status=${encodeURIComponent(status)}`;
       }
@@ -72,7 +72,7 @@ export class ProcessingJobEntity {
   static async bulkDelete({ jobIds, all }: { jobIds?: (string | number)[], all?: boolean }): Promise<any> {
     try {
       console.log('bulkDelete payload:', all ? { all: true } : { jobIds });
-      const response = await api.post('/api/processing/jobs/bulk-delete', all ? { all: true } : { jobIds });
+      const response = await api.post('/processing/jobs/bulk-delete', all ? { all: true } : { jobIds });
       return response.data;
     } catch (error) {
       console.error('Error bulk deleting jobs:', error);

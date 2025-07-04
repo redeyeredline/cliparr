@@ -12,7 +12,7 @@ import {
   setSetting,
 } from '../database/Db_Operations.js';
 import { updateWorkerLimits, pauseCpuWorkers, resumeCpuWorkers, pauseGpuWorkers, resumeGpuWorkers } from '../services/queue.js';
-import { logger } from '../services/logger.js';
+import { appLogger } from '../services/logger.js';
 import os from 'os';
 import path from 'path';
 import fs from 'fs/promises';
@@ -61,7 +61,7 @@ router.post('/import-mode', async (req, res) => {
 
     res.json({ status: 'ok', mode });
   } catch (error) {
-    logger.error('Failed to set import mode:', error);
+    appLogger.error('Failed to set import mode:', error);
     res.status(500).json({
       error: 'Failed to set import mode',
       details: error && (error.stack || error.message || error),
@@ -76,7 +76,7 @@ router.get('/polling-interval', async (req, res) => {
     const interval = getPollingInterval(db);
     res.json({ interval });
   } catch (error) {
-    logger.error('Failed to get polling interval:', error);
+    appLogger.error('Failed to get polling interval:', error);
     res.status(500).json({
       error: 'Failed to get polling interval',
       details: error && (error.stack || error.message || error),
@@ -106,7 +106,7 @@ router.post('/polling-interval', async (req, res) => {
     const savedInterval = getPollingInterval(db);
     res.json({ status: 'ok', interval: savedInterval });
   } catch (error) {
-    logger.error('Failed to set polling interval:', error);
+    appLogger.error('Failed to set polling interval:', error);
     res.status(500).json({
       error: 'Failed to set polling interval',
       details: error && (error.stack || error.message || error),
@@ -149,7 +149,7 @@ router.get('/all', async (req, res) => {
     }
     res.json(settings);
   } catch (error) {
-    logger.error('Failed to get all settings:', error);
+    appLogger.error('Failed to get all settings:', error);
     res.status(500).json({ error: 'Failed to get all settings' });
   }
 });
@@ -205,16 +205,16 @@ router.post('/all', async (req, res) => {
     if ((cpu_worker_limit !== undefined && !isNaN(cpu_worker_limit)) || (gpu_worker_limit !== undefined && !isNaN(gpu_worker_limit))) {
       try {
         await updateWorkerLimits();
-        logger.info('Worker limits updated successfully');
+        appLogger.info('Worker limits updated successfully');
       } catch (error) {
-        logger.error('Failed to update worker limits:', error);
+        appLogger.error('Failed to update worker limits:', error);
         // Don't fail the entire request, just log the error
       }
     }
 
     res.json({ status: 'ok' });
   } catch (error) {
-    logger.error('Failed to update all settings:', error);
+    appLogger.error('Failed to update all settings:', error);
     res.status(500).json({ error: 'Failed to update all settings' });
   }
 });
@@ -244,7 +244,7 @@ router.post('/queue/pause-cpu', async (req, res) => {
     await pauseCpuWorkers();
     res.json({ status: 'ok' });
   } catch (error) {
-    logger.error('Failed to pause CPU workers:', error);
+    appLogger.error('Failed to pause CPU workers:', error);
     res.status(500).json({ error: 'Failed to pause CPU workers' });
   }
 });
@@ -255,7 +255,7 @@ router.post('/queue/resume-cpu', async (req, res) => {
     await resumeCpuWorkers();
     res.json({ status: 'ok' });
   } catch (error) {
-    logger.error('Failed to resume CPU workers:', error);
+    appLogger.error('Failed to resume CPU workers:', error);
     res.status(500).json({ error: 'Failed to resume CPU workers' });
   }
 });
@@ -266,7 +266,7 @@ router.post('/queue/pause-gpu', async (req, res) => {
     await pauseGpuWorkers();
     res.json({ status: 'ok' });
   } catch (error) {
-    logger.error('Failed to pause GPU workers:', error);
+    appLogger.error('Failed to pause GPU workers:', error);
     res.status(500).json({ error: 'Failed to pause GPU workers' });
   }
 });
@@ -277,7 +277,7 @@ router.post('/queue/resume-gpu', async (req, res) => {
     await resumeGpuWorkers();
     res.json({ status: 'ok' });
   } catch (error) {
-    logger.error('Failed to resume GPU workers:', error);
+    appLogger.error('Failed to resume GPU workers:', error);
     res.status(500).json({ error: 'Failed to resume GPU workers' });
   }
 });

@@ -3,7 +3,7 @@
 
 import express from 'express';
 import axios from 'axios';
-import { logger } from '../services/logger.js';
+import { appLogger } from '../services/logger.js';
 import dotenv from 'dotenv';
 import process from 'process';
 import WebSocket from 'ws';
@@ -53,7 +53,7 @@ router.get('/unimported', async (req, res) => {
 
     res.json(showsWithEpisodeCounts);
   } catch (error) {
-    logger.error({ error: error.message }, 'Failed to fetch unimported shows');
+    appLogger.error({ error: error.message }, 'Failed to fetch unimported shows');
     res.status(500).json({ error: 'Failed to fetch unimported shows', details: error.message });
   }
 });
@@ -181,7 +181,7 @@ async function importShowById(showId, req, wss, db) {
 
     return { success: true, showId: dbShowId };
   } catch (error) {
-    logger.error({ error: error.message, stack: error.stack }, 'Failed to import show');
+    appLogger.error({ error: error.message, stack: error.stack }, 'Failed to import show');
     // Send error update
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
@@ -201,11 +201,11 @@ async function importShowById(showId, req, wss, db) {
 // --- Single import route ---
 router.post('/import/:id', async (req, res) => {
   if (!req.app.get('db')) {
-    logger.error('Database instance is not set on app');
+    appLogger.error('Database instance is not set on app');
     return res.status(500).json({ success: false, message: 'Database not initialized' });
   }
-  if (!logger) {
-    logger.error('Logger is not set on app');
+  if (!appLogger) {
+    appLogger.error('Logger is not set on app');
     return res.status(500).json({ success: false, message: 'Logger not initialized' });
   }
   try {
@@ -226,11 +226,11 @@ router.post('/import/:id', async (req, res) => {
 // --- Batch import route ---
 router.post('/import', async (req, res) => {
   if (!req.app.get('db')) {
-    logger.error('Database instance is not set on app');
+    appLogger.error('Database instance is not set on app');
     return res.status(500).json({ success: false, message: 'Database not initialized' });
   }
-  if (!logger) {
-    logger.error('Logger is not set on app');
+  if (!appLogger) {
+    appLogger.error('Logger is not set on app');
     return res.status(500).json({ success: false, message: 'Logger not initialized' });
   }
   const { showIds } = req.body;

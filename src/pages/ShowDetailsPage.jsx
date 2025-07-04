@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronUp, ArrowLeft, Folder, FileText } from 'lucide-react';
 import { apiClient } from '../integration/api-client';
 import { useToast } from '../components/ToastContext';
+import DetectionResults from '../components/DetectionResults';
 
 const ShowDetailsPage = () => {
   const { id } = useParams();
@@ -134,7 +135,11 @@ const ShowDetailsPage = () => {
 
         {/* Content */}
         <div className="flex-1 overflow-auto">
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-6">
+            {/* Detection Results */}
+            <DetectionResults showId={parseInt(id)} />
+
+            {/* Seasons */}
             {sortedSeasons.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -144,124 +149,127 @@ const ShowDetailsPage = () => {
                 <p className="text-gray-500">This show doesn't have any seasons imported yet.</p>
               </div>
             ) : (
-              sortedSeasons.map((season) => {
-                const isExpanded = expandedSeasons.has(season.id);
+              <div className="space-y-4">
+                <h2 className="text-xl font-bold text-white">Seasons</h2>
+                {sortedSeasons.map((season) => {
+                  const isExpanded = expandedSeasons.has(season.id);
 
-                return (
-                  <div
-                    key={season.id}
-                    className="bg-gray-800/30 backdrop-blur-sm border border-gray-700/50 rounded-2xl overflow-hidden"
-                  >
-                    {/* Season Header - Top Collapse/Expand */}
-                    <button
-                      onClick={() => toggleSeason(season.id)}
-                      className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-700/20 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  return (
+                    <div
+                      key={season.id}
+                      className="bg-gray-800/30 backdrop-blur-sm border border-gray-700/50 rounded-2xl overflow-hidden"
                     >
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-                          <span className="text-white font-bold text-sm">{season.season_number}</span>
+                      {/* Season Header - Top Collapse/Expand */}
+                      <button
+                        onClick={() => toggleSeason(season.id)}
+                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-700/20 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                            <span className="text-white font-bold text-sm">{season.season_number}</span>
+                          </div>
+                          <div className="text-left">
+                            <h3 className="text-lg font-semibold text-white">
+                              Season {season.season_number}
+                            </h3>
+                            <p className="text-sm text-gray-400">
+                              {season.episode_count} episode{season.episode_count !== 1 ? 's' : ''}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-left">
-                          <h3 className="text-lg font-semibold text-white">
-                            Season {season.season_number}
-                          </h3>
-                          <p className="text-sm text-gray-400">
-                            {season.episode_count} episode{season.episode_count !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-400">
-                          {isExpanded ? 'Collapse' : 'Expand'}
-                        </span>
-                        {isExpanded ? (
-                          <ChevronUp className="w-5 h-5 text-gray-400" />
-                        ) : (
-                          <ChevronDown className="w-5 h-5 text-gray-400" />
-                        )}
-                      </div>
-                    </button>
-
-                    {/* Season Content */}
-                    {isExpanded && (
-                      <>
-                        <div className="border-t border-gray-700/50">
-                          {season.episodes && season.episodes.length > 0 ? (
-                            <div className="overflow-x-auto">
-                              <table className="w-full">
-                                <thead className="bg-gray-800/50">
-                                  <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                      Episode
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                      Title
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                      Files
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-700/30">
-                                  {season.episodes
-                                    .sort((a, b) => a.episode_number - b.episode_number)
-                                    .map((episode) => (
-                                      <tr
-                                        key={episode.id}
-                                        className="hover:bg-gray-700/20 transition-all duration-200"
-                                      >
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                          <div className="flex items-center">
-                                            <div className="w-8 h-8 bg-gray-700/50 rounded-lg flex items-center justify-center">
-                                              <span className="text-sm font-medium text-gray-300">
-                                                {episode.episode_number}
-                                              </span>
-                                            </div>
-                                          </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                          <div className="text-white font-medium">
-                                            {episode.title || `Episode ${episode.episode_number}`}
-                                          </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                          <div className="flex items-center space-x-2">
-                                            <FileText className="w-4 h-4 text-gray-400" />
-                                            <span className="text-sm text-gray-300">
-                                              {episode.file_count} file{episode.file_count !== 1 ? 's' : ''}
-                                            </span>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                </tbody>
-                              </table>
-                            </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-400">
+                            {isExpanded ? 'Collapse' : 'Expand'}
+                          </span>
+                          {isExpanded ? (
+                            <ChevronUp className="w-5 h-5 text-gray-400" />
                           ) : (
-                            <div className="px-6 py-8 text-center">
-                              <div className="w-12 h-12 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <FileText className="w-6 h-6 text-gray-400" />
-                              </div>
-                              <p className="text-gray-400">No episodes found for this season</p>
-                            </div>
+                            <ChevronDown className="w-5 h-5 text-gray-400" />
                           )}
                         </div>
+                      </button>
 
-                        {/* Season Footer - Bottom Collapse */}
-                        <div className="border-t border-gray-700/50">
-                          <button
-                            onClick={() => toggleSeason(season.id)}
-                            className="w-full px-6 py-3 flex items-center justify-center space-x-2 hover:bg-gray-700/20 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                          >
-                            <span className="text-sm text-gray-400">Collapse Season {season.season_number}</span>
-                            <ChevronUp className="w-4 h-4 text-gray-400" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })
+                      {/* Season Content */}
+                      {isExpanded && (
+                        <>
+                          <div className="border-t border-gray-700/50">
+                            {season.episodes && season.episodes.length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="w-full">
+                                  <thead className="bg-gray-800/50">
+                                    <tr>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                        Episode
+                                      </th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                        Title
+                                      </th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                        Files
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-700/30">
+                                    {season.episodes
+                                      .sort((a, b) => a.episode_number - b.episode_number)
+                                      .map((episode) => (
+                                        <tr
+                                          key={episode.id}
+                                          className="hover:bg-gray-700/20 transition-all duration-200"
+                                        >
+                                          <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center">
+                                              <div className="w-8 h-8 bg-gray-700/50 rounded-lg flex items-center justify-center">
+                                                <span className="text-sm font-medium text-gray-300">
+                                                  {episode.episode_number}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </td>
+                                          <td className="px-6 py-4">
+                                            <div className="text-white font-medium">
+                                              {episode.title || `Episode ${episode.episode_number}`}
+                                            </div>
+                                          </td>
+                                          <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center space-x-2">
+                                              <FileText className="w-4 h-4 text-gray-400" />
+                                              <span className="text-sm text-gray-300">
+                                                {episode.file_count} file{episode.file_count !== 1 ? 's' : ''}
+                                              </span>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="px-6 py-8 text-center">
+                                <div className="w-12 h-12 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                  <FileText className="w-6 h-6 text-gray-400" />
+                                </div>
+                                <p className="text-gray-400">No episodes found for this season</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Season Footer - Bottom Collapse */}
+                          <div className="border-t border-gray-700/50">
+                            <button
+                              onClick={() => toggleSeason(season.id)}
+                              className="w-full px-6 py-3 flex items-center justify-center space-x-2 hover:bg-gray-700/20 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            >
+                              <span className="text-sm text-gray-400">Collapse Season {season.season_number}</span>
+                              <ChevronUp className="w-4 h-4 text-gray-400" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>

@@ -10,6 +10,7 @@ import settingsRoutes from './routes/settings.js';
 import hardwareRoutes from './routes/hardware.js';
 import processingRoutes from './routes/processing.js';
 import { initializeFingerprintSchema } from './services/fingerprintPipeline.js';
+import { appLogger } from './services/logger.js';
 
 /**
  * Assemble and return an Express application.
@@ -19,17 +20,17 @@ import { initializeFingerprintSchema } from './services/fingerprintPipeline.js';
  * @param {import('pino').BaseLogger} deps.logger
  * @param {import('ws').WebSocketServer} deps.wss
  */
-export function createApp({ db, logger, wss }) {
+export function createApp({ db, logger = appLogger, wss }) {
   const app = express();
 
   // Initialize fingerprint schema
   initializeFingerprintSchema().catch((err) => {
-    logger.error('Failed to initialize fingerprint schema:', err);
+    appLogger.error('Failed to initialize fingerprint schema:', err);
   });
 
   // make shared services available via app.get(...)
   app.set('db', db);
-  app.set('logger', logger);
+  app.set('logger', appLogger);
   app.set('wss', wss);
 
   // built-in middleware
@@ -53,7 +54,7 @@ export function createApp({ db, logger, wss }) {
   app.use('/sonarr', sonarrRoutes);
   app.use('/settings', settingsRoutes);
   app.use('/hardware', hardwareRoutes);
-  app.use('/api/processing', processingRoutes);
+  app.use('/processing', processingRoutes);
 
   app.use((req, res, next) => {
     console.log('INCOMING:', req.method, req.url, req.query);

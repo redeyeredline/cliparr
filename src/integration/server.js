@@ -1,5 +1,5 @@
 import http from 'http';
-import { logger } from '../services/logger.js';
+import { appLogger } from '../services/logger.js';
 import config from '../config/index.js';
 import { createApp } from '../app.js';
 import { setupWebSocket, getWebSocketServer } from '../services/websocket.js';
@@ -16,7 +16,7 @@ export async function startServer() {
 
   // Prevent double-start
   if (serverInstance?.listening) {
-    logger.info('Server already running, skipping initialization');
+    appLogger.info('Server already running, skipping initialization');
     return serverInstance;
   }
 
@@ -27,10 +27,10 @@ export async function startServer() {
     const redis = new Redis({ host: 'localhost', port: 6379 });
     await redis.ping();
     await redis.quit();
-    logger.info('✅ Redis connection verified');
+    appLogger.info('✅ Redis connection verified');
     console.log('✅ Redis connection verified');
   } catch (error) {
-    logger.error('❌ Redis connection failed. Please ensure Redis is running: sudo systemctl start redis-server');
+    appLogger.error('❌ Redis connection failed. Please ensure Redis is running: sudo systemctl start redis-server');
     console.error('❌ Redis connection failed:', error.message);
     throw new Error('Redis not available');
   }
@@ -46,7 +46,7 @@ export async function startServer() {
     try {
       serverInstance.close();
     } catch (err) {
-      logger.error('Error closing old server:', err);
+      appLogger.error('Error closing old server:', err);
     }
     serverInstance = null;
   }
@@ -66,7 +66,7 @@ export async function startServer() {
 
     // Create Express app
     console.log('🌐 Creating Express app...');
-    const app = createApp({ db: dbInstance, logger, wss: null });
+    const app = createApp({ db: dbInstance, logger: appLogger, wss: null });
     console.log('✅ Express app created');
 
     // HTTP & WebSocket
@@ -88,19 +88,19 @@ export async function startServer() {
     console.log('🔄 Initializing job queues...');
     await initializeQueues();
     await startQueues();
-    logger.info('Job queue system initialized and started');
+    appLogger.info('Job queue system initialized and started');
     console.log('✅ Job queues initialized and started');
 
     // Start listening
     console.log(`🎧 Starting to listen on ${config.host}:${config.port}...`);
     serverInstance.listen(config.port, config.host, () => {
-      logger.info(`Listening on ${config.host}:${config.port}`);
+      appLogger.info(`Listening on ${config.host}:${config.port}`);
       console.log(`🎉 Server is now listening on ${config.host}:${config.port}`);
     });
 
     // Graceful shutdown
     registerGracefulShutdown(async () => {
-      logger.info('Starting graceful shutdown…');
+      appLogger.info('Starting graceful shutdown…');
 
       // Stop import tasks
       if (importTaskManager) {
@@ -114,29 +114,29 @@ export async function startServer() {
       // Close WebSocket server
       if (wss) {
         await new Promise((r) => wss.close(r));
-        logger.info('WebSocket server closed');
+        appLogger.info('WebSocket server closed');
       }
 
       // Close HTTP server
       if (serverInstance?.listening) {
         await new Promise((r) => serverInstance.close(r));
         serverInstance = null;
-        logger.info('HTTP server closed');
+        appLogger.info('HTTP server closed');
       }
 
       // Close DB
       if (dbInstance) {
         dbInstance.close();
         dbInstance = null;
-        logger.info('Database connection closed');
+        appLogger.info('Database connection closed');
       }
 
-      logger.info('Cleanup completed');
+      appLogger.info('Cleanup completed');
     });
 
     return serverInstance;
   } catch (err) {
-    logger.error('Failed to start server:', err);
+    appLogger.error('Failed to start server:', err);
     console.error('❌ Failed to start server:', err);
     throw err;
   }

@@ -1,7 +1,7 @@
 // Database operations module providing CRUD functions for shows, episodes, and settings.
 // Includes performance monitoring, query caching, and transaction management for SQLite operations.
 import { getDatabaseSingleton } from './Auto_DB_Setup.js';
-import { logger } from '../services/logger.js';
+import { dbLogger } from '../services/logger.js';
 import { promises as fsPromises } from 'fs';
 
 // Simple prepared-statement cache to avoid recompiling SQL on every call
@@ -100,7 +100,7 @@ function batchInsertShows(db, shows) {
     try {
       timedQuery(db, sql, params, 'run');
     } catch (error) {
-      logger.error({ error: error.message, showCount: shows.length }, 'Batch insert failed');
+      dbLogger.error({ error: error.message, showCount: shows.length }, 'Batch insert failed');
       throw error;
     }
   })();
@@ -132,16 +132,16 @@ function setSetting(db, key, value) {
 function withPerformanceLogging(name, fn) {
   const start = process.hrtime.bigint();
   try {
-    logger.info({ operation: name }, 'Start');
+    dbLogger.info({ operation: name }, 'Start');
     const result = fn();
-    logger.info({
+    dbLogger.info({
       operation: name,
       duration: `${Number(process.hrtime.bigint() - start) / 1e6}ms`,
       success: true,
     }, 'Done');
     return result;
   } catch (err) {
-    logger.error({
+    dbLogger.error({
       operation: name,
       duration: `${Number(process.hrtime.bigint() - start) / 1e6}ms`,
       error: err.message,
@@ -155,7 +155,7 @@ function getImportMode(db) {
     const row = timedQuery(db, 'SELECT value FROM settings WHERE key = ?', ['import_mode'], 'get');
     return row ? row.value : 'none';
   } catch (error) {
-    logger.error('Failed to get import mode:', error);
+    dbLogger.error('Failed to get import mode:', error);
     throw error;
   }
 }
@@ -164,7 +164,7 @@ function setImportMode(db, mode) {
   try {
     timedQuery(db, 'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['import_mode', mode], 'run');
   } catch (error) {
-    logger.error('Failed to set import mode:', error);
+    dbLogger.error('Failed to set import mode:', error);
     throw error;
   }
 }
@@ -174,7 +174,7 @@ function getPollingInterval(db) {
     const row = timedQuery(db, 'SELECT value FROM settings WHERE key = ?', ['polling_interval'], 'get');
     return row ? parseInt(row.value, 10) : 900; // Default to 15 minutes (900 seconds)
   } catch (error) {
-    logger.error('Failed to get polling interval:', error);
+    dbLogger.error('Failed to get polling interval:', error);
     throw error;
   }
 }
@@ -185,7 +185,7 @@ function setPollingInterval(db, interval) {
     const validInterval = Math.max(60, Math.min(86400, interval));
     timedQuery(db, 'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['polling_interval', validInterval.toString()], 'run');
   } catch (error) {
-    logger.error('Failed to set polling interval:', error);
+    dbLogger.error('Failed to set polling interval:', error);
     throw error;
   }
 }
@@ -563,6 +563,30 @@ function getEpisodeFileIdsForShows(db, showIds) {
   ).map((row) => row.id);
 }
 
+// Get episode file IDs and their processing job IDs for specific shows
+function getEpisodeFileIdAndJobIdForShows(db, showIds) {
+  if (!Array.isArray(showIds) || showIds.length === 0) {
+    return [];
+  }
+  const placeholders = showIds.map(() => '?').join(',');
+  return timedQuery(
+    db,
+    `SELECT ef.id as episodeFileId, pj.id as dbJobId
+     FROM episode_files ef
+     JOIN processing_jobs pj ON pj.media_file_id = ef.id
+     JOIN episodes e ON ef.episode_id = e.id
+     JOIN seasons s ON e.season_id = s.id
+     JOIN shows sh ON s.show_id = sh.id
+     WHERE sh.id IN (${placeholders})
+     ORDER BY sh.title, s.season_number, e.episode_number`,
+    showIds,
+    'all',
+  ).map((row) => ({
+    episodeFileId: row.episodeFileId,
+    dbJobId: row.dbJobId !== null ? String(row.dbJobId) : null,
+  }));
+}
+
 export {
   getDb,
   insertShow,
@@ -594,4 +618,5 @@ export {
   getEpisodeFileById,
   getEpisodeFileIdsForShows,
   deleteProcessingJob,
+  getEpisodeFileIdAndJobIdForShows,
 };

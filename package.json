@@ -4,7 +4,7 @@
   "description": "Cliparr Node.js/TypeScript Implementation",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 8484 --strictPort",
     "build": "tsc && vite build",
     "start": "node src/app.js",
     "backend": "node src/integration/index.js",

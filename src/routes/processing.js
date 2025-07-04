@@ -15,7 +15,7 @@ import {
   getProcessingJobStats,
   deleteProcessingJob,
 } from '../database/Db_Operations.js';
-import { getQueueStatus, debugQueueState, removeJobFromAllQueues } from '../services/queue.js';
+import { getQueueStatus, debugQueueState, removeJobFromAllQueues, queues } from '../services/queue.js';
 import { getDatabaseSingleton } from '../database/Auto_DB_Setup.js';
 import path from 'path';
 import fs from 'fs/promises';
@@ -48,17 +48,15 @@ router.get('/jobs/ids', (req, res) => {
 });
 
 // Get all processing jobs with optional filtering
-router.get('/jobs', (req, res) => {
-  const db = req.app.get('db');
-  const logger = req.app.get('logger');
-  const { sortBy = '-created_date', limit, status } = req.query;
-
+router.get('/jobs', async (req, res) => {
   try {
-    const jobs = getProcessingJobs(db, { sortBy, limit: limit ? parseInt(limit) : undefined, status });
+    const queue = queues['episode-processing'];
+    // Get jobs from BullMQ/Redis (adjust job types and range as needed)
+    const jobs = await queue.getJobs(['active', 'waiting', 'completed', 'failed'], 0, 1000);
     res.json({ jobs, total: jobs.length });
   } catch (error) {
-    logger.error('Failed to fetch processing jobs:', error);
-    res.status(500).json({ error: 'Failed to fetch processing jobs' });
+    console.error('Failed to fetch jobs from BullMQ:', error);
+    res.status(500).json({ error: 'Failed to fetch jobs from BullMQ' });
   }
 });
 
@@ -423,14 +421,9 @@ router.post('/cleanup-temp-files', (req, res) => {
 // Helper function to pause all workers
 async function pauseAllWorkers() {
   try {
-    const queueModule = await import('../services/queue.js');
-    const { workers } = queueModule;
-    for (const [name, worker] of Object.entries(workers)) {
-      if (worker && typeof worker.pause === 'function') {
-        await worker.pause(true);
-        // console.log(`Paused worker: ${name}`);
-      }
-    }
+    const { pauseCpuWorkers, pauseGpuWorkers } = await import('../services/queue.js');
+    await pauseCpuWorkers();
+    await pauseGpuWorkers();
   } catch (error) {
     console.error('Failed to pause workers:', error);
   }
@@ -439,14 +432,9 @@ async function pauseAllWorkers() {
 // Helper function to resume all workers
 async function resumeAllWorkers() {
   try {
-    const queueModule = await import('../services/queue.js');
-    const { workers } = queueModule;
-    for (const [name, worker] of Object.entries(workers)) {
-      if (worker && typeof worker.resume === 'function') {
-        await worker.resume();
-        // console.log(`Resumed worker: ${name}`);
-      }
-    }
+    const { resumeCpuWorkers, resumeGpuWorkers } = await import('../services/queue.js');
+    await resumeCpuWorkers();
+    await resumeGpuWorkers();
   } catch (error) {
     console.error('Failed to resume workers:', error);
   }

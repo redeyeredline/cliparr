@@ -252,17 +252,17 @@ function HomePage() {
         if (data.status === 'completed') {
           toast({
             type: 'success',
-            message: `Scan job ${data.jobId} completed successfully`,
+            message: `Scan job ${data.dbJobId} completed successfully`,
           });
         } else if (data.status === 'failed') {
           toast({
             type: 'error',
-            message: `Scan job ${data.jobId} failed: ${data.error}`,
+            message: `Scan job ${data.dbJobId} failed: ${data.error}`,
           });
         } else if (data.status === 'active') {
           toast({
             type: 'info',
-            message: `Scan job ${data.jobId} started processing`,
+            message: `Scan job ${data.dbJobId} started processing`,
           });
         }
       }

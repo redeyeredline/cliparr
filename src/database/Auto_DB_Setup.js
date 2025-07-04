@@ -3,7 +3,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { logger } from '../services/logger.js';
+import { dbLogger } from '../services/logger.js';
 import { STATEMENTS } from './Schema.mjs';
 
 let dbInstance = null;
@@ -25,14 +25,14 @@ export async function getDatabaseSingleton(dbPath) {
       if (error.code === 'ENOENT') {
         // Create the directory if it doesn't exist
         await fs.promises.mkdir(dbDir, { recursive: true });
-        // logger.info({ dbDir }, 'Creating database directory');
+        // dbLogger.info({ dbDir }, 'Creating database directory');
       } else {
         throw error;
       }
     }
 
     // Create database connection
-    // logger.info({ dbPath: absoluteDbPath }, 'Opening database connection');
+    // dbLogger.info({ dbPath: absoluteDbPath }, 'Opening database connection');
     dbInstance = new Database(absoluteDbPath);
 
     // Batch PRAGMA settings
@@ -71,7 +71,7 @@ export async function getDatabaseSingleton(dbPath) {
     });
 
     init();
-    logger.info('✅ Database started');
+    dbLogger.info('✅ Database started');
     return dbInstance;
 
   } catch (err) {
@@ -95,9 +95,9 @@ export function closeDatabase() {
   try {
     dbInstance.close();
     dbInstance = null;
-    logger.info('Database connection closed');
+    dbLogger.info('Database connection closed');
   } catch (err) {
-    logger.error({ err }, 'Error closing database connection');
+    dbLogger.error({ err }, 'Error closing database connection');
     throw err;
   }
 }

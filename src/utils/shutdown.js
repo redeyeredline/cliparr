@@ -1,19 +1,19 @@
 // Graceful shutdown utility that handles process termination signals and cleanup.
 // Registers handlers for SIGTERM, SIGINT, and uncaught exceptions with timeout protection.
 // src/utils/shutdown.js
-import { logger } from '../services/logger.js';
+import { appLogger } from '../services/logger.js';
 
 export function registerGracefulShutdown(stopFn, options = {}) {
   let isShuttingDown = false;
   const FORCE_EXIT_TIMEOUT = options.forceExitTimeoutMs ?? 1_000;
 
-  async function shutdown(signal) {
+  async function shutdown(signal, error) {
     if (isShuttingDown) {
-      logger.info('Shutdown already in progress...');
+      appLogger.info('Shutdown already in progress...');
       return;
     }
     isShuttingDown = true;
-    logger.info(`${signal} received — shutting down gracefully...`);
+    appLogger.info(`${signal} received — shutting down gracefully...`);
 
     // Prevent duplicate handlers
     process.removeAllListeners('SIGINT');
@@ -28,10 +28,10 @@ export function registerGracefulShutdown(stopFn, options = {}) {
           setTimeout(() => reject(new Error('Shutdown timeout exceeded')), FORCE_EXIT_TIMEOUT),
         ),
       ]);
-      logger.info('Graceful shutdown completed');
+      appLogger.info('Graceful shutdown completed');
       process.exit(0);
     } catch (err) {
-      logger.error('Error during shutdown:', err);
+      appLogger.error({ err, stack: err && err.stack }, 'Error during shutdown:');
       process.exit(1);
     }
   }
@@ -45,11 +45,11 @@ export function registerGracefulShutdown(stopFn, options = {}) {
 
   // Uncaught failures
   process.once('uncaughtException', (err) => {
-    logger.error('Uncaught exception:', err);
+    appLogger.error('Uncaught exception:', err);
     shutdown('uncaughtException');
   });
   process.once('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled rejection at:', promise, 'reason:', reason);
+    appLogger.error('Unhandled rejection at:', promise, 'reason:', reason);
     shutdown('unhandledRejection');
   });
 }

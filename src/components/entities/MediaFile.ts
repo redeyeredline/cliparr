@@ -17,7 +17,7 @@ export interface MediaFile {
 export class MediaFileEntity {
   static async list(sortBy?: string, limit?: number): Promise<MediaFile[]> {
     try {
-      const response = await api.get('/api/processing/media-files');
+      const response = await api.get('/processing/media-files');
       return response.data.files || [];
     } catch (error) {
       console.error('Error fetching media files:', error);
@@ -27,7 +27,7 @@ export class MediaFileEntity {
 
   static async getById(id: string | number): Promise<MediaFile | null> {
     try {
-      const response = await api.get(`/api/media/files/${id}`);
+      const response = await api.get(`/media/files/${id}`);
       return response.data.file || null;
     } catch (error) {
       console.error('Error fetching media file:', error);
@@ -37,7 +37,7 @@ export class MediaFileEntity {
 
   static async getByEpisodeId(episodeId: string | number): Promise<MediaFile[]> {
     try {
-      const response = await api.get(`/api/media/files/episode/${episodeId}`);
+      const response = await api.get(`/media/files/episode/${episodeId}`);
       return response.data.files || [];
     } catch (error) {
       console.error('Error fetching media files for episode:', error);
