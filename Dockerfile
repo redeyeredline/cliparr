@@ -97,7 +97,6 @@ RUN cd /tmp && \
         --enable-libflite \
         --enable-libgme \
         --enable-libgsm \
-        --enable-libiec61883 \
         --enable-libjack \
         --enable-libmysofa \
         --enable-libopencore-amrnb \
