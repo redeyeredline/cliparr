@@ -117,10 +117,17 @@ RUN chmod +x docker-start.sh
 # Debug: Check what's available
 RUN echo "Node version: $(node --version)" && \
     echo "NPM version: $(npm --version)" && \
+    echo "Current directory: $(pwd)" && \
+    echo "Files in current directory:" && ls -la && \
     echo "Available scripts:" && npm run
 
-# Build the frontend (ensure dev dependencies are available)
-RUN NODE_ENV=development npm run build
+# Verify TypeScript and Vite are available
+RUN echo "TypeScript version:" && npx tsc --version && \
+    echo "Vite version:" && npx vite --version
+
+# Build the frontend step by step
+RUN NODE_ENV=development npx tsc --noEmit
+RUN NODE_ENV=development npx vite build
 
 # Remove dev dependencies to reduce image size
 RUN npm prune --production
