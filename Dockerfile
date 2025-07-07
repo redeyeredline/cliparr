@@ -46,7 +46,6 @@ RUN apt-get update && apt-get install -y \
     libspeex-dev \
     libtheora-dev \
     libtool-bin \
-    libturbojpeg0-dev \
     libvorbis-dev \
     libx264-dev \
     libxml2-dev \
@@ -91,7 +90,6 @@ RUN cd /tmp && \
         --enable-libvpx \
         --enable-libspeex \
         --enable-libxml2 \
-        --enable-libturbojpeg \
         --enable-libwebp \
         --enable-libopenh264 \
         --enable-libkvazaar \
