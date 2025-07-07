@@ -2,6 +2,8 @@
 // Configures CORS, JSON parsing, and mounts API route handlers for the backend.
 // src/app.js
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import healthRoutes from './routes/health.js';
 import showRoutes from './routes/shows.js';
 import sonarrRoutes from './routes/sonarr.js';
@@ -10,6 +12,9 @@ import hardwareRoutes from './routes/hardware.js';
 import processingRoutes from './routes/processing.js';
 import { initializeFingerprintSchema } from './services/fingerprintPipeline.js';
 import { appLogger } from './services/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Assemble and return an Express application.
@@ -47,13 +52,33 @@ export function createApp({ db, logger: _logger = appLogger, wss }) {
     next();
   });
 
-  // mount routes
+  // mount API routes
   app.use('/health', healthRoutes);
   app.use('/shows', showRoutes);
   app.use('/sonarr', sonarrRoutes);
   app.use('/settings', settingsRoutes);
   app.use('/hardware', hardwareRoutes);
   app.use('/processing', processingRoutes);
+
+  // Serve static files from the React build
+  const distPath = path.join(__dirname, '..', 'dist');
+  app.use(express.static(distPath));
+
+  // Handle client-side routing - serve index.html for all non-API routes
+  app.get('*', (req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/health') || 
+        req.path.startsWith('/shows') || 
+        req.path.startsWith('/sonarr') || 
+        req.path.startsWith('/settings') || 
+        req.path.startsWith('/hardware') || 
+        req.path.startsWith('/processing')) {
+      return next();
+    }
+    
+    // Serve index.html for all other routes (client-side routing)
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
 
   app.use((req, res, next) => {
     console.warn('INCOMING:', req.method, req.url, req.query);

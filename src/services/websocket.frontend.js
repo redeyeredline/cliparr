@@ -47,7 +47,7 @@ class WebSocketClient {
               // Don't log these expected errors
               return;
             }
-            
+
             logger.warn('[WebSocketClient] Job error received:', {
               type: data.type,
               jobId: data.jobId,

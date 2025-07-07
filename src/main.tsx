@@ -8,8 +8,8 @@ import './index.css';
 // Global error handler to suppress expected 404s from cleanup job status polling
 window.addEventListener('error', (event) => {
   // Suppress 404 errors from cleanup job status polling
-  if (event.message && event.message.includes('404') && 
-      (event.filename && event.filename.includes('cleanup-job-status') || 
+  if (event.message && event.message.includes('404') &&
+      (event.filename && event.filename.includes('cleanup-job-status') ||
        event.message.includes('cleanup-job-status'))) {
     event.preventDefault();
     return false;

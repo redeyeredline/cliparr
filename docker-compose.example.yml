@@ -1,4 +1,5 @@
 version: '3.8'
+
 services:
   cliparr:
     image: ghcr.io/redeyeredline/cliparr-dev:latest
@@ -8,9 +9,10 @@ services:
       - "8484:8484"
     volumes:
       # App data directory (database, logs, temp files)
-      - /opt/dockerdata/cliparr/data:/app/data
-      # Media files
-      - /opt/slowerdrive/media:/media:ro
+      # Change this to your preferred data location
+      - /opt/cliparr/data:/app/data
+      # Media files - CHANGE THIS to your media directory
+      - /mnt/media:/media:ro
     environment:
       - PORT=8484
     # NVIDIA runtime (uncomment if you have NVIDIA GPU)

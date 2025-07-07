@@ -8,6 +8,7 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
 import config from '../config/index.js';
+import { getDb, getSetting } from '../database/Db_Operations.js';
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -20,6 +21,16 @@ async function ensureDataDir() {
   try {
     await fsp.mkdir(DATA_DIR, { recursive: true });
   } catch (e) {}
+}
+
+// Helper to get the latest temp_dir from DB (same as in showProcessor.js)
+async function getTempDir() {
+  const db = await getDb();
+  let tempDir = getSetting(db, 'temp_dir', null);
+  if (!tempDir) {
+    tempDir = require('os').tmpdir() + '/cliprr';
+  }
+  return tempDir;
 }
 
 async function readJsonFile(filePath, fallback = null) {
@@ -330,23 +341,39 @@ async function benchmarkEncoding(sendProgress) {
   const timeout = 30000;
 
   async function runFfmpegTest(codec, encoder, resLabel, resSize) {
-    const testFile = path.join(config.tempDir, `encoding_benchmark_${codec}_${resLabel}_${Date.now()}.mp4`);
+    // Get temp directory from settings
+    const tempDir = await getTempDir();
+    await fsp.mkdir(tempDir, { recursive: true });
+    
+    const testFile = path.join(tempDir, `encoding_benchmark_${codec}_${resLabel}_${Date.now()}.mp4`);
     try {
-      const startTime = process.hrtime.bigint();
       const { stderr } = await execAsync(
         `ffmpeg -f lavfi -i testsrc=duration=${duration}:size=${resSize}:rate=30 -c:v ${encoder} -preset fast -t ${duration} -y "${testFile}"`,
         { timeout },
       );
-      const endTime = process.hrtime.bigint();
-      const seconds = Number(endTime - startTime) / 1_000_000_000;
-      let frames = 0;
-      const frameMatches = stderr.match(/frame=\s*(\d+)/g);
-      if (frameMatches && frameMatches.length > 0) {
-        const last = frameMatches[frameMatches.length - 1];
-        frames = parseInt(last.replace(/[^\d]/g, ''), 10);
+      
+      // Parse the speed from FFmpeg output (e.g., "speed=10.6x")
+      const speedMatch = stderr.match(/speed=(\d+\.?\d*)x/);
+      if (speedMatch) {
+        const speed = parseFloat(speedMatch[1]);
+        // Convert speed to FPS (30 fps input * speed multiplier)
+        return Math.round(30 * speed);
       }
-      return frames && seconds ? Math.round(frames / seconds) : 0;
+      
+      // Fallback: try to parse frame count and calculate FPS
+      const frameMatch = stderr.match(/frame=\s*(\d+)/);
+      if (frameMatch) {
+        const frames = parseInt(frameMatch[1], 10);
+        // For a 10-second test at 30fps, we expect 300 frames
+        // Calculate FPS based on actual frames vs expected frames
+        const expectedFrames = duration * 30;
+        const fpsRatio = frames / expectedFrames;
+        return Math.round(30 * fpsRatio);
+      }
+      
+      return 0;
     } catch (e) {
+      console.error(`FFmpeg test failed for ${encoder}:`, e.message);
       return 0;
     } finally {
       try {
@@ -360,15 +387,19 @@ async function benchmarkEncoding(sendProgress) {
   for (const res of resolutions) {
     // H.264 CPU
     results.h264_cpu[res.label] = await runFfmpegTest('h264_cpu', 'libx264', res.label, res.size);
-    // H.264 GPU
+    // H.264 GPU (NVENC or QSV)
     if (hardwareInfo.nvenc_support) {
       results.h264_gpu[res.label] = await runFfmpegTest('h264_gpu', 'h264_nvenc', res.label, res.size);
+    } else if (hardwareInfo.qsv_support) {
+      results.h264_gpu[res.label] = await runFfmpegTest('h264_gpu', 'h264_qsv', res.label, res.size);
     }
     // H.265 CPU
     results.h265_cpu[res.label] = await runFfmpegTest('h265_cpu', 'libx265', res.label, res.size);
-    // H.265 GPU
+    // H.265 GPU (NVENC or QSV)
     if (hardwareInfo.nvenc_support) {
       results.h265_gpu[res.label] = await runFfmpegTest('h265_gpu', 'hevc_nvenc', res.label, res.size);
+    } else if (hardwareInfo.qsv_support) {
+      results.h265_gpu[res.label] = await runFfmpegTest('h265_gpu', 'hevc_qsv', res.label, res.size);
     }
   }
 
@@ -537,8 +568,13 @@ async function detectFFmpeg() {
 
     // Test QSV support by actually trying to encode
     try {
-      await execAsync('ffmpeg -f lavfi -i testsrc=duration=1:size=320x240:rate=1 -c:v h264_qsv -t 1 -f null - 2>/dev/null');
-      result.qsv_support = true;
+      const { stderr } = await execAsync('ffmpeg -f lavfi -i testsrc=duration=1:size=320x240:rate=1 -c:v h264_qsv -t 1 -f null - 2>&1');
+      // Check if the encoding actually succeeded by looking for successful output
+      if (stderr.includes('Conversion failed!') || stderr.includes('Error while opening encoder')) {
+        result.qsv_support = false;
+      } else {
+        result.qsv_support = true;
+      }
     } catch (e) {
       result.qsv_support = false;
     }

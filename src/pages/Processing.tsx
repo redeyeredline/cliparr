@@ -430,123 +430,138 @@ export default function Processing() {
     .filter((j) => j && now - jobProgress[j.id as string | number].updated < 30000);
 
   return (
-    <div className="container mx-auto p-6 space-y-6 min-h-screen overflow-y-auto">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold text-white">Processing</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => {
-              wsClient.send({ type: 'test', message: 'Test from Processing page' });
-            }}
-            variant="outline"
-            size="sm"
-            className="text-white border-slate-600 hover:bg-slate-700"
-          >
-            Test WebSocket
-          </Button>
-        </div>
-      </div>
-      {/* Queue Status Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <QueueStatus queueStatus={queueStatus} />
-        </div>
-        <div className="space-y-6">
-          {/* Active Processes Summary */}
-          <Card className="border-0 rounded-2xl shadow-lg bg-slate-800/90 backdrop-blur-md">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold text-white">
-                Active Processes ({activeProcesses.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {activeProcesses.length === 0 ? (
-                <p className="text-slate-500 text-center py-4">No active processes</p>
-              ) : (
-                <div className="space-y-3">
-                  {activeProcesses.slice(0, 5).map((process) => (
-                    <div
-                      key={process.id}
-                      className="p-3 bg-slate-900/50 rounded-lg border border-slate-700"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-white font-medium">
-                          {mediaFiles.find((f) => f.id === process.media_file_id)?.file_name || 'Unknown'}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          {process.status}
-                        </span>
-                      </div>
-                      {process.processing_notes && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          {process.processing_notes}
+    <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <div className="flex-1 overflow-auto p-6">
+        <div className="h-full flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-bold text-white">Processing</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => {
+                  wsClient.send({ type: 'test', message: 'Test from Processing page' });
+                }}
+                variant="outline"
+                size="sm"
+                className="text-white border-slate-600 hover:bg-slate-700"
+              >
+                Test WebSocket
+              </Button>
+            </div>
+          </div>
+          {/* Queue Status Overview */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 flex-shrink-0">
+            <div className="lg:col-span-2">
+              <QueueStatus queueStatus={queueStatus} />
+            </div>
+            <div className="space-y-6">
+              {/* Active Processes Summary */}
+              <Card className="border-0 rounded-2xl shadow-lg bg-slate-800/90 backdrop-blur-md">
+                <CardHeader>
+                  <CardTitle className="text-lg font-bold text-white">
+                    Active Processes ({activeProcesses.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {activeProcesses.length === 0 ? (
+                    <p className="text-slate-500 text-center py-4">No active processes</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {activeProcesses.slice(0, 5).map((process) => (
+                        <div
+                          key={process.id}
+                          className="p-3 bg-slate-900/50 rounded-lg border border-slate-700"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-white font-medium">
+                              {mediaFiles.find((f) => f.id === process.media_file_id)?.file_name || 'Unknown'}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              {process.status}
+                            </span>
+                          </div>
+                          {process.processing_notes && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              {process.processing_notes}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                      {activeProcesses.length > 5 && (
+                        <p className="text-xs text-slate-500 text-center">
+                          +{activeProcesses.length - 5} more processes
                         </p>
                       )}
                     </div>
-                  ))}
-                  {activeProcesses.length > 5 && (
-                    <p className="text-xs text-slate-500 text-center">
-                      +{activeProcesses.length - 5} more processes
-                    </p>
                   )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Tabs and Job Queue fill all remaining vertical space */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <Tabs defaultValue="queue" className="flex-1 flex flex-col min-h-0">
+              <TabsList className="grid w-full grid-cols-4 bg-slate-800/90 backdrop-blur-md border border-slate-700">
+                <TabsTrigger value="queue" className="text-white">Queue</TabsTrigger>
+                <TabsTrigger value="monitor" className="text-white">Monitor</TabsTrigger>
+                <TabsTrigger value="analyzer" className="text-white">Analyzer</TabsTrigger>
+                <TabsTrigger value="batch" className="text-white">Batch</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="queue" className="flex-1 flex flex-col min-h-0 mt-6">
+                <div className="flex-1 flex flex-col min-h-0 overflow-auto">
+                  <ProcessingQueue
+                    jobs={jobs}
+                    mediaFiles={mediaFiles}
+                    profiles={profiles}
+                    onStopProcessing={stopProcessing}
+                    isLoading={isLoading}
+                    onDeleteJob={handleDeleteJob}
+                    selected={selected}
+                    setSelected={setSelected}
+                    onBulkDelete={handleBulkDelete}
+                    bulkDeleteLoading={bulkDeleteLoading}
+                    jobProgress={jobProgress}
+                  />
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </TabsContent>
+
+              <TabsContent value="monitor" className="flex-1 flex flex-col min-h-0 mt-6">
+                <div className="flex-1 flex flex-col min-h-0 overflow-auto">
+                  <ProcessingMonitor
+                    activeProcesses={activeProcesses}
+                    mediaFiles={mediaFiles}
+                    jobProgress={jobProgress}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="analyzer" className="flex-1 flex flex-col min-h-0 mt-6">
+                <div className="flex-1 flex flex-col min-h-0 overflow-auto">
+                  <AudioAnalyzer
+                    audioAnalyses={audioAnalyses}
+                    mediaFiles={mediaFiles}
+                    onRefresh={loadData}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="batch" className="flex-1 flex flex-col min-h-0 mt-6">
+                <div className="flex-1 flex flex-col min-h-0 overflow-auto">
+                  <BatchProcessor
+                    jobs={jobs}
+                    mediaFiles={mediaFiles}
+                    profiles={profiles}
+                    onStartBatch={startBatchProcessing}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
       </div>
-
-      <Tabs defaultValue="queue" className="space-y-6 h-full">
-        <TabsList className="grid w-full grid-cols-4 bg-slate-800/90 backdrop-blur-md border border-slate-700">
-          <TabsTrigger value="queue" className="text-white">Queue</TabsTrigger>
-          <TabsTrigger value="monitor" className="text-white">Monitor</TabsTrigger>
-          <TabsTrigger value="analyzer" className="text-white">Analyzer</TabsTrigger>
-          <TabsTrigger value="batch" className="text-white">Batch</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="queue" className="space-y-6 h-100 pb-32">
-          <ProcessingQueue
-            jobs={jobs}
-            mediaFiles={mediaFiles}
-            profiles={profiles}
-            onStopProcessing={stopProcessing}
-            isLoading={isLoading}
-            onDeleteJob={handleDeleteJob}
-            selected={selected}
-            setSelected={setSelected}
-            onBulkDelete={handleBulkDelete}
-            bulkDeleteLoading={bulkDeleteLoading}
-            jobProgress={jobProgress}
-          />
-        </TabsContent>
-
-        <TabsContent value="monitor" className="space-y-6">
-          <ProcessingMonitor
-            activeProcesses={activeProcesses}
-            mediaFiles={mediaFiles}
-            jobProgress={jobProgress}
-          />
-        </TabsContent>
-
-        <TabsContent value="analyzer" className="space-y-6">
-          <AudioAnalyzer
-            audioAnalyses={audioAnalyses}
-            mediaFiles={mediaFiles}
-            onRefresh={loadData}
-          />
-        </TabsContent>
-
-        <TabsContent value="batch" className="space-y-6">
-          <BatchProcessor
-            jobs={jobs}
-            mediaFiles={mediaFiles}
-            profiles={profiles}
-            onStartBatch={startBatchProcessing}
-          />
-        </TabsContent>
-      </Tabs>
       {/* Fixed bottom bar for deletion */}
       {selected.length > 0 && (
         <div className="fixed bottom-6 right-6 z-50">
