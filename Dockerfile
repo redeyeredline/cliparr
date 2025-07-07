@@ -41,9 +41,10 @@ RUN apt-get update && apt-get install -y \
     libx265-dev \
     libvpx-dev \
     libxml2-dev \
-    # NVIDIA CUDA toolkit
+    # NVIDIA CUDA toolkit and codec headers
     nvidia-cuda-toolkit \
     nvidia-cuda-dev \
+    # FFmpeg will fetch ffnvcodec headers automatically
     # Redis
     redis-server \
     # Node.js
@@ -63,6 +64,11 @@ RUN cd /tmp && \
     wget https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.bz2 && \
     tar -xf ffmpeg-7.1.1.tar.bz2 && \
     cd ffmpeg-7.1.1 && \
+    # Fetch ffnvcodec headers (NVIDIA codec headers)
+    git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
+    cd nv-codec-headers && \
+    make install && \
+    cd .. && \
     ./configure \
         --prefix=/usr/local \
         --enable-gpl \
@@ -86,7 +92,7 @@ RUN cd /tmp && \
     make install && \
     ldconfig && \
     cd / && \
-    rm -rf /tmp/ffmpeg-7.1.1*
+    rm -rf /tmp/ffmpeg-7.1.1* /tmp/nv-codec-headers
 
 # Create app directory
 WORKDIR /app
