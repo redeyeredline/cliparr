@@ -35,7 +35,6 @@ RUN apt-get update && apt-get install -y \
     libnuma-dev \
     libogg-dev \
     libopus-dev \
-    libtheora-dev \
     libvorbis-dev \
     libx264-dev \
     libx265-dev \
