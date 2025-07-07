@@ -37,7 +37,6 @@ RUN apt-get update && apt-get install -y \
     libfreetype-dev \
     libfribidi-dev \
     libharfbuzz-dev \
-    libjansson-dev \
     liblzma-dev \
     libmp3lame-dev \
     libnuma-dev \
