@@ -24,26 +24,23 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     yasm \
-    meson \
-    ninja-build \
     patch \
     tar \
     zlib1g-dev \
     m4 \
-    # FFmpeg dependencies
+    # FFmpeg minimal dependencies
     libbz2-dev \
     liblzma-dev \
     libmp3lame-dev \
     libnuma-dev \
     libogg-dev \
     libopus-dev \
-    libspeex-dev \
     libtheora-dev \
-    libtool-bin \
     libvorbis-dev \
     libx264-dev \
-    libxml2-dev \
+    libx265-dev \
     libvpx-dev \
+    libxml2-dev \
     # NVIDIA CUDA toolkit
     nvidia-cuda-toolkit \
     nvidia-cuda-dev \
@@ -61,7 +58,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Build FFmpeg from source with NVENC support
+# Build FFmpeg from source with NVENC support (minimal codecs)
 RUN cd /tmp && \
     wget https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.bz2 && \
     tar -xf ffmpeg-7.1.1.tar.bz2 && \
@@ -77,69 +74,12 @@ RUN cd /tmp && \
         --enable-libmp3lame \
         --enable-libopus \
         --enable-libvorbis \
-        --enable-libtheora \
         --enable-libvpx \
-        --enable-libspeex \
-        --enable-libxml2 \
-        --enable-libwebp \
-        --enable-libopenh264 \
-        --enable-libkvazaar \
-        --enable-libfdk-aac \
-        --enable-libbs2b \
-        --enable-libcaca \
-        --enable-libcdio \
-        --enable-libcodec2 \
-        --enable-libdav1d \
-        --enable-libdc1394 \
-        --enable-libdrm \
-        --enable-libdvdnav \
-        --enable-libdvdread \
-        --enable-libflite \
-        --enable-libgme \
-        --enable-libgsm \
-        --enable-libjack \
-        --enable-libmysofa \
-        --enable-libopencore-amrnb \
-        --enable-libopencore-amrwb \
-        --enable-libopenjpeg \
-        --enable-libopenmpt \
-        --enable-libplacebo \
-        --enable-libpulse \
-        --enable-librsvg \
-        --enable-librubberband \
-        --enable-libshine \
-        --enable-libsmbclient \
-        --enable-libsnappy \
-        --enable-libsoxr \
-        --enable-libsrt \
-        --enable-libtesseract \
-        --enable-libtwolame \
-        --enable-libvidstab \
-        --enable-libvo-amrwbenc \
-        --enable-libzimg \
-        --enable-libzmq \
-        --enable-libzvbi \
-        --enable-openal \
-        --enable-opencl \
-        --enable-opengl \
-        --enable-openssl \
-        --enable-postproc \
-        --enable-pthreads \
         --enable-shared \
+        --enable-pthreads \
         --enable-version3 \
+        --enable-openssl \
         --enable-vaapi \
-        --enable-libvpl \
-        --enable-libxavs2 \
-        --enable-libdavs2 \
-        --enable-libvmaf \
-        --enable-libvvenc \
-        --enable-libilbc \
-        --enable-libklvanc \
-        --enable-omx \
-        --enable-libsvtav1 \
-        --enable-librist \
-        --enable-libjxl \
-        --enable-libopenh264 \
         --extra-cflags="-I/usr/local/cuda/include" \
         --extra-ldflags="-L/usr/local/cuda/lib64" && \
     make -j$(nproc) && \
