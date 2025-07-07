@@ -91,7 +91,6 @@ RUN cd /tmp && \
         --enable-libtheora \
         --enable-libvpx \
         --enable-libspeex \
-        --enable-libsamplerate \
         --enable-libjansson \
         --enable-libxml2 \
         --enable-libturbojpeg \

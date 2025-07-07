@@ -8,24 +8,20 @@ Cliparr is available as a Docker image from GitHub Container Registry, similar t
 
 1. **Update the image name** in `docker-compose.yml`:
    ```yaml
-   image: ghcr.io/YOUR_USERNAME/cliparr:latest
+   image: ghcr.io/redeyeredline/cliparr-dev:latest
    ```
-   Replace `YOUR_USERNAME` with your GitHub username.
+   (This is your actual image name.)
 
-2. **Create the data directory**:
-   ```bash
-   sudo mkdir -p /opt/dockerdata/cliparr/data
-   sudo chown $USER:$USER /opt/dockerdata/cliparr/data
-   ```
-
-3. **Update media path** in `docker-compose.yml`:
+2. **Set your data and media directories in `docker-compose.yml`**:
+   - The following are just examples. You can use any absolute or relative paths you want.
+   - If you do not set a volume, the app will use its internal default (`./data` relative to the container's working directory).
    ```yaml
    volumes:
-     - /opt/dockerdata/cliparr/data:/app/data
+     - ./data:/app/data  # Or use an absolute path like /opt/dockerdata/cliparr/data:/app/data
      - /path/to/your/media:/media:ro  # Change this to your media directory
    ```
 
-4. **Start the container**:
+3. **Start the container**:
    ```bash
    docker-compose up -d
    ```
@@ -54,21 +50,21 @@ To publish your own image to GHCR:
 3. **Create a release** with a tag (e.g., `v1.0.0`) to create a tagged image
 
 The workflow will create images like:
-- `ghcr.io/yourusername/cliparr:latest` (latest main branch)
-- `ghcr.io/yourusername/cliparr:v1.0.0` (tagged releases)
-- `ghcr.io/yourusername/cliparr:main-abc123` (commit-specific)
+- `ghcr.io/redeyeredline/cliparr-dev:latest` (latest main branch)
+- `ghcr.io/redeyeredline/cliparr-dev:v1.0.0` (tagged releases)
+- `ghcr.io/redeyeredline/cliparr-dev:main-abc123` (commit-specific)
 
 ### Local Development
 
 For local development, you can build the image yourself:
 
 ```bash
-docker build -t cliparr:latest .
+docker build -t cliparr-dev:latest .
 ```
 
 Then update `docker-compose.yml` to use:
 ```yaml
-image: cliparr:latest
+image: cliparr-dev:latest
 ```
 
 ### Accessing the Application
@@ -78,11 +74,9 @@ Once running, access Cliparr at:
 
 ### Data Persistence
 
-The application data is stored in `/opt/dockerdata/cliparr/data` and includes:
-- SQLite database
-- Log files
-- Temporary processing files
-- Application settings
+- The application will use `/app/data` inside the container for all persistent data (database, logs, temp files, settings).
+- You control where this maps on your host via the `docker-compose.yml` volume setting.
+- If you do not set a volume, data will be stored inside the container and will be lost if the container is removed.
 
 ### Troubleshooting
 
@@ -98,7 +92,7 @@ The application data is stored in `/opt/dockerdata/cliparr/data` and includes:
 
 3. **Reset data** (WARNING: This will delete all data):
    ```bash
-   sudo rm -rf /opt/dockerdata/cliparr/data/*
+   sudo rm -rf ./data/*
    docker-compose down
    docker-compose up -d
    ``` 
