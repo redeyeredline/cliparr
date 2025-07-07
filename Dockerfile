@@ -31,12 +31,7 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     m4 \
     # FFmpeg dependencies
-    libass-dev \
     libbz2-dev \
-    libfontconfig-dev \
-    libfreetype-dev \
-    libfribidi-dev \
-    libharfbuzz-dev \
     liblzma-dev \
     libmp3lame-dev \
     libnuma-dev \
@@ -82,9 +77,6 @@ RUN cd /tmp && \
         --enable-libmp3lame \
         --enable-libopus \
         --enable-libvorbis \
-        --enable-libass \
-        --enable-libfreetype \
-        --enable-libfribidi \
         --enable-libtheora \
         --enable-libvpx \
         --enable-libspeex \
@@ -103,10 +95,8 @@ RUN cd /tmp && \
         --enable-libdvdnav \
         --enable-libdvdread \
         --enable-libflite \
-        --enable-libfontconfig \
         --enable-libgme \
         --enable-libgsm \
-        --enable-libharfbuzz \
         --enable-libiec61883 \
         --enable-libjack \
         --enable-libmysofa \
