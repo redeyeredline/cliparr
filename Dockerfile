@@ -120,7 +120,6 @@ RUN cd /tmp && \
         --enable-libzimg \
         --enable-libzmq \
         --enable-libzvbi \
-        --enable-lv2 \
         --enable-openal \
         --enable-opencl \
         --enable-opengl \
