@@ -41,6 +41,12 @@ RUN apt-get update && apt-get install -y \
     libx265-dev \
     libvpx-dev \
     libxml2-dev \
+    # VAAPI dependencies for Intel GPU support
+    libva-dev \
+    libva-drm2 \
+    libva-glx2 \
+    libva-x11-2 \
+    vainfo \
     # NVIDIA CUDA toolkit and codec headers
     nvidia-cuda-toolkit \
     nvidia-cuda-dev \
