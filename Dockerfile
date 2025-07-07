@@ -42,7 +42,6 @@ RUN apt-get update && apt-get install -y \
     libnuma-dev \
     libogg-dev \
     libopus-dev \
-    libsamplerate0-dev \
     libspeex-dev \
     libtheora-dev \
     libtool-bin \
