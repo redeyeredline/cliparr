@@ -6,7 +6,6 @@ ENV \
     LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu" \
     NVIDIA_DRIVER_CAPABILITIES="compute,video,utility" \
     NVIDIA_VISIBLE_DEVICES="all" \
-    NODE_ENV="production" \
     PORT="8484"
 
 # Install system dependencies
@@ -115,8 +114,13 @@ COPY . .
 # Make startup script executable
 RUN chmod +x docker-start.sh
 
-# Build the frontend
-RUN npm run build
+# Debug: Check what's available
+RUN echo "Node version: $(node --version)" && \
+    echo "NPM version: $(npm --version)" && \
+    echo "Available scripts:" && npm run
+
+# Build the frontend (ensure dev dependencies are available)
+RUN NODE_ENV=development npm run build
 
 # Remove dev dependencies to reduce image size
 RUN npm prune --production
