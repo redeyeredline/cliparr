@@ -344,14 +344,14 @@ async function benchmarkEncoding(sendProgress) {
     // Get temp directory from settings
     const tempDir = await getTempDir();
     await fsp.mkdir(tempDir, { recursive: true });
-    
+
     const testFile = path.join(tempDir, `encoding_benchmark_${codec}_${resLabel}_${Date.now()}.mp4`);
     try {
       const { stderr } = await execAsync(
         `ffmpeg -f lavfi -i testsrc=duration=${duration}:size=${resSize}:rate=30 -c:v ${encoder} -preset fast -t ${duration} -y "${testFile}"`,
         { timeout },
       );
-      
+
       // Parse the speed from FFmpeg output (e.g., "speed=10.6x")
       const speedMatch = stderr.match(/speed=(\d+\.?\d*)x/);
       if (speedMatch) {
@@ -359,7 +359,7 @@ async function benchmarkEncoding(sendProgress) {
         // Convert speed to FPS (30 fps input * speed multiplier)
         return Math.round(30 * speed);
       }
-      
+
       // Fallback: try to parse frame count and calculate FPS
       const frameMatch = stderr.match(/frame=\s*(\d+)/);
       if (frameMatch) {
@@ -370,7 +370,7 @@ async function benchmarkEncoding(sendProgress) {
         const fpsRatio = frames / expectedFrames;
         return Math.round(30 * fpsRatio);
       }
-      
+
       return 0;
     } catch (e) {
       console.error(`FFmpeg test failed for ${encoder}:`, e.message);

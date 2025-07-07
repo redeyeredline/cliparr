@@ -67,15 +67,15 @@ export function createApp({ db, logger: _logger = appLogger, wss }) {
   // Handle client-side routing - serve index.html for all non-API routes
   app.get('*', (req, res, next) => {
     // Skip API routes
-    if (req.path.startsWith('/health') || 
-        req.path.startsWith('/shows') || 
-        req.path.startsWith('/sonarr') || 
-        req.path.startsWith('/settings') || 
-        req.path.startsWith('/hardware') || 
+    if (req.path.startsWith('/health') ||
+        req.path.startsWith('/shows') ||
+        req.path.startsWith('/sonarr') ||
+        req.path.startsWith('/settings') ||
+        req.path.startsWith('/hardware') ||
         req.path.startsWith('/processing')) {
       return next();
     }
-    
+
     // Serve index.html for all other routes (client-side routing)
     res.sendFile(path.join(distPath, 'index.html'));
   });
