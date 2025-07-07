@@ -9,27 +9,27 @@ const redis = new Redis({
 });
 
 async function clearRedis() {
-  console.log('Clearing Redis database...');
+  console.warn('Clearing Redis database...');
 
   try {
     // Get all keys
     const keys = await redis.keys('*');
-    console.log(`Found ${keys.length} keys in Redis`);
+    console.warn(`Found ${keys.length} keys in Redis`);
 
     if (keys.length > 0) {
       // Delete all keys
       await redis.del(...keys);
-      console.log('✅ All Redis keys deleted');
+      console.warn('✅ All Redis keys deleted');
     } else {
-      console.log('No keys found in Redis');
+      console.warn('No keys found in Redis');
     }
 
     // Also flush the database to be sure
     await redis.flushdb();
-    console.log('✅ Redis database flushed');
+    console.warn('✅ Redis database flushed');
 
     await redis.disconnect();
-    console.log('Redis cleared successfully!');
+    console.warn('Redis cleared successfully!');
   } catch (error) {
     console.error('Failed to clear Redis:', error);
     await redis.disconnect();

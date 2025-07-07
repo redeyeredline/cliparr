@@ -38,9 +38,8 @@ export default function Processing() {
   const [jobProgress, setJobProgress] = useState<Record<string, { progress: number, fps: number, currentFile: any, updated: number }>>({});
 
   const loadData = async () => {
-    if (isLoading) {
-      setIsLoading(true);
-    }
+    console.log('loadData called');
+    setIsLoading(true);
     try {
       const [jobsData, filesData, audioData] = await Promise.all([
         ProcessingJobEntity.list('-created_date'),
@@ -54,58 +53,40 @@ export default function Processing() {
         (j: ProcessingJob) => j.status === 'processing' || j.status === 'scanning',
       );
       setActiveProcesses(processing);
-      console.log('[loadData] jobsData:', jobsData);
-      console.log('[loadData] processing:', processing);
     } catch (error) {
       console.error('Error loading processing data:', error);
     } finally {
-      if (isLoading) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadData();
+  }, []);
+
   // WebSocket event handlers
   useEffect(() => {
-    logger.info('Monitor tab mounted');
-
     // Add a simple message logger to debug all incoming messages
     const handleAllMessages = (data: any) => {
-      console.log('[Processing] ALL WebSocket messages received:', data);
-      logger.info('[Processing] ALL WebSocket messages received:', data);
     };
 
     // Helper to normalize job IDs (strip 'epjob-' prefix)
     const normalizeId = (id: string | number | undefined) => (id ? id.toString().replace(/^epjob-/, '') : '');
 
     const handleJobUpdate = (data: any) => {
-      logger.info('[Processing] WebSocket message received:', data);
-      logger.info('[Processing] Message type check:', {
-        hasJobId: !!data.jobId,
-        hasStatus: !!data.status,
-        hasType: !!data.type,
-        jobId: data.jobId,
-        dbJobId: data.dbJobId,
-        status: data.status,
-      });
-
       // Handle job updates - these come directly without a 'type' field
       if (data.dbJobId && data.status) {
-        logger.info('[Processing] Processing direct job update:', { jobId: data.jobId, dbJobId: data.dbJobId, status: data.status });
-
         // Check if this job exists in our current jobs array (normalize IDs)
         const existingJob = jobs.find((j) => normalizeId(j.id) === normalizeId(data.dbJobId));
 
         // If job doesn't exist in our array, reload data to get latest jobs
         if (!existingJob) {
-          logger.info('[Processing] Job not found in current jobs array, reloading data:', data.dbJobId);
           loadData();
           return; // Exit early, let the reload handle the update
         }
 
         // Track real-time progress/fps for processing jobs
         if (data.status === 'processing' && data.progress !== undefined) {
-          logger.info('[Processing] Setting job progress for:', data.dbJobId, { progress: data.progress, currentFile: data.currentFile });
           setJobProgress((prev) => {
             const newProgress = {
               ...prev,
@@ -116,29 +97,24 @@ export default function Processing() {
                 updated: Date.now(),
               },
             };
-            logger.info('[Processing] Updated jobProgress:', newProgress);
             return newProgress;
           });
         }
         // Remove progress for jobs that are completed/failed
         if (['completed', 'failed'].includes(data.status)) {
-          logger.info('[Processing] Removing job progress for:', data.dbJobId);
           setJobProgress((prev) => {
             const copy = { ...prev };
             delete copy[normalizeId(data.dbJobId) || ''];
-            logger.info('[Processing] Updated jobProgress after removal:', copy);
             return copy;
           });
         }
         // Update the specific job in the state
         setJobs((prevJobs) => {
-          logger.info('[Processing] Updating job in jobs state:', data.dbJobId);
           const updated = prevJobs.map((job) => {
             if (!job) {
               return job;
             }
             if (normalizeId(job.id) === normalizeId(data.dbJobId)) {
-              logger.info('[Processing] Found matching job:', job.id, 'updating status to:', data.status);
               return {
                 ...job,
                 status: data.status,
@@ -148,25 +124,21 @@ export default function Processing() {
             }
             return job;
           });
-          console.log('[WebSocket] Updated jobs:', updated);
           return updated;
         });
 
         // Show toast notification for important updates
         if (data.status === 'completed') {
-          logger.info('[Processing] Job completed:', data.dbJobId);
           toast({
             type: 'success',
             message: `Job ${data.dbJobId} completed successfully`,
           });
         } else if (data.status === 'failed') {
-          logger.info('[Processing] Job failed:', data.dbJobId, data.error || data.message);
           toast({
             type: 'error',
             message: `Job ${data.dbJobId} failed: ${data.error || data.message}`,
           });
         } else if (data.status === 'active') {
-          logger.info('[Processing] Job started processing:', data.dbJobId);
           toast({
             type: 'info',
             message: `Job ${data.dbJobId} started processing`,
@@ -176,14 +148,11 @@ export default function Processing() {
 
       // Handle legacy job_update type messages (for backward compatibility)
       if (data.type === 'job_update') {
-        logger.info('[Processing] Processing legacy job_update message:', data);
-
         // Check if this job exists in our current jobs array (normalize IDs)
         const existingJob = jobs.find((j) => normalizeId(j.id) === normalizeId(data.dbJobId));
 
         // If job doesn't exist in our array, reload data to get latest jobs
         if (!existingJob) {
-          logger.info('[Processing] Job not found in current jobs array (legacy), reloading data:', data.dbJobId);
           loadData();
           return; // Exit early, let the reload handle the update
         }
@@ -247,14 +216,12 @@ export default function Processing() {
     };
 
     const handleQueueStatus = (data: any) => {
-      logger.info('[Processing] Queue status update:', data);
       if (data.type === 'queue_status') {
         setQueueStatus(data.queues);
       }
     };
 
     const handleProcessingStatus = (data: any) => {
-      logger.info('[Processing] Processing status update:', data);
       if (data.type === 'processing_status') {
         // Update processing status
         setQueueStatus(data);
@@ -266,9 +233,9 @@ export default function Processing() {
     wsClient.addEventListener('message', handleJobUpdate);
     wsClient.addEventListener('message', handleQueueStatus);
     wsClient.addEventListener('message', handleProcessingStatus);
-    wsClient.addEventListener('open', () => logger.info('WebSocket connected'));
-    wsClient.addEventListener('close', () => logger.info('WebSocket disconnected'));
-    wsClient.addEventListener('error', (e: Event) => logger.error('WebSocket error', e));
+    wsClient.addEventListener('open', () => {});
+    wsClient.addEventListener('close', () => {});
+    wsClient.addEventListener('error', (e: Event) => {});
 
     // Ensure WebSocket is connected
     wsClient.connect();
@@ -343,26 +310,88 @@ export default function Processing() {
 
   // Bulk delete for selected jobs
   const handleBulkDelete = async () => {
-    console.log('Selected jobs at delete:', selected);
-    if (selected.length === jobs.length && jobs.length > 0) {
-      console.log('Sending { all: true } to bulkDelete');
-      await ProcessingJobEntity.bulkDelete({ all: true });
-      setSelected([]);
-      await loadData();
-      toast({ type: 'success', message: 'All jobs deleted' });
-      // Trigger background temp file cleanup
-      try {
-        await apiClient.cleanupTempFiles();
-      } catch (cleanupErr) {
-        // Ignore cleanup errors, just log
-        console.error('Temp file cleanup error:', cleanupErr);
+    setBulkDeleteLoading(true);
+    try {
+      let cleanupJobId = null;
+      if (selected.length === jobs.length && jobs.length > 0) {
+        const result = await ProcessingJobEntity.bulkDelete({ all: true });
+        if (typeof result === 'string') {
+          cleanupJobId = result;
+        }
+      } else {
+        const result = await ProcessingJobEntity.bulkDelete({ jobIds: selected });
+        if (typeof result === 'string') {
+          cleanupJobId = result;
+        }
       }
-    } else {
-      console.log('Sending jobIds to bulkDelete:', selected);
-      await ProcessingJobEntity.bulkDelete({ jobIds: selected });
       setSelected([]);
-      await loadData();
-      toast({ type: 'success', message: 'Selected jobs deleted' });
+      if (cleanupJobId) {
+        // Poll for cleanup job status
+        let done = false;
+        let lastState = '';
+        while (!done) {
+          try {
+            const status = await apiClient.getCleanupJobStatus(cleanupJobId);
+            if (status.state === 'completed') {
+              done = true;
+              toast({ type: 'success', message: 'Bulk delete completed!' });
+              break;
+            } else if (status.state === 'failed') {
+              done = true;
+              toast({ type: 'error', message: `Bulk delete failed: ${status.failedReason || 'Unknown error'}` });
+              break;
+            } else {
+              if (status.state !== lastState) {
+                lastState = status.state;
+                toast({ type: 'info', message: `Bulk delete status: ${status.state}` });
+              }
+            }
+          } catch (err) {
+            // If 404, treat as completed and stop polling (do not log or toast)
+            if (
+              err &&
+              typeof err === 'object' &&
+              'response' in err &&
+              err.response &&
+              typeof err.response === 'object' &&
+              'status' in err.response &&
+              typeof err.response.status === 'number' &&
+              err.response.status === 404
+            ) {
+              done = true;
+              // No toast, no log for 404
+              break;
+            } else if (
+              err &&
+              typeof err === 'object' &&
+              'response' in err &&
+              err.response &&
+              typeof err.response === 'object' &&
+              'status' in err.response &&
+              typeof err.response.status === 'number' &&
+              err.response.status >= 500
+            ) {
+              done = true;
+              toast({ type: 'error', message: 'Server error during cleanup.' });
+              break;
+            } else {
+              // Network or unknown error
+              done = true;
+              toast({ type: 'error', message: 'Unknown error during cleanup.' });
+              break;
+            }
+          }
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+        await loadData();
+      } else {
+        await loadData();
+        toast({ type: 'success', message: 'Selected jobs deleted' });
+      }
+    } catch (error) {
+      toast({ type: 'error', message: 'Failed to delete jobs' });
+    } finally {
+      setBulkDeleteLoading(false);
     }
   };
 
@@ -400,13 +429,6 @@ export default function Processing() {
     .map((id) => jobs.find((j) => j.id?.toString() === id))
     .filter((j) => j && now - jobProgress[j.id as string | number].updated < 30000);
 
-  console.log('[Processing] ActiveJobs result:', {
-    totalJobs: jobs.length,
-    activeJobsCount: activeJobs.length,
-    jobProgressKeys: Object.keys(jobProgress),
-    activeJobs: activeJobs.map((j) => j ? { id: j.id, status: j.status, progress: jobProgress[j.id as string | number]?.progress } : null),
-  });
-
   return (
     <div className="container mx-auto p-6 space-y-6 min-h-screen overflow-y-auto">
       <div className="flex items-center justify-between">
@@ -416,7 +438,6 @@ export default function Processing() {
         <div className="flex items-center gap-2">
           <Button
             onClick={() => {
-              console.log('[Processing] Sending test WebSocket message');
               wsClient.send({ type: 'test', message: 'Test from Processing page' });
             }}
             variant="outline"

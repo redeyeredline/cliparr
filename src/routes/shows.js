@@ -5,6 +5,7 @@ import express from 'express';
 import { getImportedShows, getShowById, deleteShowsByIds, getShowWithDetails, getEpisodeFiles, createProcessingJobsForShows, getEpisodeFileIdAndJobIdForShows } from '../database/Db_Operations.js';
 import { enqueueEpisodeProcessing } from '../services/queue.js';
 import { appLogger } from '../services/logger.js';
+import { deleteShowsAndCleanup } from '../services/cleanupService.js';
 
 const router = express.Router();
 
@@ -68,7 +69,7 @@ router.get('/episodes/:episodeId/files', (req, res) => {
 });
 
 // Batch delete shows
-router.post('/delete', (req, res) => {
+router.post('/delete', async (req, res) => {
   const db = req.app.get('db');
   const logger = req.app.get('logger');
   const { ids } = req.body;
@@ -78,10 +79,10 @@ router.post('/delete', (req, res) => {
   }
 
   try {
-    const deletedCount = deleteShowsByIds(db, ids);
-    res.json({ success: true, deleted: deletedCount });
+    const result = await deleteShowsAndCleanup(ids, db);
+    res.json({ success: true, ...result });
   } catch (error) {
-    appLogger.error('Failed to cascade delete shows:', error);
+    logger.error('Failed to cascade delete shows:', error);
     res.status(500).json({ error: 'Failed to cascade delete shows' });
   }
 });

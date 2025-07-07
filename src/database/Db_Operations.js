@@ -391,7 +391,7 @@ function createProcessingJobsForShows(db, showIds) {
 }
 
 function getProcessingJobs(db, options = {}) {
-  const { sortBy = '-created_date', limit = 100, status } = options;
+  const { sortBy = '-created_date', limit, status } = options;
 
   let sql = `
     SELECT 
@@ -421,8 +421,10 @@ function getProcessingJobs(db, options = {}) {
   const sortDirection = sortBy.startsWith('-') ? 'DESC' : 'ASC';
   sql += ` ORDER BY pj.${sortField} ${sortDirection}`;
 
-  sql += ' LIMIT ?';
-  params.push(limit);
+  if (limit !== undefined) {
+    sql += ' LIMIT ?';
+    params.push(limit);
+  }
 
   return timedQuery(db, sql, params, 'all');
 }
@@ -587,6 +589,16 @@ function getEpisodeFileIdAndJobIdForShows(db, showIds) {
   }));
 }
 
+function deleteProcessingJobsBatch(db, jobIds) {
+  if (!Array.isArray(jobIds) || jobIds.length === 0) {
+    return 0;
+  }
+  const placeholders = jobIds.map(() => '?').join(',');
+  const sql = `DELETE FROM processing_jobs WHERE id IN (${placeholders})`;
+  const result = timedQuery(db, sql, jobIds, 'run');
+  return result.changes;
+}
+
 export {
   getDb,
   insertShow,
@@ -619,4 +631,5 @@ export {
   getEpisodeFileIdsForShows,
   deleteProcessingJob,
   getEpisodeFileIdAndJobIdForShows,
+  deleteProcessingJobsBatch,
 };

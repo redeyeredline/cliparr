@@ -9,7 +9,6 @@ import {
   processShowData,
   getSetting,
 } from '../database/Db_Operations.js';
-import fs from 'fs';
 import { mapSonarrPath } from '../utils/pathMap.js';
 import WebSocket from 'ws';
 
@@ -31,14 +30,6 @@ export class ImportTaskManager {
     const mode = getImportMode(db);
     appLogger.info(`Import mode from database: ${mode}`);
 
-    // Log all current settings for debugging
-    const allSettings = {
-      import_mode: getSetting(db, 'import_mode', 'not set'),
-      polling_interval: getSetting(db, 'polling_interval', 'not set'),
-      sonarr_url: getSetting(db, 'sonarr_url', 'not set'),
-      sonarr_api_key: getSetting(db, 'sonarr_api_key', 'not set'),
-    };
-
     // Don't start the task if mode is 'none'
     if (mode === 'none') {
       appLogger.info('Import mode is "none"; not starting import task');
@@ -48,7 +39,9 @@ export class ImportTaskManager {
     // Check if Sonarr is configured before starting
     const sonarrUrl = getSetting(db, 'sonarr_url', '');
     const sonarrApiKey = getSetting(db, 'sonarr_api_key', '');
-    appLogger.info(`Sonarr URL configured: ${sonarrUrl ? 'yes' : 'no'}, API key configured: ${sonarrApiKey ? 'yes' : 'no'}`);
+    appLogger.info(
+      `Sonarr URL configured: ${sonarrUrl ? 'yes' : 'no'}, API key configured: ${sonarrApiKey ? 'yes' : 'no'}`,
+    );
 
     if (!sonarrUrl || !sonarrApiKey) {
       appLogger.info('Sonarr not configured; not starting import task');

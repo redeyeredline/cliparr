@@ -73,7 +73,7 @@ export class ProcessingJobEntity {
     try {
       console.log('bulkDelete payload:', all ? { all: true } : { jobIds });
       const response = await api.post('/processing/jobs/bulk-delete', all ? { all: true } : { jobIds });
-      return response.data;
+      return response.data.cleanupJobId || response.data;
     } catch (error) {
       console.error('Error bulk deleting jobs:', error);
       throw error;

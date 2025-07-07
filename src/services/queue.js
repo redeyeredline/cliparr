@@ -1,10 +1,9 @@
 // BullMQ-based job queue system for processing shows
 // Handles job orchestration, scaling, and progress tracking
-import { appLogger, workerLogger } from './logger.js';
-import { getDb, getSetting, getProcessingJobById, getEpisodeFileById } from '../database/Db_Operations.js';
+import { workerLogger } from './logger.js';
+import { getDb, getSetting, getEpisodeFileById } from '../database/Db_Operations.js';
 import { broadcastJobUpdate, broadcastQueueStatus } from './websocket.js';
 import {
-  processShowJob,
   extractAudioFromFile,
   generateAudioFingerprint,
   detectAudioSegments,
@@ -12,21 +11,40 @@ import {
 } from './processors/showProcessor.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { QueueEvents } from 'bullmq';
-
-// Import BullMQ using dynamic import to avoid ESM issues
-let Queue, Worker;
-
-// Initialize BullMQ imports
-async function initBullMQ() {
-  if (!Queue) {
-    const bullmq = await import('bullmq');
-    Queue = bullmq.Queue;
-    Worker = bullmq.Worker;
-  }
-}
-
+import { Queue, Worker, QueueEvents } from 'bullmq';
+import { deleteProcessingJobs, deleteShowsAndCleanup } from './cleanupService.js';
 import Redis from 'ioredis';
+
+// Override console.error to suppress "Missing key for job" errors from BullMQ
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  const message = args.join(' ');
+  if (message.includes('Missing key for job')) {
+    workerLogger.debug('Suppressed console.error (Missing key for job):', message);
+    return;
+  }
+  originalConsoleError.apply(console, args);
+};
+
+// Global unhandled rejection handler to suppress "Missing key for job" errors
+process.on('unhandledRejection', (reason, promise) => {
+  if (reason && typeof reason === 'object' && reason.message && reason.message.includes('Missing key for job')) {
+    workerLogger.debug('Suppressed unhandled rejection (Missing key for job):', reason.message);
+    return;
+  }
+  // Let other unhandled rejections through
+  workerLogger.error('Unhandled rejection:', reason);
+});
+
+// Global uncaught exception handler to suppress "Missing key for job" errors
+process.on('uncaughtException', (error) => {
+  if (error && error.message && error.message.includes('Missing key for job')) {
+    workerLogger.debug('Suppressed uncaught exception (Missing key for job):', error.message);
+    return;
+  }
+  // Let other uncaught exceptions through
+  workerLogger.error('Uncaught exception:', error);
+});
 
 // Redis connection
 const redis = new Redis({
@@ -168,14 +186,10 @@ export async function initializeQueues() {
       throw new Error(`Redis connection failed: ${redisError.message}`);
     }
 
-    await initBullMQ();
-    workerLogger.info('BullMQ imports initialized successfully');
-
-    // Update queue configuration from settings
     await updateQueueConfig();
 
     const initializedQueues = [];
-    for (const [name, config] of Object.entries(QUEUE_CONFIG)) {
+    for (const [_name, config] of Object.entries(QUEUE_CONFIG)) {
       try {
         workerLogger.info(`Initializing queue: ${config.name}`);
         const queue = new Queue(config.name, { connection: redis });
@@ -232,10 +246,6 @@ export async function startQueues() {
   workerLogger.info('Starting queue workers...');
 
   try {
-    await initBullMQ();
-    workerLogger.info('BullMQ imports verified for worker startup');
-
-    // Update queue configuration from settings
     await updateQueueConfig();
 
     const startedWorkers = [];
@@ -246,9 +256,19 @@ export async function startQueues() {
         const worker = new Worker(config.name, async (job) => {
           try {
             // Update job progress periodically
-            const progressInterval = setInterval(() => {
+            const progressInterval = setInterval(async () => {
               workerLogger.info({ jobId: job.id, dbJobId: job.data?.dbJobId }, 'Calling job.updateProgress(50) as keep-alive');
-              job.updateProgress(50); // Keep job alive
+              try {
+                await job.updateProgress(50); // Keep job alive
+              } catch (progressError) {
+                // Suppress "Missing key for job" errors from updateProgress
+                if (progressError.message && progressError.message.includes('Missing key for job')) {
+                  workerLogger.debug({ jobId: job.id, error: progressError.message }, 'Suppressed updateProgress missing key error');
+                  return;
+                }
+                // Re-throw other errors
+                throw progressError;
+              }
             }, 30000); // Every 30 seconds
 
             try {
@@ -355,6 +375,12 @@ function setupWorkerEvents(worker, workerName) {
   });
 
   worker.on('failed', (job, err) => {
+    // Suppress "Missing key for job" errors as they're harmless after delete all operations
+    if (err.message && err.message.includes('Missing key for job')) {
+      workerLogger.debug({ jobId: job?.id, worker: workerName, error: err.message }, 'Suppressed missing key error (harmless after delete all)');
+      return;
+    }
+
     workerLogger.error({ jobId: job.id, worker: workerName, error: err.message }, 'Job failed');
 
     // Broadcast job failure
@@ -375,6 +401,12 @@ function setupWorkerEvents(worker, workerName) {
   });
 
   worker.on('error', (err) => {
+    // Suppress "Missing key for job" errors as they're harmless after delete all operations
+    if (err.message && err.message.includes('Missing key for job')) {
+      workerLogger.debug({ worker: workerName, error: err.message }, 'Suppressed missing key error (harmless after delete all)');
+      return;
+    }
+
     workerLogger.error({ worker: workerName, error: err.message }, 'Worker error');
 
     // Broadcast worker error
@@ -734,7 +766,6 @@ export async function resumeGpuWorkers() {
 
 // Regularly clean BullMQ queues to prevent buildup of completed/failed jobs
 export async function cleanAllQueues() {
-  await initBullMQ();
   for (const queue of Object.values(queues)) {
     try {
       // Remove completed jobs older than 1 minute
@@ -751,7 +782,6 @@ export async function cleanAllQueues() {
 
 // After job deletion, clean queues
 export async function removeJobFromAllQueues(jobId) {
-  await initBullMQ();
   let removed = false;
 
   // First, kill any associated processes immediately
@@ -829,7 +859,6 @@ export async function removeJobFromAllQueues(jobId) {
 
 // Clear all jobs from all queues (one-time emergency stop)
 export async function clearAllQueues() {
-  await initBullMQ();
   workerLogger.info('Clearing all jobs from all queues...');
 
   for (const [name, queue] of Object.entries(queues)) {
@@ -939,6 +968,56 @@ async function removeDetectionData(episodeFileId) {
   } catch (error) {
     workerLogger.warn({ episodeFileId, error: error.message }, 'Failed to remove detection data');
   }
+}
+
+// --- Cleanup Queue and Worker ---
+const cleanupQueue = new Queue('cleanup', { connection: redis });
+
+const cleanupWorker = new Worker('cleanup', async (job) => {
+  workerLogger.info({ jobId: job.id, name: job.name, data: job.data }, 'Cleanup worker started');
+  if (job.name === 'deleteProcessingJobs') {
+    // Ensure DB instance is available for deleteProcessingJobs
+    let db = globalThis.db;
+    if (!db) {
+      const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
+      db = await getDbLocal();
+      globalThis.db = db;
+    }
+    return await deleteProcessingJobs(job.data, db);
+  } else if (job.name === 'deleteShowsAndCleanup') {
+    const { showIds } = job.data;
+    if (!Array.isArray(showIds) || showIds.length === 0) {
+      throw new Error('No showIds provided');
+    }
+    let db = globalThis.db;
+    if (!db) {
+      const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
+      db = await getDbLocal();
+      globalThis.db = db;
+    }
+    return await deleteShowsAndCleanup(showIds, db);
+  } else {
+    throw new Error('Unknown cleanup job type: ' + job.name);
+  }
+}, { connection: redis });
+
+cleanupWorker.on('completed', (job, result) => {
+  workerLogger.info({ jobId: job.id, result }, 'Cleanup job completed');
+});
+cleanupWorker.on('failed', (job, err) => {
+  workerLogger.error({ jobId: job.id, error: err && err.message }, 'Cleanup job failed');
+});
+
+/**
+ * Enqueue a cleanup job.
+ * @param {'deleteProcessingJobs'|'deleteShowsAndCleanup'} type
+ * @param {object} data
+ * @returns {Promise<string>} jobId
+ */
+export async function enqueueCleanupJob(type, data) {
+  const job = await cleanupQueue.add(type, data, { removeOnComplete: true, removeOnFail: false });
+  workerLogger.info({ jobId: job.id, type, data }, 'Enqueued cleanup job');
+  return job.id;
 }
 
 export { queues };

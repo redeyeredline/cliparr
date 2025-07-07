@@ -7,7 +7,7 @@ export function registerGracefulShutdown(stopFn, options = {}) {
   let isShuttingDown = false;
   const FORCE_EXIT_TIMEOUT = options.forceExitTimeoutMs ?? 1_000;
 
-  async function shutdown(signal, error) {
+  async function shutdown(signal, _error) {
     if (isShuttingDown) {
       appLogger.info('Shutdown already in progress...');
       return;

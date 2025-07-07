@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ProcessingJob, MediaFile, ProcessingProfile } from '../entities/all';
 import { ProcessingJobEntity } from '../entities/ProcessingJob';
 import { apiClient } from '../../integration/api-client';
+import { FixedSizeList as VirtualList } from 'react-window';
 
 interface ProcessingQueueProps {
   jobs: ProcessingJob[];
@@ -51,8 +52,8 @@ export default function ProcessingQueue({
   const [selectAllLoading, setSelectAllLoading] = useState(false);
   const [allJobIds, setAllJobIds] = useState<(string | number)[]>([]);
   const jobsWithId = jobs.filter((job) => job.id !== undefined && job.id !== null);
-  console.log('Job IDs in queue:', jobsWithId.map((j) => j.id));
   const filteredJobs = jobsWithId.filter((job) => filter === 'all' || job.status === filter);
+  console.log('ProcessingQueue render:', { isLoading, jobs, filteredJobs });
   const [cpuLimit, setCpuLimit] = useState<number>(2);
   const [gpuLimit, setGpuLimit] = useState<number>(1);
   const [cpuPaused, setCpuPaused] = useState(false);
@@ -129,7 +130,20 @@ export default function ProcessingQueue({
     if (allSelected) {
       setSelected([]);
     } else {
-      setSelected([...allJobIds.filter((id) => id !== undefined && id !== null)]);
+      setSelectAllLoading(true);
+      try {
+        // Always fetch all job IDs from the backend
+        const ids = await ProcessingJobEntity.getAllIds('all');
+        setAllJobIds(ids);
+        setSelected([...ids.filter((id) => id !== undefined && id !== null)]);
+      } catch (error) {
+        console.error('Error fetching all job IDs:', error);
+        // Fallback to using filtered jobs
+        setAllJobIds(filteredJobs.map((job) => job.id!));
+        setSelected(filteredJobs.map((job) => job.id!));
+      } finally {
+        setSelectAllLoading(false);
+      }
     }
   };
 
@@ -317,7 +331,6 @@ export default function ProcessingQueue({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 max-h-[60vh] overflow-y-auto flex-1 min-h-0">
-
         {isLoading && filteredJobs.length === 0 ? (
           <p className="text-slate-400">Loading...</p>
         ) : filteredJobs.length === 0 ? (
@@ -325,8 +338,14 @@ export default function ProcessingQueue({
             <p>No jobs in this category.</p>
           </div>
         ) : (
-          <AnimatePresence>
-            {filteredJobs.map((job) => {
+          <VirtualList
+            height={480} // 60vh
+            itemCount={filteredJobs.length}
+            itemSize={90}
+            width={'100%'}
+          >
+            {({ index, style }) => {
+              const job = filteredJobs[index];
               const mediaFile = getMediaFile(job.media_file_id);
               const config = statusConfig[job.status as keyof typeof statusConfig] || {
                 color: 'bg-slate-700 text-slate-200',
@@ -334,64 +353,65 @@ export default function ProcessingQueue({
               };
               const StatusIcon = config.icon;
               return (
-                <motion.div
-                  key={job.id}
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="p-5 border-0 rounded-xl shadow-md bg-slate-900/80 hover:scale-[1.01] transition-transform duration-200 cursor-pointer"
-                >
-                  <div className="flex items-start gap-4">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(job.id!)}
-                      onChange={() => handleRowSelect(job.id!)}
-                      className="w-4 h-4 mt-2 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
-                      title="Select job"
-                      disabled={job.id === undefined || job.id === null}
-                    />
-                    <div className="flex-1 space-y-2">
-                      <h3 className="font-semibold text-white text-base">
-                        {mediaFile?.file_name || 'Loading...'}
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <Badge className={`${config.color} capitalize rounded-full px-3 py-1 text-xs font-semibold border border-slate-700`}> <StatusIcon className="w-3 h-3 mr-1.5" /> {job.status}
-                        </Badge>
-                        <Badge variant="outline" className="rounded-full px-3 py-1 text-xs border-slate-700 text-slate-200">
-                          Profile: {profiles.find((p) => p.id === job.profile_id)?.name || 'Auto'}
-                        </Badge>
+                <div style={style} key={job.id}>
+                  <motion.div
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="p-5 border-0 rounded-xl shadow-md bg-slate-900/80 hover:scale-[1.01] transition-transform duration-200 cursor-pointer"
+                  >
+                    <div className="flex items-start gap-4">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(job.id!)}
+                        onChange={() => handleRowSelect(job.id!)}
+                        className="w-4 h-4 mt-2 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
+                        title="Select job"
+                        disabled={job.id === undefined || job.id === null}
+                      />
+                      <div className="flex-1 space-y-2">
+                        <h3 className="font-semibold text-white text-base">
+                          {mediaFile?.file_name || 'Loading...'}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <Badge className={`${config.color} capitalize rounded-full px-3 py-1 text-xs font-semibold border border-slate-700`}> <StatusIcon className="w-3 h-3 mr-1.5" /> {job.status}
+                          </Badge>
+                          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs border-slate-700 text-slate-200">
+                            Profile: {profiles.find((p) => p.id === job.profile_id)?.name || 'Auto'}
+                          </Badge>
+                        </div>
+                        {job.status === 'processing' && (
+                          <Progress value={Math.random() * 80 + 10} className="h-2 mt-2 rounded-full bg-slate-700" />
+                        )}
                       </div>
                       {job.status === 'processing' && (
-                        <Progress value={Math.random() * 80 + 10} className="h-2 mt-2 rounded-full bg-slate-700" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onStopProcessing(job.id!)}
+                          className="rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200"
+                        >
+                          <Pause className="w-5 h-5" />
+                        </Button>
+                      )}
+                      {job.status === 'completed' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDeleteJob(job.id!)}
+                          className="rounded-full bg-slate-800 hover:bg-red-700 text-red-400"
+                          title="Remove job"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </Button>
                       )}
                     </div>
-                    {job.status === 'processing' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onStopProcessing(job.id!)}
-                        className="rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200"
-                      >
-                        <Pause className="w-5 h-5" />
-                      </Button>
-                    )}
-                    {job.status === 'completed' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onDeleteJob(job.id!)}
-                        className="rounded-full bg-slate-800 hover:bg-red-700 text-red-400"
-                        title="Remove job"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </Button>
-                    )}
-                  </div>
-                </motion.div>
+                  </motion.div>
+                </div>
               );
-            })}
-          </AnimatePresence>
+            }}
+          </VirtualList>
         )}
       </CardContent>
     </Card>

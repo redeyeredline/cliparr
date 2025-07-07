@@ -272,7 +272,9 @@ function HomePage() {
       if (data.type === 'queue_status') {
         // Update scan status from queue data
         if (data.queues) {
-          const showProcessingQueue = data.queues.find((q: any) => q.name === 'show-processing');
+          // Handle queues as object (not array)
+          const queuesArray = Array.isArray(data.queues) ? data.queues : Object.values(data.queues);
+          const showProcessingQueue = queuesArray.find((q: any) => q.name === 'show-processing');
           if (showProcessingQueue) {
             setScanStatus({
               active: showProcessingQueue.active || 0,
@@ -427,7 +429,9 @@ function HomePage() {
   const handleScanAll = useCallback(async () => {
     try {
       const result = await apiClient.scanShows(shows.map((show) => show.id));
-      toast({ type: 'success', message: `Scanning all ${result.scanned} shows` });
+      // Show correct number of episodes/jobs, not shows
+      const episodeCount = result.enqueued || result.scanned || 0;
+      toast({ type: 'success', message: `Scanning all ${episodeCount} episodes` });
     } catch {
       toast({ type: 'error', message: 'Failed to scan all shows' });
     }

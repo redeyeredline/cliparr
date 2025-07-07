@@ -2,7 +2,6 @@
 // Configures CORS, JSON parsing, and mounts API route handlers for the backend.
 // src/app.js
 import express from 'express';
-import cors from './middleware/cors.js';
 import healthRoutes from './routes/health.js';
 import showRoutes from './routes/shows.js';
 import sonarrRoutes from './routes/sonarr.js';
@@ -20,7 +19,7 @@ import { appLogger } from './services/logger.js';
  * @param {import('pino').BaseLogger} deps.logger
  * @param {import('ws').WebSocketServer} deps.wss
  */
-export function createApp({ db, logger = appLogger, wss }) {
+export function createApp({ db, logger: _logger = appLogger, wss }) {
   const app = express();
 
   // Initialize fingerprint schema
@@ -57,12 +56,12 @@ export function createApp({ db, logger = appLogger, wss }) {
   app.use('/processing', processingRoutes);
 
   app.use((req, res, next) => {
-    console.log('INCOMING:', req.method, req.url, req.query);
+    console.warn('INCOMING:', req.method, req.url, req.query);
     next();
   });
 
   // Catch-all unmatched route logger
-  app.use((req, res, next) => {
+  app.use((req, res, _next) => {
     console.error('UNMATCHED ROUTE:', req.method, req.url);
     res.status(404).json({ error: 'Not found' });
   });

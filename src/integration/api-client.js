@@ -18,6 +18,13 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Suppress logging for expected 404s (like cleanup job status polling)
+    if (error.response && error.response.status === 404) {
+      // Don't log 404s as they're often expected (e.g., cleanup job not found)
+      return Promise.reject(error);
+    }
+
+    // Log other errors
     console.error('API request failed:', error);
     return Promise.reject(error);
   },
@@ -222,6 +229,12 @@ class ApiClient {
       url += `?season=${seasonNumber}`;
     }
     const response = await api.get(url);
+    return response.data;
+  }
+
+  // Poll cleanup job status by job ID
+  async getCleanupJobStatus(jobId) {
+    const response = await api.get(`/processing/cleanup-job-status/${jobId}`);
     return response.data;
   }
 }

@@ -18,7 +18,7 @@ const queueNames = [
 ];
 
 async function clearAllQueues() {
-  console.log('Clearing all queues...');
+  console.warn('Clearing all queues...');
 
   for (const queueName of queueNames) {
     try {
@@ -34,7 +34,7 @@ async function clearAllQueues() {
         await job.remove();
       }
 
-      console.log(`✅ Cleared ${queueName}: ${waiting.length} waiting, ${active.length} active, ${delayed.length} delayed`);
+      console.warn(`✅ Cleared ${queueName}: ${waiting.length} waiting, ${active.length} active, ${delayed.length} delayed`);
 
       await queue.close();
     } catch (error) {
@@ -43,7 +43,7 @@ async function clearAllQueues() {
   }
 
   await redis.disconnect();
-  console.log('Queue clearing completed!');
+  console.warn('Queue clearing completed!');
 }
 
 clearAllQueues().catch(console.error);
