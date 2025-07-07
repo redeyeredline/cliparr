@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
     tar \
     zlib1g-dev \
     m4 \
+    libssl-dev \
     # FFmpeg minimal dependencies
     libbz2-dev \
     liblzma-dev \
