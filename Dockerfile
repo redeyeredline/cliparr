@@ -1,145 +1,62 @@
-FROM lsiobase/ubuntu:jammy
-
-# Set environment variables
-ENV \
-    LIBVA_DRIVERS_PATH="/usr/lib/x86_64-linux-gnu/dri" \
-    LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu" \
-    NVIDIA_DRIVER_CAPABILITIES="compute,video,utility" \
-    NVIDIA_VISIBLE_DEVICES="all" \
-    PORT="8484"
-
-# Install system dependencies
+# Stage 1: Build FFmpeg
+FROM lsiobase/ubuntu:jammy as ffmpeg-build
 RUN apt-get update && apt-get install -y \
-    # Build tools
-    autoconf \
-    automake \
-    build-essential \
-    cmake \
-    git \
-    libtool \
-    make \
-    nasm \
-    pkg-config \
-    wget \
-    curl \
-    yasm \
-    patch \
-    tar \
-    zlib1g-dev \
-    m4 \
-    libssl-dev \
-    # FFmpeg minimal dependencies
-    libbz2-dev \
-    liblzma-dev \
-    libmp3lame-dev \
-    libnuma-dev \
-    libogg-dev \
-    libopus-dev \
-    libvorbis-dev \
-    libx264-dev \
-    libx265-dev \
-    libvpx-dev \
-    libxml2-dev \
-    # VAAPI dependencies for Intel GPU support
-    libva-dev \
-    libva-drm2 \
-    libva-glx2 \
-    libva-x11-2 \
-    vainfo \
-    # NVIDIA CUDA toolkit and codec headers
-    nvidia-cuda-toolkit \
-    nvidia-cuda-dev \
-    # FFmpeg will fetch ffnvcodec headers automatically
-    # Redis
-    redis-server \
-    # Node.js
-    curl \
-    ca-certificates \
-    gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    # Install specific npm version (lockfileVersion 3 indicates npm 7+)
-    && npm install -g npm@11.4.2 \
-    # Clean up
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# Build FFmpeg from source with NVENC support (minimal codecs)
-RUN cd /tmp && \
+    autoconf automake build-essential cmake git libtool make nasm pkg-config wget curl yasm patch tar zlib1g-dev m4 libssl-dev \
+    libbz2-dev liblzma-dev libmp3lame-dev libnuma-dev libogg-dev libopus-dev libvorbis-dev libx264-dev libx265-dev libvpx-dev libxml2-dev \
+    libva-dev libva-drm2 libva-glx2 libva-x11-2 vainfo \
+    nvidia-cuda-toolkit nvidia-cuda-dev \
+    libfdk-aac-dev libmp3lame-dev libflac-dev libwavpack-dev && \
+    cd /tmp && \
     wget https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.bz2 && \
     tar -xf ffmpeg-7.1.1.tar.bz2 && \
     cd ffmpeg-7.1.1 && \
-    # Fetch ffnvcodec headers (NVIDIA codec headers)
     git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
-    cd nv-codec-headers && \
-    make install && \
-    cd .. && \
+    cd nv-codec-headers && make install && cd .. && \
     ./configure \
-        --prefix=/usr/local \
+        --prefix=/ffmpeg-static \
         --enable-gpl \
         --enable-nonfree \
-        --enable-nvenc \
-        --enable-cuda-nvcc \
-        --enable-libx264 \
-        --enable-libx265 \
-        --enable-libmp3lame \
-        --enable-libopus \
-        --enable-libvorbis \
-        --enable-libvpx \
+        --enable-version3 \
         --enable-shared \
         --enable-pthreads \
-        --enable-version3 \
-        --enable-openssl \
+        --enable-libx264 \
+        --enable-libx265 \
+        --enable-libopus \
+        --enable-libvorbis \
+        --enable-libmp3lame \
+        --enable-libfdk-aac \
+        --enable-libflac \
+        --enable-libvpx \
         --enable-vaapi \
+        --enable-nvenc \
+        --enable-cuda-nvcc \
+        --enable-qsv \
         --extra-cflags="-I/usr/local/cuda/include" \
         --extra-ldflags="-L/usr/local/cuda/lib64" && \
-    make -j$(nproc) && \
-    make install && \
-    ldconfig && \
-    cd / && \
-    rm -rf /tmp/ffmpeg-7.1.1* /tmp/nv-codec-headers
+    make -j$(nproc) && make install && cd / && rm -rf /tmp/ffmpeg-7.1.1* /tmp/nv-codec-headers
 
-# Create app directory
+# Stage 2: Build Node.js app and frontend
+FROM lsiobase/ubuntu:jammy as app-build
+RUN apt-get update && apt-get install -y curl ca-certificates gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && npm install -g npm@11.4.2
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
-
-# Install Node.js dependencies (including dev dependencies for building)
 RUN npm ci
-
-# Copy source code
 COPY . .
-
-# Make startup script executable
 RUN chmod +x docker-start.sh
-
-# Debug: Check what's available
-RUN echo "Node version: $(node --version)" && \
-    echo "NPM version: $(npm --version)" && \
-    echo "Current directory: $(pwd)" && \
-    echo "Files in current directory:" && ls -la && \
-    echo "Available scripts:" && npm run
-
-# Verify TypeScript and Vite are available
-RUN echo "TypeScript version:" && npx tsc --version && \
-    echo "Vite version:" && npx vite --version
-
-# Build the frontend (skip TypeScript check for now, let Vite handle it)
-RUN NODE_ENV=development npx vite build --mode production
-
-# Remove dev dependencies to reduce image size
+RUN npm run build
 RUN npm prune --production
 
-# Create necessary directories
+# Stage 3: Final minimal image
+FROM lsiobase/ubuntu:jammy
+RUN apt-get update && apt-get install -y redis-server curl ca-certificates libva-drm2 libva-x11-2 libva-glx2 libnuma1 libx264-163 libx265-199 libvpx7 libopus0 libvorbis0a libmp3lame0 libfdk-aac2 libflac8 && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY --from=ffmpeg-build /ffmpeg-static /usr/local
+COPY --from=app-build /app /app
+WORKDIR /app
+RUN chmod +x docker-start.sh
 RUN mkdir -p /app/data /app/logs /app/temp /app/src/database/data
-
-# Expose port
 EXPOSE 8484
-
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8484/health/status || exit 1
-
-# Start the application
 CMD ["./docker-start.sh"] 
