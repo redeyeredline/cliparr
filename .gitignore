@@ -109,4 +109,4 @@ Thumbs.db
 
 # Backup files
 *.bak
-*.backup 
+*.backup ffmpeg-7.1.1/
