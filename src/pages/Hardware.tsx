@@ -194,7 +194,7 @@ export default function Hardware() {
           <ProcessingProfiles
             profiles={profiles}
             hardwareInfo={hardwareInfo}
-            onRefresh={() => {}}
+            onRefresh={() => { /* intentionally left blank */ }}
           />
         </div>
 

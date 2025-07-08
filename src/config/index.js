@@ -23,7 +23,7 @@ try {
 const config = {
   env: process.env.NODE_ENV || 'development',
   host: process.env.HOST || '0.0.0.0',
-  port: +(process.env.PORT || 8485),
+  port: +(process.env.PORT || 8484),
 
   // Sonarr
   sonarr: {
@@ -45,9 +45,7 @@ const config = {
 
   // CORS (used in your cors middleware)
   cors: {
-    origin: isProd
-      ? process.env.FRONTEND_URL || 'https://cliprr.example.com'
-      : 'http://localhost:8484',
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,

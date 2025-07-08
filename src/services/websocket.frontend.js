@@ -21,7 +21,8 @@ class WebSocketClient {
     this.isConnecting = true;
 
     try {
-      this.ws = new WebSocket('ws://localhost:8485/ws');
+      // Use relative path for WebSocket
+      this.ws = new WebSocket('/ws');
 
       this.ws.onopen = () => {
         this.reconnectAttempts = 0;

@@ -27,6 +27,10 @@ export default defineConfig({
       }
     }
   ],
+  // Suppress Node.js module externalization warnings
+  optimizeDeps: {
+    exclude: ['better-sqlite3', 'ioredis', 'bullmq', 'pino', 'pino-pretty', 'redis-semaphore'],
+  },
   server: {
     host: '0.0.0.0',
     port: 8484, // Frontend port
@@ -45,6 +49,36 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split vendor libraries into separate chunks
+          'react-vendor': ['react', 'react-dom'],
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-tabs', '@radix-ui/react-progress', '@radix-ui/react-checkbox', '@radix-ui/react-label', '@radix-ui/react-slot'],
+          'icons-vendor': ['lucide-react', 'react-icons'],
+          'utils-vendor': ['lodash', 'date-fns', 'clsx', 'class-variance-authority', 'tailwind-merge'],
+          'animation-vendor': ['framer-motion'],
+          'router-vendor': ['react-router-dom'],
+          'data-vendor': ['better-sqlite3', 'bullmq', 'ioredis', 'redis-semaphore'],
+          'network-vendor': ['axios', 'ws'],
+          'logging-vendor': ['pino', 'pino-pretty'],
+        },
+        // Optimize chunk naming
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+    },
+    // Increase chunk size warning limit slightly
+    chunkSizeWarningLimit: 600,
+    // Enable minification
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.log in production
+        drop_debugger: true,
+      },
+    },
   },
   resolve: {
     alias: {

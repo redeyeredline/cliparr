@@ -40,9 +40,9 @@ export function createApp({ db, logger: _logger = appLogger, wss }) {
   // built-in middleware
   app.use(express.json());
 
-  // CORS (uses config from src/config/index.js via your cors middleware)
+  // CORS (allow all origins for internal/LAN use)
   app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:8484');
+    res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     res.header('Access-Control-Allow-Credentials', 'true');
@@ -64,8 +64,13 @@ export function createApp({ db, logger: _logger = appLogger, wss }) {
   const distPath = path.join(__dirname, '..', 'dist');
   app.use(express.static(distPath));
 
+  app.use((req, res, next) => {
+    console.warn('INCOMING:', req.method, req.url, req.query);
+    next();
+  });
+
   // Handle client-side routing - serve index.html for all non-API routes
-  app.get('*', (req, res, next) => {
+  app.use((req, res, next) => {
     // Skip API routes
     if (req.path.startsWith('/health') ||
         req.path.startsWith('/shows') ||
@@ -78,11 +83,6 @@ export function createApp({ db, logger: _logger = appLogger, wss }) {
 
     // Serve index.html for all other routes (client-side routing)
     res.sendFile(path.join(distPath, 'index.html'));
-  });
-
-  app.use((req, res, next) => {
-    console.warn('INCOMING:', req.method, req.url, req.query);
-    next();
   });
 
   // Catch-all unmatched route logger

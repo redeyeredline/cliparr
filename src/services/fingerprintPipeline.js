@@ -5,9 +5,9 @@ import { execFile, spawn } from 'child_process';
 import lodash from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import { workerLogger } from './logger.js';
-import { getDb, getSetting, setSetting } from '../database/Db_Operations.js';
+import { getDb, getSetting } from '../database/Db_Operations.js';
 
-const { meanBy, ceil, round } = lodash;
+const { ceil, round } = lodash;
 
 /**
  * Enhanced fingerprint pipeline for robust intro/credits detection
