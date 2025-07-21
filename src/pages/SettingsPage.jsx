@@ -161,7 +161,10 @@ const Settings2Page = () => {
     // If the API key is masked (contains *), fail immediately
     if (!apiKey || apiKey.includes('*')) {
       setSonarrTestResult('fail');
-      toast({ type: 'error', message: 'Please enter your real Sonarr API key to test connection.' });
+      toast({
+        type: 'error',
+        message: 'Please enter your real Sonarr API key to test connection.',
+      });
       setTestingSonarr(false);
       return;
     }
@@ -193,7 +196,7 @@ const Settings2Page = () => {
         e.key === 'Enter' &&
         hasChanges &&
         !saving &&
-        (document.activeElement.tagName !== 'TEXTAREA')
+        document.activeElement.tagName !== 'TEXTAREA'
       ) {
         e.preventDefault();
         handleSaveRef.current();
@@ -203,13 +206,12 @@ const Settings2Page = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [hasChanges, saving]);
 
-  const apiKeyInputValue = (
-    apiKeyEdited
-      ? pending.sonarr_api_key
-      : (settings.sonarr_api_key && (!pending.sonarr_api_key || pending.sonarr_api_key === settings.sonarr_api_key)
-        ? maskApiKey(settings.sonarr_api_key)
-        : (pending.sonarr_api_key || ''))
-  );
+  const apiKeyInputValue = apiKeyEdited
+    ? pending.sonarr_api_key
+    : settings.sonarr_api_key &&
+        (!pending.sonarr_api_key || pending.sonarr_api_key === settings.sonarr_api_key)
+      ? maskApiKey(settings.sonarr_api_key)
+      : pending.sonarr_api_key || '';
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -288,7 +290,19 @@ const Settings2Page = () => {
                     onClick={() => setShowOutputDirPicker(true)}
                     tabIndex={-1}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h3.172a2 2 0 011.414.586l1.828 1.828A2 2 0 0012.828 8H19a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 7a2 2 0 012-2h3.172a2 2 0 011.414.586l1.828 1.828A2 2 0 0012.828 8H19a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                      />
+                    </svg>
                   </button>
                 </div>
                 <span className="text-sm text-gray-400">
@@ -302,7 +316,9 @@ const Settings2Page = () => {
                 />
               </div>
               <div className="mb-2">
-                <label className="block font-semibold text-gray-200 mb-1">Temporary Directory</label>
+                <label className="block font-semibold text-gray-200 mb-1">
+                  Temporary Directory
+                </label>
                 <div className="flex items-center gap-2">
                   <input
                     className="w-full rounded-lg px-3 py-2 bg-gray-900 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -318,14 +334,29 @@ const Settings2Page = () => {
                     onClick={() => setShowTempDirPicker(true)}
                     tabIndex={-1}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h3.172a2 2 0 011.414.586l1.828 1.828A2 2 0 0012.828 8H19a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 7a2 2 0 012-2h3.172a2 2 0 011.414.586l1.828 1.828A2 2 0 0012.828 8H19a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                      />
+                    </svg>
                   </button>
                 </div>
                 <span className="text-sm text-gray-400">
-                  Directory for temporary files (default: system temp dir, e.g. /tmp/cliprr). Change only if you want to use a custom location.
+                  Directory for temporary files (default: system temp dir, e.g. /tmp/cliprr). Change
+                  only if you want to use a custom location.
                 </span>
                 {!tempDirValid && (
-                  <div className="text-sm text-red-400 mt-1">{tempDirError || 'Invalid temp directory'}</div>
+                  <div className="text-sm text-red-400 mt-1">
+                    {tempDirError || 'Invalid temp directory'}
+                  </div>
                 )}
                 <FolderPickerModal
                   isOpen={showTempDirPicker}
@@ -335,7 +366,9 @@ const Settings2Page = () => {
                 />
               </div>
               <div className="mb-2">
-                <label className="block font-semibold text-gray-200 mb-1">Minimum Confidence Threshold</label>
+                <label className="block font-semibold text-gray-200 mb-1">
+                  Minimum Confidence Threshold
+                </label>
                 <div className="flex items-center">
                   <input
                     className="w-16 rounded-lg px-3 py-2 bg-gray-900 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -403,9 +436,7 @@ const Settings2Page = () => {
             <CardContent>
               <div className="mb-2">
                 <div className="flex items-baseline justify-between mb-3">
-                  <label className="block font-semibold text-gray-200 text-lg">
-                    Import Mode
-                  </label>
+                  <label className="block font-semibold text-gray-200 text-lg">Import Mode</label>
                   <span className="text-sm text-gray-400">
                     Choose how Cliparr handles show imports from Sonarr.
                   </span>
@@ -437,9 +468,7 @@ const Settings2Page = () => {
           {/* Floating Save Bar */}
           {hasChanges && (
             <div className="fixed bottom-6 right-6 z-50">
-              <div
-                className="bg-gray-800/90 backdrop-blur-lg border border-gray-700/50 rounded-2xl shadow-2xl p-2"
-              >
+              <div className="bg-gray-800/90 backdrop-blur-lg border border-gray-700/50 rounded-2xl shadow-2xl p-2">
                 <button
                   onClick={handleSave}
                   disabled={saving}

@@ -85,17 +85,24 @@ async function analyzeFileState(filePath) {
 
     // Get video duration using ffprobe
     const duration = await new Promise((resolve, reject) => {
-      execFile('ffprobe', [
-        '-v', 'error',
-        '-show_entries', 'format=duration',
-        '-of', 'default=noprint_wrappers=1:nokey=1',
-        filePath,
-      ], (err, stdout) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(parseFloat(stdout));
-      });
+      execFile(
+        'ffprobe',
+        [
+          '-v',
+          'error',
+          '-show_entries',
+          'format=duration',
+          '-of',
+          'default=noprint_wrappers=1:nokey=1',
+          filePath,
+        ],
+        (err, stdout) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(parseFloat(stdout));
+        },
+      );
     });
 
     // Basic heuristics for already-processed files
@@ -106,13 +113,15 @@ async function analyzeFileState(filePath) {
     };
 
     // Check for typical signs of already-processed files
-    if (duration < 300) { // Less than 5 minutes
+    if (duration < 300) {
+      // Less than 5 minutes
       isAlreadyProcessed.indicators.push('short_duration');
     }
 
     // Check file size relative to duration (rough heuristic)
     const bytesPerSecond = fileSize / duration;
-    if (bytesPerSecond < 100000) { // Very low bitrate
+    if (bytesPerSecond < 100000) {
+      // Very low bitrate
       isAlreadyProcessed.indicators.push('low_bitrate');
     }
 
@@ -132,13 +141,19 @@ async function extractAudioFromFile(filePath, tempDir, episodeFileId) {
 
   // Use a simpler, more robust filter chain that's less likely to fail
   // Basic normalization and band-pass filtering without complex loudnorm
-  const filterChain = 'aresample=44100,pan=mono|c0=.5*c0+.5*c1,highpass=f=300,lowpass=f=3000,volume=1.5';
+  const filterChain =
+    'aresample=44100,pan=mono|c0=.5*c0+.5*c1,highpass=f=300,lowpass=f=3000,volume=1.5';
   const ffmpegArgs = [
-    '-i', filePath,
-    '-af', filterChain,
-    '-acodec', 'pcm_s16le',
-    '-ar', '44100',
-    '-ac', '1',
+    '-i',
+    filePath,
+    '-af',
+    filterChain,
+    '-acodec',
+    'pcm_s16le',
+    '-ar',
+    '44100',
+    '-ac',
+    '1',
     '-y',
     filteredPath,
   ];
@@ -146,24 +161,34 @@ async function extractAudioFromFile(filePath, tempDir, episodeFileId) {
   // Get total duration using ffprobe
   const getDuration = async (file) => {
     return new Promise((resolve, reject) => {
-      execFile('ffprobe', [
-        '-v', 'error',
-        '-show_entries', 'format=duration',
-        '-of', 'default=noprint_wrappers=1:nokey=1',
-        file,
-      ], (err, stdout) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(parseFloat(stdout));
-      });
+      execFile(
+        'ffprobe',
+        [
+          '-v',
+          'error',
+          '-show_entries',
+          'format=duration',
+          '-of',
+          'default=noprint_wrappers=1:nokey=1',
+          file,
+        ],
+        (err, stdout) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(parseFloat(stdout));
+        },
+      );
     });
   };
   let totalDuration = 0;
   try {
     totalDuration = await getDuration(filePath);
   } catch (e) {
-    workerLogger.warn({ filePath, error: e.message }, 'Failed to get duration for audio extraction progress');
+    workerLogger.warn(
+      { filePath, error: e.message },
+      'Failed to get duration for audio extraction progress',
+    );
   }
 
   const t0 = Date.now();
@@ -182,16 +207,19 @@ async function extractAudioFromFile(filePath, tempDir, episodeFileId) {
           const parts = timeMatch[1].split(':');
           let seconds = 0;
           if (parts.length === 3) {
-            seconds = (+parts[0]) * 3600 + (+parts[1]) * 60 + parseFloat(parts[2]);
+            seconds = +parts[0] * 3600 + +parts[1] * 60 + parseFloat(parts[2]);
           } else if (parts.length === 2) {
-            seconds = (+parts[0]) * 60 + parseFloat(parts[1]);
+            seconds = +parts[0] * 60 + parseFloat(parts[1]);
           } else {
             seconds = parseFloat(parts[0]);
           }
           const percent = Math.min(100, Math.round((seconds / totalDuration) * 100));
           if (percent !== lastPercent) {
             lastPercent = percent;
-            workerLogger.info({ filePath, episodeFileId, percent }, `Audio extraction progress: ${percent}%`);
+            workerLogger.info(
+              { filePath, episodeFileId, percent },
+              `Audio extraction progress: ${percent}%`,
+            );
             if (typeof broadcastJobUpdate === 'function' && episodeFileId) {
               broadcastJobUpdate({
                 episodeFileId,
@@ -209,24 +237,39 @@ async function extractAudioFromFile(filePath, tempDir, episodeFileId) {
           resolve();
         } else {
           const truncatedStderr = stderr ? stderr.split('\n').slice(0, 5).join('\n') : '';
-          workerLogger.error({ filePath, error: `ffmpeg exited with code ${code}`, stderr: truncatedStderr }, 'FFmpeg audio extraction failed');
-          reject(new Error(`FFmpeg audio extraction failed: ${truncatedStderr || 'Unknown error'}`));
+          workerLogger.error(
+            { filePath, error: `ffmpeg exited with code ${code}`, stderr: truncatedStderr },
+            'FFmpeg audio extraction failed',
+          );
+          reject(
+            new Error(`FFmpeg audio extraction failed: ${truncatedStderr || 'Unknown error'}`),
+          );
         }
       });
       ffmpeg.on('error', (err) => {
-        workerLogger.error({ filePath, error: err.message }, 'FFmpeg process error during audio extraction');
+        workerLogger.error(
+          { filePath, error: err.message },
+          'FFmpeg process error during audio extraction',
+        );
         reject(err);
       });
     });
   } catch (extractionError) {
     // Fallback to even simpler extraction if the first attempt fails
-    workerLogger.warn({ filePath, error: extractionError.message }, 'Primary audio extraction failed, trying fallback method');
+    workerLogger.warn(
+      { filePath, error: extractionError.message },
+      'Primary audio extraction failed, trying fallback method',
+    );
     const fallbackArgs = [
-      '-i', filePath,
+      '-i',
+      filePath,
       '-vn',
-      '-acodec', 'pcm_s16le',
-      '-ar', '44100',
-      '-ac', '1',
+      '-acodec',
+      'pcm_s16le',
+      '-ar',
+      '44100',
+      '-ac',
+      '1',
       '-y',
       filteredPath,
     ];
@@ -241,16 +284,19 @@ async function extractAudioFromFile(filePath, tempDir, episodeFileId) {
           const parts = timeMatch[1].split(':');
           let seconds = 0;
           if (parts.length === 3) {
-            seconds = (+parts[0]) * 3600 + (+parts[1]) * 60 + parseFloat(parts[2]);
+            seconds = +parts[0] * 3600 + +parts[1] * 60 + parseFloat(parts[2]);
           } else if (parts.length === 2) {
-            seconds = (+parts[0]) * 60 + parseFloat(parts[1]);
+            seconds = +parts[0] * 60 + parseFloat(parts[1]);
           } else {
             seconds = parseFloat(parts[0]);
           }
           const percent = Math.min(100, Math.round((seconds / totalDuration) * 100));
           if (percent !== lastPercent) {
             lastPercent = percent;
-            workerLogger.info({ filePath, episodeFileId, percent }, `Audio extraction progress: ${percent}%`);
+            workerLogger.info(
+              { filePath, episodeFileId, percent },
+              `Audio extraction progress: ${percent}%`,
+            );
             if (typeof broadcastJobUpdate === 'function' && episodeFileId) {
               broadcastJobUpdate({
                 episodeFileId,
@@ -268,12 +314,22 @@ async function extractAudioFromFile(filePath, tempDir, episodeFileId) {
           resolve();
         } else {
           const truncatedStderr = stderr ? stderr.split('\n').slice(0, 5).join('\n') : '';
-          workerLogger.error({ filePath, error: `ffmpeg exited with code ${code}`, stderr: truncatedStderr }, 'FFmpeg fallback audio extraction failed');
-          reject(new Error(`FFmpeg fallback audio extraction failed: ${truncatedStderr || 'Unknown error'}`));
+          workerLogger.error(
+            { filePath, error: `ffmpeg exited with code ${code}`, stderr: truncatedStderr },
+            'FFmpeg fallback audio extraction failed',
+          );
+          reject(
+            new Error(
+              `FFmpeg fallback audio extraction failed: ${truncatedStderr || 'Unknown error'}`,
+            ),
+          );
         }
       });
       ffmpeg.on('error', (err) => {
-        workerLogger.error({ filePath, error: err.message }, 'FFmpeg process error during fallback audio extraction');
+        workerLogger.error(
+          { filePath, error: err.message },
+          'FFmpeg process error during fallback audio extraction',
+        );
         reject(err);
       });
     });
@@ -300,7 +356,10 @@ async function extractAudioFromFile(filePath, tempDir, episodeFileId) {
       throw new Error('Extracted audio file is empty');
     }
   } catch (error) {
-    workerLogger.error({ filePath, filteredPath, error: error.message }, 'Audio extraction verification failed');
+    workerLogger.error(
+      { filePath, filteredPath, error: error.message },
+      'Audio extraction verification failed',
+    );
     throw new Error(`Audio extraction failed: ${error.message}`);
   }
 
@@ -310,20 +369,33 @@ async function extractAudioFromFile(filePath, tempDir, episodeFileId) {
 /**
  * Generate fingerprints for sliding windows in an audio file
  */
-async function fingerprintEpisodeChunks(filePath, chunkLength = 30, overlap = 20, episodeFileId = null, progressCallback = null) {
+async function fingerprintEpisodeChunks(
+  filePath,
+  chunkLength = 30,
+  overlap = 20,
+  episodeFileId = null,
+  progressCallback = null,
+) {
   const getAudioDuration = async (file) => {
     return new Promise((resolve, reject) => {
-      execFile('ffprobe', [
-        '-v', 'error',
-        '-show_entries', 'format=duration',
-        '-of', 'default=noprint_wrappers=1:nokey=1',
-        file,
-      ], (err, stdout) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(parseFloat(stdout));
-      });
+      execFile(
+        'ffprobe',
+        [
+          '-v',
+          'error',
+          '-show_entries',
+          'format=duration',
+          '-of',
+          'default=noprint_wrappers=1:nokey=1',
+          file,
+        ],
+        (err, stdout) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(parseFloat(stdout));
+        },
+      );
     });
   };
 
@@ -333,42 +405,60 @@ async function fingerprintEpisodeChunks(filePath, chunkLength = 30, overlap = 20
   const totalChunks = Math.ceil(duration / (chunkLength - overlap));
 
   const tChunkStart = Date.now();
-  for (let i = 0, start = 0; start < duration; i++, start += (chunkLength - overlap)) {
+  for (let i = 0, start = 0; start < duration; i++, start += chunkLength - overlap) {
     const chunkFileName = `chunk_${start}_${Date.now()}.wav`;
     const chunkPath = path.join(tempDir, chunkFileName);
     const tChunk = Date.now();
     try {
       await new Promise((resolve, reject) => {
-        const ffmpeg = execFile('ffmpeg', [
-          '-i', filePath,
-          '-ss', String(start),
-          '-t', String(chunkLength),
-          '-acodec', 'pcm_s16le',
-          '-ar', '44100',
-          '-ac', '1',
-          '-fflags', '+genpts+igndts',
-          '-err_detect', 'ignore_err',
-          '-y',
-          chunkPath,
-        ], (err, stdout, stderr) => {
-          if (episodeFileId) {
-            delete activeFfmpegJobs[episodeFileId];
-          }
-          const fileExists = fs.existsSync(chunkPath);
-          if (err && !fileExists) {
-            const truncatedStderr = stderr ? stderr.split('\n').slice(0, 5).join('\n') : '';
-            workerLogger.error({ filePath, start, error: err.message, stderr: truncatedStderr }, 'FFmpeg chunk extraction failed');
-            return reject(err);
-          } else if (err && fileExists) {
-            const truncatedStderr = stderr ? stderr.split('\n').slice(0, 3).join('\n') : '';
-            if (truncatedStderr) {
-              workerLogger.debug({ filePath, start, stderr: truncatedStderr }, 'FFmpeg warnings during chunk extraction (file created successfully)');
+        const ffmpeg = execFile(
+          'ffmpeg',
+          [
+            '-i',
+            filePath,
+            '-ss',
+            String(start),
+            '-t',
+            String(chunkLength),
+            '-acodec',
+            'pcm_s16le',
+            '-ar',
+            '44100',
+            '-ac',
+            '1',
+            '-fflags',
+            '+genpts+igndts',
+            '-err_detect',
+            'ignore_err',
+            '-y',
+            chunkPath,
+          ],
+          (err, stdout, stderr) => {
+            if (episodeFileId) {
+              delete activeFfmpegJobs[episodeFileId];
             }
-            resolve();
-          } else {
-            resolve();
-          }
-        });
+            const fileExists = fs.existsSync(chunkPath);
+            if (err && !fileExists) {
+              const truncatedStderr = stderr ? stderr.split('\n').slice(0, 5).join('\n') : '';
+              workerLogger.error(
+                { filePath, start, error: err.message, stderr: truncatedStderr },
+                'FFmpeg chunk extraction failed',
+              );
+              return reject(err);
+            } else if (err && fileExists) {
+              const truncatedStderr = stderr ? stderr.split('\n').slice(0, 3).join('\n') : '';
+              if (truncatedStderr) {
+                workerLogger.debug(
+                  { filePath, start, stderr: truncatedStderr },
+                  'FFmpeg warnings during chunk extraction (file created successfully)',
+                );
+              }
+              resolve();
+            } else {
+              resolve();
+            }
+          },
+        );
         if (episodeFileId) {
           activeFfmpegJobs[episodeFileId] = {
             pid: ffmpeg.pid,
@@ -385,7 +475,10 @@ async function fingerprintEpisodeChunks(filePath, chunkLength = 30, overlap = 20
         progressCallback(percent, `Chunk ${i + 1} of ${totalChunks} extracted`);
       }
       const tChunkEnd = Date.now();
-      workerLogger.info({ filePath, chunk: i, totalChunks, start, durationMs: tChunkEnd - tChunk }, `Chunk ${i + 1} of ${totalChunks} extraction complete`);
+      workerLogger.info(
+        { filePath, chunk: i, totalChunks, start, durationMs: tChunkEnd - tChunk },
+        `Chunk ${i + 1} of ${totalChunks} extraction complete`,
+      );
 
       // Fingerprint the chunk
       const tFp = Date.now();
@@ -407,7 +500,10 @@ async function fingerprintEpisodeChunks(filePath, chunkLength = 30, overlap = 20
         progressCallback(percent, `Chunk ${i + 1} of ${totalChunks} fingerprinted`);
       }
       const tFpEnd = Date.now();
-      workerLogger.info({ filePath, chunk: i, start, durationMs: tFpEnd - tFp }, 'Fingerprinting complete');
+      workerLogger.info(
+        { filePath, chunk: i, start, durationMs: tFpEnd - tFp },
+        'Fingerprinting complete',
+      );
 
       results.push({ start, fingerprint: fp });
 
@@ -417,20 +513,25 @@ async function fingerprintEpisodeChunks(filePath, chunkLength = 30, overlap = 20
       } catch (cleanupErr) {
         // Ignore cleanup errors
       }
-
     } catch (error) {
-      workerLogger.warn({
-        filePath,
-        start,
-        error: error.message,
-      }, 'Failed to process chunk, skipping');
+      workerLogger.warn(
+        {
+          filePath,
+          start,
+          error: error.message,
+        },
+        'Failed to process chunk, skipping',
+      );
       try {
         await fsp.unlink(chunkPath);
       } catch (cleanupErr) {}
     }
   }
   const tChunkEndAll = Date.now();
-  workerLogger.info({ filePath, totalChunks, totalDurationMs: tChunkEndAll - tChunkStart }, 'All chunking+fingerprinting complete');
+  workerLogger.info(
+    { filePath, totalChunks, totalDurationMs: tChunkEndAll - tChunkStart },
+    'All chunking+fingerprinting complete',
+  );
   // Emit 100% progress at end
   if (progressCallback) {
     progressCallback(100, 'All chunks processed and fingerprinted');
@@ -451,7 +552,15 @@ async function fingerprintEpisodeChunks(filePath, chunkLength = 30, overlap = 20
 /**
  * Store episode fingerprint data in database
  */
-async function storeEpisodeFingerprints(showId, seasonNumber, episodeNumber, episodeFileId, fingerprintData, fileDuration, fileSize) {
+async function storeEpisodeFingerprints(
+  showId,
+  seasonNumber,
+  episodeNumber,
+  episodeFileId,
+  fingerprintData,
+  fileDuration,
+  fileSize,
+) {
   const db = await getDb();
   const now = new Date().toISOString();
 
@@ -473,13 +582,16 @@ async function storeEpisodeFingerprints(showId, seasonNumber, episodeNumber, epi
     now,
   );
 
-  workerLogger.info({
-    showId,
-    seasonNumber,
-    episodeNumber,
-    episodeFileId,
-    fingerprintCount: fingerprintData.length,
-  }, 'Episode fingerprints stored in database');
+  workerLogger.info(
+    {
+      showId,
+      seasonNumber,
+      episodeNumber,
+      episodeFileId,
+      fingerprintCount: fingerprintData.length,
+    },
+    'Episode fingerprints stored in database',
+  );
 }
 
 /**
@@ -648,18 +760,24 @@ function detectSegments(commonFpMap, episodeDuration, options = {}) {
     }
   }
 
-  workerLogger.info({
-    totalEntries: entries.length,
-    uniqueFingerprints: commonFpMap.size,
-  }, 'Flattened fingerprint entries for clustering');
+  workerLogger.info(
+    {
+      totalEntries: entries.length,
+      uniqueFingerprints: commonFpMap.size,
+    },
+    'Flattened fingerprint entries for clustering',
+  );
 
   // 2) Cluster by time proximity
   const clusters = clusterByTime(entries, timeThreshold);
 
-  workerLogger.info({
-    clusterCount: clusters.length,
-    timeThreshold,
-  }, 'Time-based clustering completed');
+  workerLogger.info(
+    {
+      clusterCount: clusters.length,
+      timeThreshold,
+    },
+    'Time-based clustering completed',
+  );
 
   // 3) For each cluster, compute segment info
   const segments = clusters.map((cluster, index) => {
@@ -685,13 +803,16 @@ function detectSegments(commonFpMap, episodeDuration, options = {}) {
 
   const goodSegments = segments.filter((seg) => seg.episodeCount >= minEpisodes);
 
-  workerLogger.info({
-    totalSegments: segments.length,
-    goodSegments: goodSegments.length,
-    minEpisodes,
-    totalEpisodes,
-    coverageThreshold: `${(minEpisodeCoverage * 100).toFixed(1)}%`,
-  }, 'Filtered segments by episode coverage');
+  workerLogger.info(
+    {
+      totalSegments: segments.length,
+      goodSegments: goodSegments.length,
+      minEpisodes,
+      totalEpisodes,
+      coverageThreshold: `${(minEpisodeCoverage * 100).toFixed(1)}%`,
+    },
+    'Filtered segments by episode coverage',
+  );
 
   // 5) Sort by start time
   goodSegments.sort((a, b) => a.start - b.start);
@@ -730,27 +851,34 @@ function detectSegments(commonFpMap, episodeDuration, options = {}) {
   }
 
   // Log detailed segment analysis
-  workerLogger.info({
-    intro: intro ? {
-      start: intro.start,
-      end: intro.end,
-      episodeCount: intro.episodeCount,
-      medianTime: intro.medianTime,
-    } : null,
-    credits: credits ? {
-      start: credits.start,
-      end: credits.end,
-      episodeCount: credits.episodeCount,
-      medianTime: credits.medianTime,
-    } : null,
-    stingers: stingers.map((s) => ({
-      start: s.start,
-      end: s.end,
-      episodeCount: s.episodeCount,
-      medianTime: s.medianTime,
-    })),
-    totalSegments: goodSegments.length,
-  }, 'Segment detection and labeling completed');
+  workerLogger.info(
+    {
+      intro: intro
+        ? {
+            start: intro.start,
+            end: intro.end,
+            episodeCount: intro.episodeCount,
+            medianTime: intro.medianTime,
+          }
+        : null,
+      credits: credits
+        ? {
+            start: credits.start,
+            end: credits.end,
+            episodeCount: credits.episodeCount,
+            medianTime: credits.medianTime,
+          }
+        : null,
+      stingers: stingers.map((s) => ({
+        start: s.start,
+        end: s.end,
+        episodeCount: s.episodeCount,
+        medianTime: s.medianTime,
+      })),
+      totalSegments: goodSegments.length,
+    },
+    'Segment detection and labeling completed',
+  );
 
   return {
     segments: goodSegments,
@@ -765,7 +893,7 @@ function detectSegments(commonFpMap, episodeDuration, options = {}) {
  */
 function calculateClusteringConfidence(segments, totalEpisodes, episodeDuration) {
   if (!segments || segments.length === 0) {
-    return 0.00;
+    return 0.0;
   }
 
   // Base confidence from segment coverage
@@ -782,7 +910,7 @@ function calculateClusteringConfidence(segments, totalEpisodes, episodeDuration)
   const totalConfidence = coverageConfidence + segmentBonus + episodeBonus;
 
   // Round to 2 decimal places
-  return round(Math.min(totalConfidence, 1.00), 2);
+  return round(Math.min(totalConfidence, 1.0), 2);
 }
 
 /**
@@ -825,7 +953,13 @@ function shouldPreserveExistingData(existingData, newData) {
 /**
  * Store detection results in database
  */
-async function storeDetectionResults(showId, seasonNumber, episodeNumber, episodeFileId, detectionData) {
+async function storeDetectionResults(
+  showId,
+  seasonNumber,
+  episodeNumber,
+  episodeFileId,
+  detectionData,
+) {
   const db = await getDb();
   const now = new Date().toISOString();
 
@@ -862,18 +996,25 @@ async function storeDetectionResults(showId, seasonNumber, episodeNumber, episod
     now,
   );
 
-  workerLogger.info({
-    showId,
-    seasonNumber,
-    episodeNumber,
-    episodeFileId,
-    confidence: detectionData.confidence_score,
-    method: detectionData.detection_method,
-    intro: detectionData.intro ? `${detectionData.intro.start}s-${detectionData.intro.end}s` : 'none',
-    credits: detectionData.credits ? `${detectionData.credits.start}s-${detectionData.credits.end}s` : 'none',
-    stingers: detectionData.stingers ? detectionData.stingers.length : 0,
-    segments: detectionData.segments ? detectionData.segments.length : 0,
-  }, 'Detection results stored in database');
+  workerLogger.info(
+    {
+      showId,
+      seasonNumber,
+      episodeNumber,
+      episodeFileId,
+      confidence: detectionData.confidence_score,
+      method: detectionData.detection_method,
+      intro: detectionData.intro
+        ? `${detectionData.intro.start}s-${detectionData.intro.end}s`
+        : 'none',
+      credits: detectionData.credits
+        ? `${detectionData.credits.start}s-${detectionData.credits.end}s`
+        : 'none',
+      stingers: detectionData.stingers ? detectionData.stingers.length : 0,
+      segments: detectionData.segments ? detectionData.segments.length : 0,
+    },
+    'Detection results stored in database',
+  );
 }
 
 /**
@@ -895,11 +1036,14 @@ async function getAutoProcessingSettings() {
  */
 export async function detectIntroAndCreditsForSeason(showId, seasonNumber, options = {}) {
   const startTime = Date.now();
-  workerLogger.info({
-    showId,
-    seasonNumber,
-    options,
-  }, 'Starting season detection pipeline');
+  workerLogger.info(
+    {
+      showId,
+      seasonNumber,
+      options,
+    },
+    'Starting season detection pipeline',
+  );
 
   try {
     // Initialize schema if needed
@@ -907,11 +1051,14 @@ export async function detectIntroAndCreditsForSeason(showId, seasonNumber, optio
 
     // Get current season fingerprints
     const currentSeasonEpisodes = await getSeasonFingerprints(showId, seasonNumber);
-    workerLogger.info({
-      showId,
-      seasonNumber,
-      episodeCount: currentSeasonEpisodes.length,
-    }, 'Retrieved current season fingerprints');
+    workerLogger.info(
+      {
+        showId,
+        seasonNumber,
+        episodeCount: currentSeasonEpisodes.length,
+      },
+      'Retrieved current season fingerprints',
+    );
 
     // Determine detection method and episodes to use
     let detectionEpisodes = currentSeasonEpisodes;
@@ -920,11 +1067,14 @@ export async function detectIntroAndCreditsForSeason(showId, seasonNumber, optio
 
     // If insufficient episodes in current season, try cross-season fallback
     if (currentSeasonEpisodes.length < 3) {
-      workerLogger.info({
-        showId,
-        seasonNumber,
-        currentEpisodeCount: currentSeasonEpisodes.length,
-      }, 'Insufficient episodes in current season, attempting cross-season fallback');
+      workerLogger.info(
+        {
+          showId,
+          seasonNumber,
+          currentEpisodeCount: currentSeasonEpisodes.length,
+        },
+        'Insufficient episodes in current season, attempting cross-season fallback',
+      );
 
       const previousSeasonEpisodes = await getPreviousSeasonFingerprints(showId, seasonNumber);
 
@@ -938,35 +1088,44 @@ export async function detectIntroAndCreditsForSeason(showId, seasonNumber, optio
           totalEpisodes: detectionEpisodes.length,
         };
 
-        workerLogger.info({
-          showId,
-          seasonNumber,
-          crossSeasonData,
-        }, 'Using cross-season detection method');
+        workerLogger.info(
+          {
+            showId,
+            seasonNumber,
+            crossSeasonData,
+          },
+          'Using cross-season detection method',
+        );
       }
     }
 
     if (detectionEpisodes.length === 0) {
-      workerLogger.warn({
-        showId,
-        seasonNumber,
-      }, 'No episodes available for detection');
+      workerLogger.warn(
+        {
+          showId,
+          seasonNumber,
+        },
+        'No episodes available for detection',
+      );
 
       return {
         success: false,
         reason: 'No episodes available',
-        confidence_score: 0.00,
+        confidence_score: 0.0,
         detection_method: 'none',
       };
     }
 
     // Build fingerprint map
     const fpMap = buildFingerprintMap(detectionEpisodes);
-    workerLogger.info({
-      showId,
-      seasonNumber,
-      uniqueFingerprints: fpMap.size,
-    }, 'Built fingerprint map');
+    workerLogger.info(
+      {
+        showId,
+        seasonNumber,
+        uniqueFingerprints: fpMap.size,
+      },
+      'Built fingerprint map',
+    );
 
     // Select common fingerprints
     const thresholdPercent = options.thresholdPercent || 0.5;
@@ -974,17 +1133,23 @@ export async function detectIntroAndCreditsForSeason(showId, seasonNumber, optio
 
     // Log detailed confidence calculation breakdown
     const minRequiredEpisodes = Math.ceil(detectionEpisodes.length * thresholdPercent);
-    workerLogger.info({
-      showId,
-      seasonNumber,
-      totalEpisodes: detectionEpisodes.length,
-      uniqueFingerprints: fpMap.size,
-      commonFingerprints: commonFpMap.size,
-      thresholdPercent: `${(thresholdPercent * 100).toFixed(1)}%`,
-      minRequiredEpisodes,
-      thresholdCalculation: `${detectionEpisodes.length} episodes × ${(thresholdPercent * 100).toFixed(1)}% = ${minRequiredEpisodes} episodes required`,
-      noCommonFingerprints: commonFpMap.size === 0 ? 'No fingerprints found in enough episodes to meet threshold' : null,
-    }, 'Fingerprint selection analysis');
+    workerLogger.info(
+      {
+        showId,
+        seasonNumber,
+        totalEpisodes: detectionEpisodes.length,
+        uniqueFingerprints: fpMap.size,
+        commonFingerprints: commonFpMap.size,
+        thresholdPercent: `${(thresholdPercent * 100).toFixed(1)}%`,
+        minRequiredEpisodes,
+        thresholdCalculation: `${detectionEpisodes.length} episodes × ${(thresholdPercent * 100).toFixed(1)}% = ${minRequiredEpisodes} episodes required`,
+        noCommonFingerprints:
+          commonFpMap.size === 0
+            ? 'No fingerprints found in enough episodes to meet threshold'
+            : null,
+      },
+      'Fingerprint selection analysis',
+    );
 
     // Get episode duration for detection
     const episodeDuration = detectionEpisodes[0]?.file_duration || 0;
@@ -993,37 +1158,47 @@ export async function detectIntroAndCreditsForSeason(showId, seasonNumber, optio
     const ranges = detectSegments(commonFpMap, episodeDuration, options);
 
     // Calculate confidence with detailed breakdown
-    const confidence = calculateClusteringConfidence(ranges.segments, detectionEpisodes.length, episodeDuration);
+    const confidence = calculateClusteringConfidence(
+      ranges.segments,
+      detectionEpisodes.length,
+      episodeDuration,
+    );
 
     // Log confidence calculation details
-    workerLogger.info({
-      showId,
-      seasonNumber,
-      finalConfidence: `${(confidence * 100).toFixed(2)}%`,
-      commonFingerprints: commonFpMap.size,
-      totalEpisodes: detectionEpisodes.length,
-      episodeDuration: `${episodeDuration.toFixed(1)}s`,
-      introDetected: !!ranges.intro,
-      creditsDetected: !!ranges.credits,
-    }, 'Confidence calculation completed');
+    workerLogger.info(
+      {
+        showId,
+        seasonNumber,
+        finalConfidence: `${(confidence * 100).toFixed(2)}%`,
+        commonFingerprints: commonFpMap.size,
+        totalEpisodes: detectionEpisodes.length,
+        episodeDuration: `${episodeDuration.toFixed(1)}s`,
+        introDetected: !!ranges.intro,
+        creditsDetected: !!ranges.credits,
+      },
+      'Confidence calculation completed',
+    );
 
     // Check for existing detection results
     const existingResults = await getExistingDetectionResults(showId, seasonNumber);
 
     // Apply smart data preservation
-    const hasDetections = (ranges.intro || ranges.credits);
+    const hasDetections = ranges.intro || ranges.credits;
     const preservationDecision = shouldPreserveExistingData(existingResults, {
       confidence_score: confidence,
       hasDetections,
     });
 
     if (preservationDecision.preserve && existingResults) {
-      workerLogger.info({
-        showId,
-        seasonNumber,
-        reason: preservationDecision.reason,
-        recommendation: preservationDecision.recommendation,
-      }, 'Preserving existing detection data');
+      workerLogger.info(
+        {
+          showId,
+          seasonNumber,
+          reason: preservationDecision.reason,
+          recommendation: preservationDecision.recommendation,
+        },
+        'Preserving existing detection data',
+      );
 
       return {
         success: true,
@@ -1038,8 +1213,10 @@ export async function detectIntroAndCreditsForSeason(showId, seasonNumber, optio
 
     // Get auto-processing settings
     const autoSettings = await getAutoProcessingSettings();
-    const approvalStatus = (confidence >= autoSettings.threshold && autoSettings.autoProcess) ?
-      'auto_approved' : 'pending';
+    const approvalStatus =
+      confidence >= autoSettings.threshold && autoSettings.autoProcess
+        ? 'auto_approved'
+        : 'pending';
 
     // Store detection results for each episode in the season
     for (const episode of currentSeasonEpisodes) {
@@ -1051,9 +1228,11 @@ export async function detectIntroAndCreditsForSeason(showId, seasonNumber, optio
         confidence_score: confidence,
         detection_method: detectionMethod,
         approval_status: approvalStatus,
-        processing_notes: `Season batch detection. ${crossSeasonData ?
-          `Cross-season: ${crossSeasonData.currentSeasonCount} current + ${crossSeasonData.previousSeasonCount} previous episodes` :
-          `${detectionEpisodes.length} episodes analyzed`}`,
+        processing_notes: `Season batch detection. ${
+          crossSeasonData
+            ? `Cross-season: ${crossSeasonData.currentSeasonCount} current + ${crossSeasonData.previousSeasonCount} previous episodes`
+            : `${detectionEpisodes.length} episodes analyzed`
+        }`,
       };
 
       await storeDetectionResults(
@@ -1066,18 +1245,21 @@ export async function detectIntroAndCreditsForSeason(showId, seasonNumber, optio
     }
 
     const duration = Date.now() - startTime;
-    workerLogger.info({
-      showId,
-      seasonNumber,
-      duration,
-      confidence,
-      method: detectionMethod,
-      approvalStatus,
-      intro: ranges.intro ? `${ranges.intro.start}s-${ranges.intro.end}s` : 'none',
-      credits: ranges.credits ? `${ranges.credits.start}s-${ranges.credits.end}s` : 'none',
-      stingers: ranges.stingers ? ranges.stingers.length : 0,
-      segments: ranges.segments ? ranges.segments.length : 0,
-    }, 'Season detection pipeline completed successfully');
+    workerLogger.info(
+      {
+        showId,
+        seasonNumber,
+        duration,
+        confidence,
+        method: detectionMethod,
+        approvalStatus,
+        intro: ranges.intro ? `${ranges.intro.start}s-${ranges.intro.end}s` : 'none',
+        credits: ranges.credits ? `${ranges.credits.start}s-${ranges.credits.end}s` : 'none',
+        stingers: ranges.stingers ? ranges.stingers.length : 0,
+        segments: ranges.segments ? ranges.segments.length : 0,
+      },
+      'Season detection pipeline completed successfully',
+    );
 
     return {
       success: true,
@@ -1091,15 +1273,17 @@ export async function detectIntroAndCreditsForSeason(showId, seasonNumber, optio
       cross_season_data: crossSeasonData,
       processing_time_ms: duration,
     };
-
   } catch (error) {
     const duration = Date.now() - startTime;
-    workerLogger.error({
-      showId,
-      seasonNumber,
-      error: error.message,
-      duration,
-    }, 'Season detection pipeline failed');
+    workerLogger.error(
+      {
+        showId,
+        seasonNumber,
+        error: error.message,
+        duration,
+      },
+      'Season detection pipeline failed',
+    );
 
     throw error;
   }
@@ -1108,7 +1292,11 @@ export async function detectIntroAndCreditsForSeason(showId, seasonNumber, optio
 /**
  * Process a single episode and trigger season batch detection
  */
-export async function processEpisodeAndTriggerSeasonDetection(episodeFileId, options = {}, progressCallback = null) {
+export async function processEpisodeAndTriggerSeasonDetection(
+  episodeFileId,
+  options = {},
+  progressCallback = null,
+) {
   const startTime = Date.now();
 
   try {
@@ -1124,10 +1312,13 @@ export async function processEpisodeAndTriggerSeasonDetection(episodeFileId, opt
     // Defensive: log and check for required fields
     const { show_id, season_number, episode_number, file_path: filePath } = episodeFile;
     if (!show_id || !season_number || !episode_number || !filePath) {
-      workerLogger.error({
-        episodeFileId,
-        episodeFile,
-      }, 'Missing required episode file fields (show_id, season_number, episode_number, file_path). Skipping job.');
+      workerLogger.error(
+        {
+          episodeFileId,
+          episodeFile,
+        },
+        'Missing required episode file fields (show_id, season_number, episode_number, file_path). Skipping job.',
+      );
       throw new Error(`Missing required episode file fields for episodeFileId: ${episodeFileId}`);
     }
 
@@ -1161,17 +1352,29 @@ export async function processEpisodeAndTriggerSeasonDetection(episodeFileId, opt
       if (progressCallback) {
         progressCallback(20, 'Starting fingerprint generation...');
       }
-      workerLogger.info({ episodeFileId, chunkLength, overlap }, 'Starting fingerprint generation...');
-      const fingerprints = await fingerprintEpisodeChunks(audioPath, chunkLength, overlap, episodeFileId, progressCallback);
+      workerLogger.info(
+        { episodeFileId, chunkLength, overlap },
+        'Starting fingerprint generation...',
+      );
+      const fingerprints = await fingerprintEpisodeChunks(
+        audioPath,
+        chunkLength,
+        overlap,
+        episodeFileId,
+        progressCallback,
+      );
       if (progressCallback) {
         progressCallback(70, 'Fingerprint generation completed');
       }
-      workerLogger.info({
-        episodeFileId,
-        fingerprintCount: fingerprints.length,
-        chunkLength,
-        overlap,
-      }, 'Fingerprint generation completed');
+      workerLogger.info(
+        {
+          episodeFileId,
+          fingerprintCount: fingerprints.length,
+          chunkLength,
+          overlap,
+        },
+        'Fingerprint generation completed',
+      );
 
       // Store fingerprints
       if (progressCallback) {
@@ -1195,20 +1398,27 @@ export async function processEpisodeAndTriggerSeasonDetection(episodeFileId, opt
         progressCallback(85, 'Starting season detection...');
       }
       workerLogger.info({ episodeFileId, show_id, season_number }, 'Starting season detection...');
-      const seasonDetectionResult = await detectIntroAndCreditsForSeason(show_id, season_number, options);
+      const seasonDetectionResult = await detectIntroAndCreditsForSeason(
+        show_id,
+        season_number,
+        options,
+      );
       if (progressCallback) {
         progressCallback(95, 'Season detection completed');
       }
 
       const duration = Date.now() - startTime;
-      workerLogger.info({
-        episodeFileId,
-        show_id,
-        season_number,
-        episode_number,
-        duration,
-        seasonDetectionSuccess: seasonDetectionResult.success,
-      }, 'Episode processing and season detection completed');
+      workerLogger.info(
+        {
+          episodeFileId,
+          show_id,
+          season_number,
+          episode_number,
+          duration,
+          seasonDetectionSuccess: seasonDetectionResult.success,
+        },
+        'Episode processing and season detection completed',
+      );
 
       return {
         success: true,
@@ -1220,7 +1430,6 @@ export async function processEpisodeAndTriggerSeasonDetection(episodeFileId, opt
         seasonDetection: seasonDetectionResult,
         processing_time_ms: duration,
       };
-
     } finally {
       // Clean up temp directory
       try {
@@ -1228,20 +1437,25 @@ export async function processEpisodeAndTriggerSeasonDetection(episodeFileId, opt
         await Promise.all(files.map((f) => fsp.unlink(path.join(tempDir, f))));
         await fsp.rmdir(tempDir);
       } catch (cleanupErr) {
-        workerLogger.warn({
-          tempDir,
-          error: cleanupErr.message,
-        }, 'Failed to clean up temp directory');
+        workerLogger.warn(
+          {
+            tempDir,
+            error: cleanupErr.message,
+          },
+          'Failed to clean up temp directory',
+        );
       }
     }
-
   } catch (error) {
     const duration = Date.now() - startTime;
-    workerLogger.error({
-      episodeFileId,
-      error: error.message,
-      duration,
-    }, 'Episode processing and season detection failed');
+    workerLogger.error(
+      {
+        episodeFileId,
+        error: error.message,
+        duration,
+      },
+      'Episode processing and season detection failed',
+    );
 
     throw error;
   }
@@ -1316,11 +1530,14 @@ export async function invalidateFingerprintData(showId, seasonNumber = null) {
 
   const result = db.prepare(sql).run(...params);
 
-  workerLogger.info({
-    showId,
-    seasonNumber,
-    affectedRows: result.changes,
-  }, 'Fingerprint data invalidated for rescan');
+  workerLogger.info(
+    {
+      showId,
+      seasonNumber,
+      affectedRows: result.changes,
+    },
+    'Fingerprint data invalidated for rescan',
+  );
 
   return result.changes;
 }

@@ -92,9 +92,7 @@ const PollingIntervalControl = ({ disabled = false, onValueChange }) => {
           <div
             key={opt.value}
             className={`flex items-center transition-all duration-200 cursor-pointer ${
-              currentInterval === opt.value
-                ? 'text-blue-200'
-                : 'text-gray-400 hover:text-gray-300'
+              currentInterval === opt.value ? 'text-blue-200' : 'text-gray-400 hover:text-gray-300'
             } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={(e) => handleClick(e, opt.value)}
             onKeyDown={(e) => handleKeyDown(e, opt.value)}
@@ -110,11 +108,11 @@ const PollingIntervalControl = ({ disabled = false, onValueChange }) => {
             <div
               className={`
                 w-4 h-4 rounded-full border-2 mr-3 flex-shrink-0 transition-all duration-200 ${
-          currentInterval === opt.value
-            ? 'border-blue-400 bg-blue-400 ring-2 ring-blue-400 ring-offset-2 ' +
+                  currentInterval === opt.value
+                    ? 'border-blue-400 bg-blue-400 ring-2 ring-blue-400 ring-offset-2 ' +
                       'ring-offset-gray-800'
-            : 'border-gray-500 hover:border-gray-400'
-          }`}
+                    : 'border-gray-500 hover:border-gray-400'
+                }`}
               aria-hidden="true"
             >
               {currentInterval === opt.value && (

@@ -22,16 +22,25 @@ interface HardwareDetectionProps {
   onDetect: () => void;
 }
 
-export default function HardwareDetection({ hardwareInfo, isDetecting, onDetect }: HardwareDetectionProps) {
+export default function HardwareDetection({
+  hardwareInfo,
+  isDetecting,
+  onDetect,
+}: HardwareDetectionProps) {
   const renderInfoRow = (label: string, value: any, badgeColor?: string) => (
     <div className="flex justify-between items-center py-3 border-b border-gray-700/20 last:border-b-0">
       <span className="text-gray-200 font-medium text-base">{label}</span>
       {value ? (
-        <Badge variant={badgeColor ? 'default' : 'secondary'} className={badgeColor || 'bg-gray-700/60 text-white'}>
+        <Badge
+          variant={badgeColor ? 'default' : 'secondary'}
+          className={badgeColor || 'bg-gray-700/60 text-white'}
+        >
           {value === true ? 'Supported' : value}
         </Badge>
       ) : (
-        <Badge variant="outline" className="border-gray-700/40 text-gray-400">Not Detected</Badge>
+        <Badge variant="outline" className="border-gray-700/40 text-gray-400">
+          Not Detected
+        </Badge>
       )}
     </div>
   );
@@ -72,7 +81,9 @@ export default function HardwareDetection({ hardwareInfo, isDetecting, onDetect 
           </Button>
         </div>
         {hardwareInfo && hardwareInfo.last_detected && (
-          <p className="text-sm text-gray-400 pt-1">Last detected: {formatDistanceToNow(hardwareInfo.last_detected)}</p>
+          <p className="text-sm text-gray-400 pt-1">
+            Last detected: {formatDistanceToNow(hardwareInfo.last_detected)}
+          </p>
         )}
       </div>
       <div>
@@ -90,17 +101,32 @@ export default function HardwareDetection({ hardwareInfo, isDetecting, onDetect 
             {renderInfoRow('GPU', hardwareInfo.gpu_name)}
             {renderInfoRow('CPU', hardwareInfo.cpu_name)}
             {renderInfoRow('CPU Cores', hardwareInfo.cpu_cores)}
-            {renderInfoRow('Memory', hardwareInfo.memory_gb ? `${hardwareInfo.memory_gb} GB` : undefined)}
+            {renderInfoRow(
+              'Memory',
+              hardwareInfo.memory_gb ? `${hardwareInfo.memory_gb} GB` : undefined,
+            )}
             {renderInfoRow('FFmpeg Version', hardwareInfo.ffmpeg_version)}
-            {renderInfoRow('NVENC', hardwareInfo.nvenc_support, hardwareInfo.nvenc_support ? 'bg-emerald-100 text-emerald-800' : '')}
-            {renderInfoRow('QSV', hardwareInfo.qsv_support, hardwareInfo.qsv_support ? 'bg-emerald-100 text-emerald-800' : '')}
+            {renderInfoRow(
+              'NVENC',
+              hardwareInfo.nvenc_support,
+              hardwareInfo.nvenc_support ? 'bg-emerald-100 text-emerald-800' : '',
+            )}
+            {renderInfoRow(
+              'QSV',
+              hardwareInfo.qsv_support,
+              hardwareInfo.qsv_support ? 'bg-emerald-100 text-emerald-800' : '',
+            )}
           </div>
         ) : (
           <div className="text-center py-12">
             <Cpu className="w-16 h-16 mx-auto mb-4 text-gray-400" />
             <h3 className="font-semibold text-gray-200 mb-2 text-lg">No Hardware Info</h3>
             <p className="text-gray-400 mb-4">Click below to detect your system hardware</p>
-            <Button onClick={onDetect} disabled={isDetecting} className="bg-gray-700/60 text-white hover:bg-gray-700/80">
+            <Button
+              onClick={onDetect}
+              disabled={isDetecting}
+              className="bg-gray-700/60 text-white hover:bg-gray-700/80"
+            >
               <Zap className="w-4 h-4 mr-2" />
               {isDetecting ? 'Detecting...' : 'Detect Hardware'}
             </Button>

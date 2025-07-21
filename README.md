@@ -25,6 +25,21 @@ Cliparr supports three import modes, controlled by the `CLIPARR_IMPORT_MODE` env
 
 You can change this mode at any time from the Settings page.
 
+## Development vs Production
+
+- **Development:**
+  - Run the backend and frontend separately for hot reload:
+    - Backend: `npm run backend` (optionally set PORT)
+    - Frontend: `npm run dev` (Vite dev server)
+  - Access frontend at http://localhost:8484 (default)
+  - Update API URLs in the frontend to point to the backend port if different.
+
+- **Production (Docker):**
+  - Use Docker Compose or `docker build`/`docker run`.
+  - The backend serves the built frontend static files from `/app/dist`.
+  - All services (backend, frontend, Redis, SQLite) are unified and accessible via a single port (default: 8484).
+  - No need to run Vite dev server or separate backend process.
+
 ## Installation
 1. Clone the repository.
 2. Navigate to the project directory.

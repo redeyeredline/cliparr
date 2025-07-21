@@ -160,7 +160,10 @@ export default function PerformanceBenchmark({
                               }}
                             />
                           ) : (
-                            <div className="h-full rounded-full bg-gray-600 opacity-40" style={{ width: '100%' }} />
+                            <div
+                              className="h-full rounded-full bg-gray-600 opacity-40"
+                              style={{ width: '100%' }}
+                            />
                           )}
                         </div>
                         <span className="text-xs font-semibold w-12 text-right text-gray-200">
@@ -187,7 +190,11 @@ export default function PerformanceBenchmark({
               <h4 className="font-semibold text-white mb-2">Recommended Profiles:</h4>
               <div className="flex flex-wrap gap-2">
                 {benchmarkResults.recommended_profiles.map((profile: string) => (
-                  <Badge key={profile} variant="outline" className="bg-emerald-900/30 text-emerald-200 border-emerald-700/40">
+                  <Badge
+                    key={profile}
+                    variant="outline"
+                    className="bg-emerald-900/30 text-emerald-200 border-emerald-700/40"
+                  >
                     <CheckCircle2 className="w-3 h-3 mr-1" />
                     {profile}
                   </Badge>
@@ -207,7 +214,11 @@ export default function PerformanceBenchmark({
               <div className="text-xs text-gray-400 mt-1">(This may take a few minutes)</div>
             </div>
           ) : (
-            <Button onClick={onRunBenchmark} disabled={!hardwareInfo} className="w-full bg-gray-700/60 text-white hover:bg-gray-700/80">
+            <Button
+              onClick={onRunBenchmark}
+              disabled={!hardwareInfo}
+              className="w-full bg-gray-700/60 text-white hover:bg-gray-700/80"
+            >
               <Zap className="w-4 h-4 mr-2" />
               {benchmarkResults ? 'Run Benchmark Again' : 'Start Benchmark'}
             </Button>

@@ -4,10 +4,57 @@
 import { WebSocketServer } from 'ws';
 import { websocketLogger } from './logger.js';
 import fs from 'fs';
+import Redis from 'ioredis';
 
 let wsServer;
 const wsLogStream = fs.createWriteStream('websocket.log', { flags: 'a' });
 let messageQueue = [];
+
+// Redis pub/sub setup
+const redisPub = new Redis({ host: 'localhost', port: 6379 });
+const redisSub = new Redis({ host: 'localhost', port: 6379 });
+const REDIS_CHANNEL = 'ws:broadcast';
+
+// Helper to broadcast to all clients (internal use only)
+function _broadcastToClients(payload) {
+  let sent = false;
+  wsServer.clients.forEach((client) => {
+    websocketLogger.info(
+      {
+        clientReadyState: client.readyState,
+        isOpen: client.readyState === 1,
+      },
+      'Client state during broadcast',
+    );
+    if (client.readyState === 1) {
+      client.send(payload);
+      sent = true;
+    }
+  });
+  if (!sent) {
+    websocketLogger.warn('No open clients during broadcast, queuing message');
+    messageQueue.push(payload);
+  }
+}
+
+// Subscribe to Redis channel and broadcast messages to clients
+redisSub.subscribe(REDIS_CHANNEL, (err, count) => {
+  if (err) {
+    websocketLogger.error('Failed to subscribe to Redis channel:', err);
+  } else {
+    websocketLogger.info(`Subscribed to Redis channel: ${REDIS_CHANNEL}`);
+  }
+});
+redisSub.on('message', (channel, message) => {
+  if (channel === REDIS_CHANNEL) {
+    wsLogStream.write(`[WebSocket IN] ${message}\n`);
+    websocketLogger.info(
+      { channel, message },
+      'Received message from Redis pub/sub, broadcasting to clients',
+    );
+    _broadcastToClients(message);
+  }
+});
 
 /**
  * Initialize and attach a WebSocketServer to an existing HTTP(S) server.
@@ -25,7 +72,10 @@ export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}
 
     // Flush any queued messages
     if (messageQueue.length > 0) {
-      websocketLogger.info({ count: messageQueue.length }, 'Flushing queued messages to new client');
+      websocketLogger.info(
+        { count: messageQueue.length },
+        'Flushing queued messages to new client',
+      );
       messageQueue.forEach((payload) => {
         ws.send(payload);
       });
@@ -36,11 +86,13 @@ export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}
     ws.on('pong', () => (ws.isAlive = true));
 
     ws.on('message', (raw) => {
-      ws.send(JSON.stringify({
-        type: 'echo',
-        data: raw.toString(),
-        timestamp: new Date().toISOString(),
-      }));
+      ws.send(
+        JSON.stringify({
+          type: 'echo',
+          data: raw.toString(),
+          timestamp: new Date().toISOString(),
+        }),
+      );
     });
 
     ws.on('error', (err) => {
@@ -51,24 +103,34 @@ export function setupWebSocket(server, { path = '/ws', heartbeat = 30_000 } = {}
       websocketLogger.info('WebSocket client disconnected');
     });
 
-    ws.send(JSON.stringify({
-      type: 'welcome',
-      message: 'Connected to Cliparr backend',
-      timestamp: new Date().toISOString(),
-    }));
+    ws.send(
+      JSON.stringify({
+        type: 'welcome',
+        message: 'Connected to Cliparr backend',
+        timestamp: new Date().toISOString(),
+      }),
+    );
 
     setTimeout(() => {
       websocketLogger.info({ clientCount: wsServer.clients.size }, 'Clients after welcome');
       wsServer.clients.forEach((client) => {
-        websocketLogger.info({
-          clientReadyState: client.readyState,
-          isOpen: client.readyState === 1,
-        }, 'Client state after welcome');
+        websocketLogger.info(
+          {
+            clientReadyState: client.readyState,
+            isOpen: client.readyState === 1,
+          },
+          'Client state after welcome',
+        );
       });
     }, 1000);
 
     setTimeout(() => {
-      ws.send(JSON.stringify({ type: 'test_broadcast', message: 'This is a test broadcast from backend' }));
+      ws.send(
+        JSON.stringify({
+          type: 'test_broadcast',
+          message: 'This is a test broadcast from backend',
+        }),
+      );
     }, 2000);
   });
 
@@ -93,41 +155,21 @@ export function getWebSocketServer() {
   return wsServer;
 }
 
-/**
- * Broadcast a message to all connected WebSocket clients
- * @param {object} message - The message to broadcast
- */
+// Broadcast a message to all connected WebSocket clients via Redis pub/sub
 export function broadcastMessage(message) {
   if (!wsServer) {
     websocketLogger.warn('WebSocket server not initialized');
     return;
   }
-
   const payload = JSON.stringify({
     ...message,
     timestamp: new Date().toISOString(),
   });
-
   // Write to websocket.log
   wsLogStream.write(`[WebSocket OUT] ${payload}\n`);
-
-  websocketLogger.info({ clientCount: wsServer.clients.size, payload }, 'Broadcasting message to clients');
-
-  let sent = false;
-  wsServer.clients.forEach((client) => {
-    websocketLogger.info({
-      clientReadyState: client.readyState,
-      isOpen: client.readyState === 1,
-    }, 'Client state during broadcast');
-    if (client.readyState === 1) {
-      client.send(payload);
-      sent = true;
-    }
-  });
-  if (!sent) {
-    websocketLogger.warn('No open clients during broadcast, queuing message');
-    messageQueue.push(payload);
-  }
+  websocketLogger.info({ payload }, 'Publishing message to Redis pub/sub for broadcast');
+  // Publish to Redis channel (all instances will receive and broadcast)
+  redisPub.publish(REDIS_CHANNEL, payload);
 }
 
 /**

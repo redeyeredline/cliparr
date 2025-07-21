@@ -3,10 +3,22 @@ import type { ProcessingProfile } from '@/components/entities/ProcessingProfile'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Settings, Plus, Zap, Monitor } from 'lucide-react';
 
@@ -23,7 +35,11 @@ interface ProcessingProfilesProps {
   onRefresh: () => void;
 }
 
-export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }: ProcessingProfilesProps) {
+export default function ProcessingProfiles({
+  profiles,
+  hardwareInfo,
+  onRefresh,
+}: ProcessingProfilesProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newProfile, setNewProfile] = useState<Omit<ProcessingProfile, 'id'>>({
     name: '',
@@ -107,7 +123,9 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
                     <Label>Profile Name</Label>
                     <Input
                       value={newProfile.name}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProfile({ ...newProfile, name: e.target.value })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setNewProfile({ ...newProfile, name: e.target.value })
+                      }
                       placeholder="High Quality NVENC"
                     />
                   </div>
@@ -115,7 +133,9 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
                     <Label>Container Format</Label>
                     <Select
                       value={newProfile.container}
-                      onValueChange={(value: string) => setNewProfile({ ...newProfile, container: value as 'mp4' | 'mkv' | 'avi' })}
+                      onValueChange={(value: string) =>
+                        setNewProfile({ ...newProfile, container: value as 'mp4' | 'mkv' | 'avi' })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -133,7 +153,9 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
                   <Label>Description</Label>
                   <Textarea
                     value={newProfile.description}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewProfile({ ...newProfile, description: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                      setNewProfile({ ...newProfile, description: e.target.value })
+                    }
                     placeholder="Optimized for high quality with NVIDIA hardware acceleration"
                   />
                 </div>
@@ -143,7 +165,12 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
                     <Label>Video Codec</Label>
                     <Select
                       value={newProfile.video_codec}
-                      onValueChange={(value: string) => setNewProfile({ ...newProfile, video_codec: value as 'h264' | 'h265' | 'av1' | 'copy' })}
+                      onValueChange={(value: string) =>
+                        setNewProfile({
+                          ...newProfile,
+                          video_codec: value as 'h264' | 'h265' | 'av1' | 'copy',
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -160,7 +187,12 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
                     <Label>Audio Codec</Label>
                     <Select
                       value={newProfile.audio_codec}
-                      onValueChange={(value: string) => setNewProfile({ ...newProfile, audio_codec: value as 'aac' | 'ac3' | 'copy' })}
+                      onValueChange={(value: string) =>
+                        setNewProfile({
+                          ...newProfile,
+                          audio_codec: value as 'aac' | 'ac3' | 'copy',
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -179,7 +211,17 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
                     <Label>Hardware Acceleration</Label>
                     <Select
                       value={newProfile.hardware_acceleration}
-                      onValueChange={(value: string) => setNewProfile({ ...newProfile, hardware_acceleration: value as 'none' | 'nvidia_nvenc' | 'intel_qsv' | 'amd_vce' | 'vaapi' })}
+                      onValueChange={(value: string) =>
+                        setNewProfile({
+                          ...newProfile,
+                          hardware_acceleration: value as
+                            | 'none'
+                            | 'nvidia_nvenc'
+                            | 'intel_qsv'
+                            | 'amd_vce'
+                            | 'vaapi',
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -197,7 +239,21 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
                     <Label>Quality Preset</Label>
                     <Select
                       value={newProfile.quality_preset}
-                      onValueChange={(value: string) => setNewProfile({ ...newProfile, quality_preset: value as 'ultrafast' | 'superfast' | 'veryfast' | 'faster' | 'fast' | 'medium' | 'slow' | 'slower' | 'veryslow' })}
+                      onValueChange={(value: string) =>
+                        setNewProfile({
+                          ...newProfile,
+                          quality_preset: value as
+                            | 'ultrafast'
+                            | 'superfast'
+                            | 'veryfast'
+                            | 'faster'
+                            | 'fast'
+                            | 'medium'
+                            | 'slow'
+                            | 'slower'
+                            | 'veryslow',
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -218,9 +274,7 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
                   <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleCreateProfile}>
-                    Create Profile
-                  </Button>
+                  <Button onClick={handleCreateProfile}>Create Profile</Button>
                 </div>
               </div>
             </DialogContent>
@@ -233,8 +287,13 @@ export default function ProcessingProfiles({ profiles, hardwareInfo, onRefresh }
           <div className="flex flex-col items-center justify-center py-12">
             <Monitor className="w-16 h-16 mb-4 text-gray-400" />
             <h3 className="font-semibold text-gray-200 mb-2 text-lg">No Processing Profiles</h3>
-            <p className="text-gray-400 mb-4">Create custom profiles for different quality and performance needs</p>
-            <Button onClick={() => setShowCreateDialog(true)} className="bg-gray-700/60 text-white hover:bg-gray-700/80">
+            <p className="text-gray-400 mb-4">
+              Create custom profiles for different quality and performance needs
+            </p>
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              className="bg-gray-700/60 text-white hover:bg-gray-700/80"
+            >
               <Plus className="w-4 h-4 mr-2" />
               Create First Profile
             </Button>

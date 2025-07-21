@@ -111,7 +111,9 @@ export default function QueueStatus({ queueStatus }: QueueStatusProps) {
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-semibold text-white">{queue.name}</h4>
                   <div className="flex items-center gap-2">
-                    {getStatusIcon(queue.active > 0 ? 'active' : queue.waiting > 0 ? 'waiting' : 'completed')}
+                    {getStatusIcon(
+                      queue.active > 0 ? 'active' : queue.waiting > 0 ? 'waiting' : 'completed',
+                    )}
                     <span className="text-sm text-slate-400">
                       {queue.active > 0 ? 'Active' : queue.waiting > 0 ? 'Waiting' : 'Idle'}
                     </span>

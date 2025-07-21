@@ -12,7 +12,9 @@ const SystemPage = () => {
   });
 
   useEffect(() => {
-    const backendBase = import.meta.env.VITE_BACKEND_URL || `${window.location.protocol}//${window.location.hostname}:8485`;
+    const backendBase =
+      import.meta.env.VITE_BACKEND_URL ||
+      `${window.location.protocol}//${window.location.hostname}:8485`;
     const fetchStats = async () => {
       try {
         const res = await fetch(`${backendBase}/health/system/diagnostics`);

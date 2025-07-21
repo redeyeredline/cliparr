@@ -25,63 +25,15 @@ export const useKeyboardNavigation = () => {
       'details',
     ];
 
-    return Array.from(container.querySelectorAll(focusableSelectors.join(', ')))
-      .filter((el) => {
-        const style = window.getComputedStyle(el);
-        return style.display !== 'none' && style.visibility !== 'hidden';
-      });
+    return Array.from(container.querySelectorAll(focusableSelectors.join(', '))).filter((el) => {
+      const style = window.getComputedStyle(el);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    });
   }, []);
 
   // Focus trap for modals and dialogs
-  const createFocusTrap = useCallback((containerRef) => {
-    const container = containerRef.current;
-    if (!container) {
-      return;
-    }
-
-    const elements = getFocusableElements(container);
-    if (elements.length === 0) {
-      return;
-    }
-
-    const firstElement = elements[0];
-    const lastElement = elements[elements.length - 1];
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Tab') {
-        if (e.shiftKey) {
-          // Shift + Tab: move backwards
-          if (document.activeElement === firstElement) {
-            e.preventDefault();
-            lastElement.focus();
-          }
-        } else {
-          // Tab: move forwards
-          if (document.activeElement === lastElement) {
-            e.preventDefault();
-            firstElement.focus();
-          }
-        }
-      }
-    };
-
-    container.addEventListener('keydown', handleKeyDown);
-    firstElement.focus();
-
-    return () => {
-      container.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [getFocusableElements]);
-
-  // Arrow key navigation for lists and grids
-  const useArrowNavigation = useCallback((containerRef, options = {}) => {
-    const {
-      direction = 'vertical', // 'vertical', 'horizontal', 'grid'
-      wrap = false,
-      onNavigate = null,
-    } = options;
-
-    const handleArrowKeys = (e) => {
+  const createFocusTrap = useCallback(
+    (containerRef) => {
       const container = containerRef.current;
       if (!container) {
         return;
@@ -92,70 +44,123 @@ export const useKeyboardNavigation = () => {
         return;
       }
 
-      const currentIndex = elements.indexOf(document.activeElement);
-      if (currentIndex === -1) {
-        return;
-      }
+      const firstElement = elements[0];
+      const lastElement = elements[elements.length - 1];
 
-      let nextIndex = currentIndex;
-
-      switch (e.key) {
-        case 'ArrowDown':
-          if (direction === 'vertical' || direction === 'grid') {
-            e.preventDefault();
-            nextIndex = currentIndex + 1;
-            if (nextIndex >= elements.length) {
-              nextIndex = wrap ? 0 : currentIndex;
+      const handleKeyDown = (e) => {
+        if (e.key === 'Tab') {
+          if (e.shiftKey) {
+            // Shift + Tab: move backwards
+            if (document.activeElement === firstElement) {
+              e.preventDefault();
+              lastElement.focus();
+            }
+          } else {
+            // Tab: move forwards
+            if (document.activeElement === lastElement) {
+              e.preventDefault();
+              firstElement.focus();
             }
           }
-          break;
-        case 'ArrowUp':
-          if (direction === 'vertical' || direction === 'grid') {
-            e.preventDefault();
-            nextIndex = currentIndex - 1;
-            if (nextIndex < 0) {
-              nextIndex = wrap ? elements.length - 1 : currentIndex;
-            }
-          }
-          break;
-        case 'ArrowRight':
-          if (direction === 'horizontal' || direction === 'grid') {
-            e.preventDefault();
-            nextIndex = currentIndex + 1;
-            if (nextIndex >= elements.length) {
-              nextIndex = wrap ? 0 : currentIndex;
-            }
-          }
-          break;
-        case 'ArrowLeft':
-          if (direction === 'horizontal' || direction === 'grid') {
-            e.preventDefault();
-            nextIndex = currentIndex - 1;
-            if (nextIndex < 0) {
-              nextIndex = wrap ? elements.length - 1 : currentIndex;
-            }
-          }
-          break;
-        case 'Home':
-          e.preventDefault();
-          nextIndex = 0;
-          break;
-        case 'End':
-          e.preventDefault();
-          nextIndex = elements.length - 1;
-          break;
-      }
-
-      if (nextIndex !== currentIndex) {
-        elements[nextIndex].focus();
-        if (onNavigate) {
-          onNavigate(nextIndex, elements[nextIndex]);
         }
-      }
-    };
+      };
 
-    return handleArrowKeys;
-  }, [getFocusableElements]);
+      container.addEventListener('keydown', handleKeyDown);
+      firstElement.focus();
+
+      return () => {
+        container.removeEventListener('keydown', handleKeyDown);
+      };
+    },
+    [getFocusableElements],
+  );
+
+  // Arrow key navigation for lists and grids
+  const useArrowNavigation = useCallback(
+    (containerRef, options = {}) => {
+      const {
+        direction = 'vertical', // 'vertical', 'horizontal', 'grid'
+        wrap = false,
+        onNavigate = null,
+      } = options;
+
+      const handleArrowKeys = (e) => {
+        const container = containerRef.current;
+        if (!container) {
+          return;
+        }
+
+        const elements = getFocusableElements(container);
+        if (elements.length === 0) {
+          return;
+        }
+
+        const currentIndex = elements.indexOf(document.activeElement);
+        if (currentIndex === -1) {
+          return;
+        }
+
+        let nextIndex = currentIndex;
+
+        switch (e.key) {
+          case 'ArrowDown':
+            if (direction === 'vertical' || direction === 'grid') {
+              e.preventDefault();
+              nextIndex = currentIndex + 1;
+              if (nextIndex >= elements.length) {
+                nextIndex = wrap ? 0 : currentIndex;
+              }
+            }
+            break;
+          case 'ArrowUp':
+            if (direction === 'vertical' || direction === 'grid') {
+              e.preventDefault();
+              nextIndex = currentIndex - 1;
+              if (nextIndex < 0) {
+                nextIndex = wrap ? elements.length - 1 : currentIndex;
+              }
+            }
+            break;
+          case 'ArrowRight':
+            if (direction === 'horizontal' || direction === 'grid') {
+              e.preventDefault();
+              nextIndex = currentIndex + 1;
+              if (nextIndex >= elements.length) {
+                nextIndex = wrap ? 0 : currentIndex;
+              }
+            }
+            break;
+          case 'ArrowLeft':
+            if (direction === 'horizontal' || direction === 'grid') {
+              e.preventDefault();
+              nextIndex = currentIndex - 1;
+              if (nextIndex < 0) {
+                nextIndex = wrap ? elements.length - 1 : currentIndex;
+              }
+            }
+            break;
+          case 'Home':
+            e.preventDefault();
+            nextIndex = 0;
+            break;
+          case 'End':
+            e.preventDefault();
+            nextIndex = elements.length - 1;
+            break;
+        }
+
+        if (nextIndex !== currentIndex) {
+          elements[nextIndex].focus();
+          if (onNavigate) {
+            onNavigate(nextIndex, elements[nextIndex]);
+          }
+        }
+      };
+
+      return handleArrowKeys;
+    },
+    [getFocusableElements],
+  );
 
   // Keyboard shortcuts manager
   const useKeyboardShortcuts = useCallback((shortcuts) => {
@@ -316,28 +321,28 @@ export const scrollIntoView = (element, offset = 0) => {
  */
 export const COMMON_SHORTCUTS = {
   // Navigation
-  'h': 'Navigate to Home',
-  's': 'Navigate to Settings',
-  'i': 'Open Import Modal',
+  h: 'Navigate to Home',
+  s: 'Navigate to Settings',
+  i: 'Open Import Modal',
 
   // Actions
   'ctrl+a': 'Select All',
   'ctrl+d': 'Deselect All',
-  'Delete': 'Delete Selected',
-  'Enter': 'Activate/Confirm',
-  'Escape': 'Close/Cancel',
+  Delete: 'Delete Selected',
+  Enter: 'Activate/Confirm',
+  Escape: 'Close/Cancel',
 
   // Search and Filter
   'ctrl+f': 'Focus Search',
   'ctrl+k': 'Focus Search',
 
   // Table Navigation
-  'ArrowUp': 'Previous Row',
-  'ArrowDown': 'Next Row',
-  'Home': 'First Row',
-  'End': 'Last Row',
-  'PageUp': 'Previous Page',
-  'PageDown': 'Next Page',
+  ArrowUp: 'Previous Row',
+  ArrowDown: 'Next Row',
+  Home: 'First Row',
+  End: 'Last Row',
+  PageUp: 'Previous Page',
+  PageDown: 'Next Page',
 };
 
 /**

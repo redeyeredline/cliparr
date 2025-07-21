@@ -1,7 +1,7 @@
 // Empty state component displayed when no shows are imported, with import modal trigger.
 // Provides visual feedback and call-to-action for users to start importing shows from Sonarr.
 import React, { useRef, useEffect } from 'react';
-import { useImportModal } from '../hooks/useImportModal';
+import { useImportModal } from '../hooks/useImportModal.tsx';
 import { Database, Plus } from 'lucide-react';
 
 const EmptyState: React.FC = () => {
@@ -21,11 +21,13 @@ const EmptyState: React.FC = () => {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
       {/* Animated Icon Container */}
       <div className="relative mb-8">
-        <div className={`
+        <div
+          className={`
           w-32 h-32 bg-gradient-to-br from-gray-700/30 to-gray-800/30 rounded-3xl 
           flex items-center justify-center backdrop-blur-sm border border-gray-700/20 
           shadow-2xl
-        `}>
+        `}
+        >
           <Database className="w-16 h-16 text-gray-400" />
         </div>
         {/* Floating accent as a button, no focus border */}
@@ -50,15 +52,17 @@ const EmptyState: React.FC = () => {
 
       {/* Content */}
       <div className="text-center max-w-md">
-        <h3 className={`
+        <h3
+          className={`
           text-2xl font-bold text-white mb-3 bg-gradient-to-r from-white to-gray-300 
           bg-clip-text text-transparent
-        `}>
+        `}
+        >
           No shows imported yet
         </h3>
         <p className="text-gray-400 mb-8 leading-relaxed">
-          Start clipping your media library by importing shows from Sonarr.
-          Analyze, clip, and free yourself from hearing the same shit over and over.
+          Start clipping your media library by importing shows from Sonarr. Analyze, clip, and free
+          yourself from hearing the same shit over and over.
         </p>
 
         {/* CTA Button */}
@@ -78,24 +82,30 @@ const EmptyState: React.FC = () => {
           </span>
 
           {/* Button shine effect */}
-          <div className={`
+          <div
+            className={`
             absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-white/10 
             to-transparent opacity-0 group-hover:opacity-100 transition-opacity 
             duration-300 transform -skew-x-12
-          `}></div>
+          `}
+          ></div>
         </button>
       </div>
 
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className={`
+        <div
+          className={`
           absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/5 
           rounded-full blur-3xl
-        `}></div>
-        <div className={`
+        `}
+        ></div>
+        <div
+          className={`
           absolute bottom-1/4 right-1/4 w-64 h-64 bg-purple-500/5 
           rounded-full blur-3xl
-        `}></div>
+        `}
+        ></div>
       </div>
     </div>
   );

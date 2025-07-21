@@ -33,10 +33,13 @@ export default function Review() {
       setMediaFiles(filesData);
 
       // Debug: Log job status distribution
-      const statusCounts = jobsData.reduce((acc, job) => {
-        acc[job.status] = (acc[job.status] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const statusCounts = jobsData.reduce(
+        (acc, job) => {
+          acc[job.status] = (acc[job.status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
       console.log('Review page loaded jobs:', {
         total: jobsData.length,
         statusCounts,

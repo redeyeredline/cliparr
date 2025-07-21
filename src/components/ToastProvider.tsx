@@ -12,7 +12,10 @@ interface Toast {
   message: string;
 }
 
-const typeConfig: Record<ToastType, { icon: React.ComponentType<any>; colors: { bg: string; border: string; icon: string } }> = {
+const typeConfig: Record<
+  ToastType,
+  { icon: React.ComponentType<any>; colors: { bg: string; border: string; icon: string } }
+> = {
   success: {
     icon: CheckCircle,
     colors: {
@@ -46,16 +49,27 @@ interface ToastProviderProps {
 export function ToastProvider({ children }: ToastProviderProps) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const toast = useCallback(({ type = 'info', message, duration = 3500 }: { type?: ToastType; message: string; duration?: number }) => {
-    const id = Math.random().toString(36).slice(2);
-    setToasts((prev) => [...prev, { id, type, message }]);
+  const toast = useCallback(
+    ({
+      type = 'info',
+      message,
+      duration = 3500,
+    }: {
+      type?: ToastType;
+      message: string;
+      duration?: number;
+    }) => {
+      const id = Math.random().toString(36).slice(2);
+      setToasts((prev) => [...prev, { id, type, message }]);
 
-    if (type !== 'error') {
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, duration);
-    }
-  }, []);
+      if (type !== 'error') {
+        setTimeout(() => {
+          setToasts((prev) => prev.filter((t) => t.id !== id));
+        }, duration);
+      }
+    },
+    [],
+  );
 
   const closeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -99,12 +113,8 @@ export function ToastProvider({ children }: ToastProviderProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm font-medium text-white capitalize mb-1">
-                      {type}
-                    </p>
-                    <p className="text-sm text-gray-300 leading-relaxed">
-                      {message}
-                    </p>
+                    <p className="text-sm font-medium text-white capitalize mb-1">{type}</p>
+                    <p className="text-sm text-gray-300 leading-relaxed">{message}</p>
                   </div>
 
                   {/* Close button for error toasts */}

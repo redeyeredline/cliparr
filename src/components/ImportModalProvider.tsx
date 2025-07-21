@@ -4,7 +4,7 @@ import React, { useState, useCallback } from 'react';
 import ImportModal, { Show } from './ImportModal';
 import { apiClient } from '../integration/api-client';
 import { useToast } from './ToastContext';
-import { ImportModalContext } from '../contexts/ImportModalContext';
+import { ImportModalContext } from '../contexts/ImportModalContext.tsx';
 
 export const ImportModalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [open, setOpen] = useState(false);

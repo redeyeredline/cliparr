@@ -69,10 +69,19 @@ export class ProcessingJobEntity {
     }
   }
 
-  static async bulkDelete({ jobIds, all }: { jobIds?: (string | number)[], all?: boolean }): Promise<any> {
+  static async bulkDelete({
+    jobIds,
+    all,
+  }: {
+    jobIds?: (string | number)[];
+    all?: boolean;
+  }): Promise<any> {
     try {
       console.log('bulkDelete payload:', all ? { all: true } : { jobIds });
-      const response = await api.post('/processing/jobs/bulk-delete', all ? { all: true } : { jobIds });
+      const response = await api.post(
+        '/processing/jobs/bulk-delete',
+        all ? { all: true } : { jobIds },
+      );
       return response.data.cleanupJobId || response.data;
     } catch (error) {
       console.error('Error bulk deleting jobs:', error);

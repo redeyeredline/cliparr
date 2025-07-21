@@ -1,7 +1,19 @@
 import path from 'path';
 import fs from 'fs/promises';
-import { queues, removeJobFromAllQueues, pauseCpuWorkers, resumeCpuWorkers, pauseGpuWorkers, resumeGpuWorkers } from './queue.js';
-import { getProcessingJobById, deleteProcessingJob, getEpisodeFileIdAndJobIdForShows, deleteProcessingJobsBatch } from '../database/Db_Operations.js';
+import {
+  queues,
+  removeJobFromAllQueues,
+  pauseCpuWorkers,
+  resumeCpuWorkers,
+  pauseGpuWorkers,
+  resumeGpuWorkers,
+} from './queue.js';
+import {
+  getProcessingJobById,
+  deleteProcessingJob,
+  getEpisodeFileIdAndJobIdForShows,
+  deleteProcessingJobsBatch,
+} from '../database/Db_Operations.js';
 import { appLogger as logger } from './logger.js';
 import Redis from 'ioredis';
 import { exec } from 'child_process';
@@ -64,7 +76,8 @@ export async function deleteProcessingJobs(jobIdsOrOptions, dbOverride) {
     await resumeCpuWorkers();
     await resumeGpuWorkers();
     // Then batch delete all jobs from the DB
-    const { getProcessingJobs, deleteProcessingJobsBatch: deleteProcessingJobsBatchLocal } = await import('../database/Db_Operations.js');
+    const { getProcessingJobs, deleteProcessingJobsBatch: deleteProcessingJobsBatchLocal } =
+      await import('../database/Db_Operations.js');
     jobIds = getProcessingJobs(db).map((job) => job.id);
     for (let i = 0; i < jobIds.length; i += BATCH_SIZE) {
       const batch = jobIds.slice(i, i + BATCH_SIZE);
@@ -82,41 +95,51 @@ export async function deleteProcessingJobs(jobIdsOrOptions, dbOverride) {
   for (let i = 0; i < jobIds.length; i += BATCH_SIZE) {
     const batch = jobIds.slice(i, i + BATCH_SIZE);
     // Remove from BullMQ/Redis and clean up temp files in parallel
-    await Promise.allSettled(batch.map(async (jobId) => {
-      try {
-        await removeJobFromAllQueues(jobId);
-        const jobIdInt = parseInt(jobId);
-        if (!isNaN(jobIdInt)) {
-          const jobDb = getProcessingJobById(db, jobIdInt);
-          if (jobDb) {
-            const tempFiles = [];
-            if (jobDb.file_path) {
-              const audioFileName = path.basename(jobDb.file_path, path.extname(jobDb.file_path)) + '.wav';
-              const audioPath = path.join(globalThis.config?.tempDir || '', 'audio', audioFileName);
-              tempFiles.push(audioPath);
-              tempFiles.push(
-                path.join(globalThis.config?.tempDir || '', 'trimmed', `intro_${jobIdInt}.mp4`),
-                path.join(globalThis.config?.tempDir || '', 'trimmed', `credits_${jobIdInt}.mp4`),
-              );
-            }
-            for (const file of tempFiles) {
-              try {
-                await fs.unlink(file);
-                logger.info({ file }, 'Deleted temp file on job deletion');
-              } catch (err) {
-                if (err.code !== 'ENOENT') {
-                  logger.warn({ file, error: err.message }, 'Failed to delete temp file on job deletion');
+    await Promise.allSettled(
+      batch.map(async (jobId) => {
+        try {
+          await removeJobFromAllQueues(jobId);
+          const jobIdInt = parseInt(jobId);
+          if (!isNaN(jobIdInt)) {
+            const jobDb = getProcessingJobById(db, jobIdInt);
+            if (jobDb) {
+              const tempFiles = [];
+              if (jobDb.file_path) {
+                const audioFileName =
+                  path.basename(jobDb.file_path, path.extname(jobDb.file_path)) + '.wav';
+                const audioPath = path.join(
+                  globalThis.config?.tempDir || '',
+                  'audio',
+                  audioFileName,
+                );
+                tempFiles.push(audioPath);
+                tempFiles.push(
+                  path.join(globalThis.config?.tempDir || '', 'trimmed', `intro_${jobIdInt}.mp4`),
+                  path.join(globalThis.config?.tempDir || '', 'trimmed', `credits_${jobIdInt}.mp4`),
+                );
+              }
+              for (const file of tempFiles) {
+                try {
+                  await fs.unlink(file);
+                  logger.info({ file }, 'Deleted temp file on job deletion');
+                } catch (err) {
+                  if (err.code !== 'ENOENT') {
+                    logger.warn(
+                      { file, error: err.message },
+                      'Failed to delete temp file on job deletion',
+                    );
+                  }
                 }
               }
             }
           }
+          deletedCount++;
+        } catch (err) {
+          failed.push(jobId);
+          logger.error(`Failed to delete job ${jobId}: ${err && err.message}`);
         }
-        deletedCount++;
-      } catch (err) {
-        failed.push(jobId);
-        logger.error(`Failed to delete job ${jobId}: ${err && err.message}`);
-      }
-    }));
+      }),
+    );
     // Batch delete from DB for this batch
     try {
       deleteProcessingJobsBatch(db, batch);
@@ -142,7 +165,9 @@ export async function deleteShowsAndCleanup(showIds, db) {
   const jobIds = episodeFileAndJobIds
     .map((e) => e.dbJobId)
     .filter((id) => id !== null && id !== undefined);
-  logger.info(`Cleaning up jobs for shows: ${showIds.join(', ')}. Found job IDs: ${jobIds.join(', ')}`);
+  logger.info(
+    `Cleaning up jobs for shows: ${showIds.join(', ')}. Found job IDs: ${jobIds.join(', ')}`,
+  );
 
   // 2. Delete shows from DB (cascade will handle related tables)
   const { deleteShowsByIds } = await import('../database/Db_Operations.js');
@@ -155,7 +180,11 @@ export async function deleteShowsAndCleanup(showIds, db) {
     try {
       let job = await queue.getJob(jobId);
       if (!job) {
-        const jobs = await queue.getJobs(['active', 'waiting', 'completed', 'failed', 'delayed'], 0, 10000);
+        const jobs = await queue.getJobs(
+          ['active', 'waiting', 'completed', 'failed', 'delayed'],
+          0,
+          10000,
+        );
         job = jobs.find((j) => j.data && String(j.data.dbJobId) === String(jobId));
       }
       if (job) {
@@ -164,7 +193,9 @@ export async function deleteShowsAndCleanup(showIds, db) {
       // Temp file cleanup is not strictly needed since DB is gone, but can be added if desired
     } catch (err) {
       failed.push(jobId);
-      logger.error(`Failed to delete job ${jobId} from BullMQ during show cleanup: ${err && err.message}`);
+      logger.error(
+        `Failed to delete job ${jobId} from BullMQ during show cleanup: ${err && err.message}`,
+      );
     }
   }
   return { deletedCount, failed };

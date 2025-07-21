@@ -27,8 +27,7 @@ router.get('/db-test', (req, res) => {
   try {
     const testResult = db.transaction(() => {
       // Just test a simple query without modifying settings
-      const result = db.prepare('SELECT COUNT(*) as count FROM settings')
-        .get();
+      const result = db.prepare('SELECT COUNT(*) as count FROM settings').get();
 
       return {
         success: true,

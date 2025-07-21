@@ -19,8 +19,15 @@ import { useToast } from '../components/ToastContext';
 import { Trash2 } from 'lucide-react';
 import { apiClient } from '../integration/api-client';
 import { Button } from '@/components/ui/button';
+import { filterJobsByCategory, JobCategory } from '@/utils/jobFilters.tsx';
 
-type ProcessingJobStatus = 'detected' | 'verified' | 'processing' | 'completed' | 'failed' | 'scanning';
+type ProcessingJobStatus =
+  | 'detected'
+  | 'verified'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'scanning';
 
 interface CurrentFile {
   fileId: string | number;
@@ -43,14 +50,16 @@ export default function Processing() {
   const [jobs, setJobs] = useState<ProcessingJob[]>([]);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [audioAnalyses, setAudioAnalyses] = useState<AudioAnalysis[]>([]);
-  const [activeProcesses, setActiveProcesses] = useState<ProcessingJob[]>([]);
+  // Remove activeProcesses state, use derived values instead
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Update the state type
   const [queueStatus, setQueueStatus] = useState<QueueStatusType[] | null>(null);
   const [selected, setSelected] = useState<(string | number)[]>([]);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
   const toast = useToast();
-  const [jobProgress, setJobProgress] = useState<Record<string, { progress: number, fps: number, currentFile: CurrentFile, updated: number }>>({});
+  const [jobProgress, setJobProgress] = useState<
+    Record<string, { progress: number; fps: number; currentFile: CurrentFile; updated: number }>
+  >({});
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -63,10 +72,6 @@ export default function Processing() {
       setJobs(jobsData);
       setMediaFiles(filesData);
       setAudioAnalyses(audioData);
-      const processing = jobsData.filter(
-        (j: ProcessingJob) => j.status === 'processing' || j.status === 'scanning',
-      );
-      setActiveProcesses(processing);
     } catch {
       console.error('Error loading processing data:');
     } finally {
@@ -78,18 +83,41 @@ export default function Processing() {
     loadData();
   }, [loadData]);
 
+  // Derive job lists for each tab/category
+  const now = Date.now();
+  const activeProcesses = jobs.filter(
+    (j) =>
+      (j.status === 'processing' || j.status === 'scanning') &&
+      jobProgress[j.id as string | number] &&
+      now - jobProgress[j.id as string | number].updated < 10000
+  );
+  const queuedJobs = filterJobsByCategory(jobs, 'queued');
+  const completedJobs = filterJobsByCategory(jobs, 'completed');
+  const failedJobs = filterJobsByCategory(jobs, 'failed');
+
   // WebSocket event handlers
   useEffect(() => {
     // Add a simple message logger to debug all incoming messages
-    const handleAllMessages = (_data: unknown) => { /* intentionally left blank */ };
+    const handleAllMessages = (_data: unknown) => {
+      /* intentionally left blank */
+    };
 
     // Helper to normalize job IDs (strip 'epjob-' prefix)
-    const normalizeId = (id: string | number | undefined) => (id ? id.toString().replace(/^epjob-/, '') : '');
+    const normalizeId = (id: string | number | undefined) =>
+      id ? id.toString().replace(/^epjob-/, '') : '';
 
     const handleJobUpdate = (data: unknown) => {
       // Handle job updates - these come directly without a 'type' field
       if (data && typeof data === 'object' && 'dbJobId' in data && 'status' in data) {
-        const jobData = data as { dbJobId: string | number; status: ProcessingJobStatus; progress?: number; fps?: number; currentFile?: CurrentFile; error?: string; result?: { message?: string } };
+        const jobData = data as {
+          dbJobId: string | number;
+          status: ProcessingJobStatus;
+          progress?: number;
+          fps?: number;
+          currentFile?: CurrentFile;
+          error?: string;
+          result?: { message?: string };
+        };
 
         if (jobData.dbJobId && jobData.status) {
           // Check if this job exists in our current jobs array (normalize IDs)
@@ -134,7 +162,8 @@ export default function Processing() {
                 return {
                   ...job,
                   status: jobData.status,
-                  processing_notes: jobData.error || jobData.result?.message || job.processing_notes,
+                  processing_notes:
+                    jobData.error || jobData.result?.message || job.processing_notes,
                   updated_date: new Date().toISOString(),
                 };
               }
@@ -163,12 +192,29 @@ export default function Processing() {
         }
 
         // Handle legacy job_update type messages (for backward compatibility)
-        if (data && typeof data === 'object' && 'type' in data && 'dbJobId' in data && 'status' in data) {
-          const legacyJobData = data as { type: string; dbJobId: string | number; status: ProcessingJobStatus; progress?: number; fps?: number; currentFile?: CurrentFile; error?: string; result?: { message?: string } };
+        if (
+          data &&
+          typeof data === 'object' &&
+          'type' in data &&
+          'dbJobId' in data &&
+          'status' in data
+        ) {
+          const legacyJobData = data as {
+            type: string;
+            dbJobId: string | number;
+            status: ProcessingJobStatus;
+            progress?: number;
+            fps?: number;
+            currentFile?: CurrentFile;
+            error?: string;
+            result?: { message?: string };
+          };
 
           if (legacyJobData.type === 'job_update') {
             // Check if this job exists in our current jobs array (normalize IDs)
-            const existingJob = jobs.find((j) => normalizeId(j.id) === normalizeId(legacyJobData.dbJobId));
+            const existingJob = jobs.find(
+              (j) => normalizeId(j.id) === normalizeId(legacyJobData.dbJobId),
+            );
 
             // If job doesn't exist in our array, reload data to get latest jobs
             if (!existingJob) {
@@ -206,7 +252,8 @@ export default function Processing() {
                   return {
                     ...job,
                     status: legacyJobData.status,
-                    processing_notes: legacyJobData.error || legacyJobData.result?.message || job.processing_notes,
+                    processing_notes:
+                      legacyJobData.error || legacyJobData.result?.message || job.processing_notes,
                     updated_date: new Date().toISOString(),
                   };
                 }
@@ -266,7 +313,9 @@ export default function Processing() {
     wsClient.addEventListener('close', () => {
       // intentionally left blank
     });
-    wsClient.addEventListener('error', (_e: Event) => { /* intentionally left blank */ });
+    wsClient.addEventListener('error', (_e: Event) => {
+      /* intentionally left blank */
+    });
 
     // Ensure WebSocket is connected
     wsClient.connect();
@@ -286,10 +335,7 @@ export default function Processing() {
   //   return () => clearInterval(intervalId);
   // }, []);
 
-  const startBatchProcessing = async (
-    jobIds: (string | number)[],
-    profileId: string | number,
-  ) => {
+  const startBatchProcessing = async (jobIds: (string | number)[], profileId: string | number) => {
     try {
       await Promise.all(
         jobIds.map((id) =>
@@ -359,7 +405,10 @@ export default function Processing() {
               break;
             } else if (status.state === 'failed') {
               done = true;
-              toast({ type: 'error', message: `Bulk delete failed: ${status.failedReason || 'Unknown error'}` });
+              toast({
+                type: 'error',
+                message: `Bulk delete failed: ${status.failedReason || 'Unknown error'}`,
+              });
               break;
             } else {
               if (status.state !== lastState) {
@@ -474,11 +523,10 @@ export default function Processing() {
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-white font-medium">
-                              {mediaFiles.find((f) => f.id === process.media_file_id)?.file_name || 'Unknown'}
+                              {mediaFiles.find((f) => f.id === process.media_file_id)?.file_name ||
+                                'Unknown'}
                             </span>
-                            <span className="text-xs text-slate-400">
-                              {process.status}
-                            </span>
+                            <span className="text-xs text-slate-400">{process.status}</span>
                           </div>
                           {process.processing_notes && (
                             <p className="text-xs text-slate-500 mt-1">
@@ -503,16 +551,24 @@ export default function Processing() {
           <div className="flex-1 flex flex-col min-h-0">
             <Tabs defaultValue="queue" className="flex-1 flex flex-col min-h-0">
               <TabsList className="grid w-full grid-cols-4 bg-slate-800/90 backdrop-blur-md border border-slate-700">
-                <TabsTrigger value="queue" className="text-white">Queue</TabsTrigger>
-                <TabsTrigger value="monitor" className="text-white">Monitor</TabsTrigger>
-                <TabsTrigger value="analyzer" className="text-white">Analyzer</TabsTrigger>
-                <TabsTrigger value="batch" className="text-white">Batch</TabsTrigger>
+                <TabsTrigger value="queue" className="text-white">
+                  Queue
+                </TabsTrigger>
+                <TabsTrigger value="monitor" className="text-white">
+                  Monitor
+                </TabsTrigger>
+                <TabsTrigger value="analyzer" className="text-white">
+                  Analyzer
+                </TabsTrigger>
+                <TabsTrigger value="batch" className="text-white">
+                  Batch
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="queue" className="flex-1 flex flex-col min-h-0 mt-6">
                 <div className="flex-1 flex flex-col min-h-0 overflow-auto">
                   <ProcessingQueue
-                    jobs={jobs}
+                    jobs={queuedJobs}
                     mediaFiles={mediaFiles}
                     profiles={[]} // Removed profiles prop
                     onStopProcessing={stopProcessing}
@@ -550,7 +606,7 @@ export default function Processing() {
               <TabsContent value="batch" className="flex-1 flex flex-col min-h-0 mt-6">
                 <div className="flex-1 flex flex-col min-h-0 overflow-auto">
                   <BatchProcessor
-                    jobs={jobs}
+                    jobs={queuedJobs}
                     mediaFiles={mediaFiles}
                     profiles={[]} // Removed profiles prop
                     onStartBatch={startBatchProcessing}
@@ -577,7 +633,22 @@ export default function Processing() {
               <Trash2 className="w-4 h-4" />
               <span>{bulkDeleteLoading ? 'Deleting...' : 'Delete'}</span>
               {bulkDeleteLoading && (
-                <svg className="animate-spin ml-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+                <svg
+                  className="animate-spin ml-2 h-4 w-4 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
               )}
             </button>
           </div>

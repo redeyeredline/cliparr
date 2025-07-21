@@ -36,8 +36,7 @@ export async function getDatabaseSingleton(dbPath) {
     dbInstance = new Database(absoluteDbPath);
 
     // Batch PRAGMA settings
-    ['journal_mode = WAL', 'busy_timeout = 5000']
-      .forEach((setting) => dbInstance.pragma(setting));
+    ['journal_mode = WAL', 'busy_timeout = 5000'].forEach((setting) => dbInstance.pragma(setting));
 
     // Create schema inside a single transaction
     const init = dbInstance.transaction(() => {
@@ -60,9 +59,7 @@ export async function getDatabaseSingleton(dbPath) {
           { key: 'gpu_worker_limit', value: '1' },
         ];
 
-        const insertStmt = dbInstance.prepare(
-          'INSERT INTO settings (key, value) VALUES (?, ?)',
-        );
+        const insertStmt = dbInstance.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
 
         for (const setting of defaultSettings) {
           insertStmt.run(setting.key, setting.value);
@@ -73,7 +70,6 @@ export async function getDatabaseSingleton(dbPath) {
     init();
     dbLogger.info('✅ Database started');
     return dbInstance;
-
   } catch (err) {
     console.error('❌ Database failed to start:', err);
     if (dbInstance) {

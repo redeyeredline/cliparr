@@ -73,10 +73,7 @@ export const {
   clearAllQueues,
 } = QueueOperations;
 
-export const {
-  removeFingerprintData,
-  removeDetectionData,
-} = DataCleanup;
+export const { removeFingerprintData, removeDetectionData } = DataCleanup;
 
 // Export queues for backward compatibility
 export { queues };

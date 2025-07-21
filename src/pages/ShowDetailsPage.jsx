@@ -18,9 +18,7 @@ const ShowDetailsPage = () => {
   const [expandedSeasons, setExpandedSeasons] = useState(new Set());
 
   const sortedSeasons = useMemo(() => {
-    return show?.seasons ?
-      [...show.seasons].sort((a, b) => a.season_number - b.season_number) :
-      [];
+    return show?.seasons ? [...show.seasons].sort((a, b) => a.season_number - b.season_number) : [];
   }, [show?.seasons]);
 
   useEffect(() => {
@@ -64,10 +62,12 @@ const ShowDetailsPage = () => {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-900">
         <div className="text-center">
-          <div className={`
+          <div
+            className={`
             w-12 h-12 border-4 border-blue-500 border-t-transparent 
             rounded-full animate-spin mx-auto mb-4
-          `}></div>
+          `}
+          ></div>
           <p className="text-gray-400">Loading show details...</p>
         </div>
       </div>
@@ -78,16 +78,16 @@ const ShowDetailsPage = () => {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-900">
         <div className="text-center max-w-md">
-          <div className={`
+          <div
+            className={`
             w-16 h-16 bg-red-500/10 rounded-full flex items-center 
             justify-center mx-auto mb-4
-          `}>
+          `}
+          >
             <FileText className="w-8 h-8 text-red-400" />
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Show Not Found</h2>
-          <p className="text-gray-400 mb-6">
-            {error || 'The requested show could not be found.'}
-          </p>
+          <p className="text-gray-400 mb-6">{error || 'The requested show could not be found.'}</p>
           <button
             onClick={handleBack}
             className={`
@@ -166,7 +166,9 @@ const ShowDetailsPage = () => {
                       >
                         <div className="flex items-center space-x-4">
                           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-                            <span className="text-white font-bold text-sm">{season.season_number}</span>
+                            <span className="text-white font-bold text-sm">
+                              {season.season_number}
+                            </span>
                           </div>
                           <div className="text-left">
                             <h3 className="text-lg font-semibold text-white">
@@ -235,7 +237,8 @@ const ShowDetailsPage = () => {
                                             <div className="flex items-center space-x-2">
                                               <FileText className="w-4 h-4 text-gray-400" />
                                               <span className="text-sm text-gray-300">
-                                                {episode.file_count} file{episode.file_count !== 1 ? 's' : ''}
+                                                {episode.file_count} file
+                                                {episode.file_count !== 1 ? 's' : ''}
                                               </span>
                                             </div>
                                           </td>
@@ -260,7 +263,9 @@ const ShowDetailsPage = () => {
                               onClick={() => toggleSeason(season.id)}
                               className="w-full px-6 py-3 flex items-center justify-center space-x-2 hover:bg-gray-700/20 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                             >
-                              <span className="text-sm text-gray-400">Collapse Season {season.season_number}</span>
+                              <span className="text-sm text-gray-400">
+                                Collapse Season {season.season_number}
+                              </span>
                               <ChevronUp className="w-4 h-4 text-gray-400" />
                             </button>
                           </div>

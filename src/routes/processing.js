@@ -1,7 +1,11 @@
 process.on('unhandledRejection', (reason, promise) => {
   // Suppress logging for expected 404s from cleanup job status polling
-  if (reason && typeof reason === 'object' && reason.message &&
-      (reason.message.includes('not found') || reason.message.includes('404'))) {
+  if (
+    reason &&
+    typeof reason === 'object' &&
+    reason.message &&
+    (reason.message.includes('not found') || reason.message.includes('404'))
+  ) {
     return; // Don't log expected 404s
   }
 
@@ -20,7 +24,13 @@ import {
   getProcessingJobStats,
   deleteProcessingJob,
 } from '../database/Db_Operations.js';
-import { getQueueStatus, debugQueueState, removeJobFromAllQueues, queues, enqueueCleanupJob } from '../services/queue.js';
+import {
+  getQueueStatus,
+  debugQueueState,
+  removeJobFromAllQueues,
+  queues,
+  enqueueCleanupJob,
+} from '../services/queue.js';
 import { getDatabaseSingleton } from '../database/Auto_DB_Setup.js';
 import path from 'path';
 import fs from 'fs/promises';
@@ -72,7 +82,17 @@ router.get('/jobs/:id', async (req, res) => {
   try {
     const queue = queues['episode-processing'];
     const jobId = req.params.id;
-    const allStates = ['active', 'waiting', 'completed', 'failed', 'delayed', 'paused', 'waiting-children', 'repeat', 'scheduled'];
+    const allStates = [
+      'active',
+      'waiting',
+      'completed',
+      'failed',
+      'delayed',
+      'paused',
+      'waiting-children',
+      'repeat',
+      'scheduled',
+    ];
     // Try to find by dbJobId (custom data) or BullMQ jobId
     let job = await queue.getJob(jobId);
     if (!job) {
@@ -83,13 +103,21 @@ router.get('/jobs/:id', async (req, res) => {
     if (!job) {
       return res.status(404).json({ error: 'Processing job not found in Redis/BullMQ' });
     }
-    res.json({ job: {
-      id: job.data && job.data.dbJobId ? job.data.dbJobId : job.id,
-      status: job.finishedOn ? (job.failedReason ? 'failed' : 'completed') : (job.processedOn ? 'processing' : job.state || 'waiting'),
-      ...job.data,
-      createdAt: job.timestamp,
-      updatedAt: job.finishedOn || job.processedOn || job.timestamp,
-    } });
+    res.json({
+      job: {
+        id: job.data && job.data.dbJobId ? job.data.dbJobId : job.id,
+        status: job.finishedOn
+          ? job.failedReason
+            ? 'failed'
+            : 'completed'
+          : job.processedOn
+            ? 'processing'
+            : job.state || 'waiting',
+        ...job.data,
+        createdAt: job.timestamp,
+        updatedAt: job.finishedOn || job.processedOn || job.timestamp,
+      },
+    });
   } catch (error) {
     console.error('Failed to fetch job from BullMQ:', error);
     res.status(500).json({ error: 'Failed to fetch job from BullMQ' });
@@ -161,10 +189,7 @@ router.get('/status', async (req, res) => {
   const logger = req.app.get('logger');
 
   try {
-    const [dbStats, queueStatus] = await Promise.all([
-      getProcessingJobStats(db),
-      getQueueStatus(),
-    ]);
+    const [dbStats, queueStatus] = await Promise.all([getProcessingJobStats(db), getQueueStatus()]);
 
     const totalActive = queueStatus.reduce((sum, queue) => sum + queue.active, 0);
     const totalWaiting = queueStatus.reduce((sum, queue) => sum + queue.waiting, 0);
@@ -317,7 +342,9 @@ router.post('/cleanup-jobs-for-shows', async (req, res) => {
     const jobIds = episodeFileAndJobIds
       .map((e) => e.dbJobId)
       .filter((id) => id !== null && id !== undefined);
-    logger.info(`Cleaning up jobs for shows: ${showIds.join(', ')}. Found job IDs: ${jobIds.join(', ')}`);
+    logger.info(
+      `Cleaning up jobs for shows: ${showIds.join(', ')}. Found job IDs: ${jobIds.join(', ')}`,
+    );
 
     const queue = queues['episode-processing'];
     let deletedCount = 0;
@@ -328,7 +355,11 @@ router.post('/cleanup-jobs-for-shows', async (req, res) => {
         // Remove from BullMQ/Redis (robust logic)
         let job = await queue.getJob(jobId);
         if (!job) {
-          const jobs = await queue.getJobs(['active', 'waiting', 'completed', 'failed', 'delayed'], 0, 10000);
+          const jobs = await queue.getJobs(
+            ['active', 'waiting', 'completed', 'failed', 'delayed'],
+            0,
+            10000,
+          );
           job = jobs.find((j) => j.data && String(j.data.dbJobId) === String(jobId));
         }
         if (job) {
@@ -342,7 +373,8 @@ router.post('/cleanup-jobs-for-shows', async (req, res) => {
             // Clean up temp files (audio and trimmed)
             const tempFiles = [];
             if (jobDb.file_path) {
-              const audioFileName = path.basename(jobDb.file_path, path.extname(jobDb.file_path)) + '.wav';
+              const audioFileName =
+                path.basename(jobDb.file_path, path.extname(jobDb.file_path)) + '.wav';
               const audioPath = path.join(config.tempDir, 'audio', audioFileName);
               tempFiles.push(audioPath);
               tempFiles.push(
@@ -356,7 +388,10 @@ router.post('/cleanup-jobs-for-shows', async (req, res) => {
                 logger.info({ file }, 'Deleted temp file on job deletion');
               } catch (err) {
                 if (err.code !== 'ENOENT') {
-                  logger.warn({ file, error: err.message }, 'Failed to delete temp file on job deletion');
+                  logger.warn(
+                    { file, error: err.message },
+                    'Failed to delete temp file on job deletion',
+                  );
                 }
               }
             }
@@ -372,7 +407,9 @@ router.post('/cleanup-jobs-for-shows', async (req, res) => {
     res.json({ success: true, showIds, deletedCount, failed });
   } catch (error) {
     logger.error('Failed to cleanup jobs for shows:', error);
-    res.status(500).json({ error: 'Failed to cleanup jobs for shows', details: error && error.message });
+    res
+      .status(500)
+      .json({ error: 'Failed to cleanup jobs for shows', details: error && error.message });
   }
 });
 

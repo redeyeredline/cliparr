@@ -128,9 +128,12 @@ export default function DetectionResults({ showId, seasonNumber }: DetectionResu
     const isSelected = selectedSegments.has(key);
 
     return (
-      <Card key={segment.id} className={`mb-4 transition-all duration-200 ${
-        isSelected ? 'ring-2 ring-blue-500 bg-blue-50/10' : 'bg-gray-800/30'
-      }`}>
+      <Card
+        key={segment.id}
+        className={`mb-4 transition-all duration-200 ${
+          isSelected ? 'ring-2 ring-blue-500 bg-blue-50/10' : 'bg-gray-800/30'
+        }`}
+      >
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
@@ -143,18 +146,12 @@ export default function DetectionResults({ showId, seasonNumber }: DetectionResu
                 onClick={() => toggleSegment(type, segment.id)}
                 className="h-6 w-6 p-0"
               >
-                {isSelected ? (
-                  <EyeOff className="w-3 h-3" />
-                ) : (
-                  <Eye className="w-3 h-3" />
-                )}
+                {isSelected ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
               </Button>
             </div>
             <div className="flex items-center space-x-2">
               <Clock className="w-3 h-3 text-gray-400" />
-              <span className="text-xs text-gray-400">
-                {formatTime(segment.medianTime)}
-              </span>
+              <span className="text-xs text-gray-400">{formatTime(segment.medianTime)}</span>
             </div>
           </div>
 
@@ -168,9 +165,7 @@ export default function DetectionResults({ showId, seasonNumber }: DetectionResu
 
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Duration:</span>
-              <span className="text-white">
-                {formatDuration(segment.start, segment.end)}
-              </span>
+              <span className="text-white">{formatDuration(segment.start, segment.end)}</span>
             </div>
 
             <div className="flex justify-between text-sm">
@@ -347,8 +342,7 @@ export default function DetectionResults({ showId, seasonNumber }: DetectionResu
           <p className="text-gray-400">
             {seasonNumber
               ? `No detection results found for Season ${seasonNumber}`
-              : 'No detection results found for this show'
-            }
+              : 'No detection results found for this show'}
           </p>
         </CardContent>
       </Card>
@@ -391,7 +385,8 @@ export default function DetectionResults({ showId, seasonNumber }: DetectionResu
                     <CardContent className="p-4">
                       <div className="flex justify-between items-center">
                         <span className="text-white">
-                          S{result.season_number}E{result.episode_number.toString().padStart(2, '0')}
+                          S{result.season_number}E
+                          {result.episode_number.toString().padStart(2, '0')}
                         </span>
                         <span className="text-gray-400">
                           {formatTime(result.intro_start!)} - {formatTime(result.intro_end!)}
@@ -414,7 +409,8 @@ export default function DetectionResults({ showId, seasonNumber }: DetectionResu
                     <CardContent className="p-4">
                       <div className="flex justify-between items-center">
                         <span className="text-white">
-                          S{result.season_number}E{result.episode_number.toString().padStart(2, '0')}
+                          S{result.season_number}E
+                          {result.episode_number.toString().padStart(2, '0')}
                         </span>
                         <span className="text-gray-400">
                           {formatTime(result.credits_start!)} - {formatTime(result.credits_end!)}
@@ -432,14 +428,14 @@ export default function DetectionResults({ showId, seasonNumber }: DetectionResu
               <h3 className="text-lg font-semibold text-white mb-4">Stinger Segments</h3>
               {results
                 .filter((r) => r.stingers && r.stingers.length > 0)
-                .flatMap((r) => r.stingers.map((stinger, index) => ({
-                  ...stinger,
-                  episode: r,
-                  stingerIndex: index,
-                })))
-                .map((stinger, index) =>
-                  renderSegmentCard(stinger, 'stinger', index),
-                )}
+                .flatMap((r) =>
+                  r.stingers.map((stinger, index) => ({
+                    ...stinger,
+                    episode: r,
+                    stingerIndex: index,
+                  })),
+                )
+                .map((stinger, index) => renderSegmentCard(stinger, 'stinger', index))}
             </div>
           )}
         </TabsContent>

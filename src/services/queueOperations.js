@@ -65,11 +65,23 @@ export async function enqueueEpisodeProcessing(episodeFileAndJobIds) {
     throw new Error('episodeFileAndJobIds must be an array');
   }
 
-  workerLogger.info('enqueueEpisodeProcessing called with episodeFileAndJobIds:', episodeFileAndJobIds.map((e) => ({ ...e, dbJobIdType: typeof e.dbJobId, episodeFileIdType: typeof e.episodeFileId })));
+  workerLogger.info(
+    'enqueueEpisodeProcessing called with episodeFileAndJobIds:',
+    episodeFileAndJobIds.map((e) => ({
+      ...e,
+      dbJobIdType: typeof e.dbJobId,
+      episodeFileIdType: typeof e.episodeFileId,
+    })),
+  );
   const jobIds = [];
 
   for (const { episodeFileId, dbJobId } of episodeFileAndJobIds) {
-    workerLogger.info('Processing episode:', { episodeFileId, dbJobId, dbJobIdType: typeof dbJobId, episodeFileIdType: typeof episodeFileId });
+    workerLogger.info('Processing episode:', {
+      episodeFileId,
+      dbJobId,
+      dbJobIdType: typeof dbJobId,
+      episodeFileIdType: typeof episodeFileId,
+    });
 
     // Enhanced validation
     if (!episodeFileId || !dbJobId) {
@@ -82,7 +94,12 @@ export async function enqueueEpisodeProcessing(episodeFileAndJobIds) {
     const numericDbJobId = Number(dbJobId);
 
     if (isNaN(numericEpisodeFileId) || isNaN(numericDbJobId)) {
-      workerLogger.warn('Skipping non-numeric IDs:', { episodeFileId, dbJobId, numericEpisodeFileId, numericDbJobId });
+      workerLogger.warn('Skipping non-numeric IDs:', {
+        episodeFileId,
+        dbJobId,
+        numericEpisodeFileId,
+        numericDbJobId,
+      });
       continue;
     }
 
@@ -111,7 +128,8 @@ export async function enqueueEpisodeProcessing(episodeFileAndJobIds) {
       let errorDetails = {};
       try {
         errorDetails = Object.getOwnPropertyNames(error).reduce((acc, key) => {
-          acc[key] = error[key]; return acc;
+          acc[key] = error[key];
+          return acc;
         }, {});
       } catch (e) {}
       console.error('BULLMQ ERROR DETAILS:', {
@@ -308,7 +326,10 @@ export async function removeJobFromAllQueues(jobId) {
         try {
           await job.remove();
         } catch (removeErr) {
-          workerLogger.warn({ jobId, queue: queueName, error: removeErr.message }, 'Normal job removal failed, but Redis cleanup succeeded');
+          workerLogger.warn(
+            { jobId, queue: queueName, error: removeErr.message },
+            'Normal job removal failed, but Redis cleanup succeeded',
+          );
         }
 
         // Resume the worker
@@ -326,7 +347,10 @@ export async function removeJobFromAllQueues(jobId) {
 
       removed = true;
     } catch (err) {
-      workerLogger.warn({ jobId, queue: queueName, error: err.message }, 'Failed to remove job from queue');
+      workerLogger.warn(
+        { jobId, queue: queueName, error: err.message },
+        'Failed to remove job from queue',
+      );
     }
   }
 
@@ -351,13 +375,15 @@ export async function clearAllQueues() {
         await job.remove();
       }
 
-      workerLogger.info({
-        queue: name,
-        waiting: waiting.length,
-        active: active.length,
-        delayed: delayed.length,
-      }, 'Cleared all jobs from queue');
-
+      workerLogger.info(
+        {
+          queue: name,
+          waiting: waiting.length,
+          active: active.length,
+          delayed: delayed.length,
+        },
+        'Cleared all jobs from queue',
+      );
     } catch (err) {
       workerLogger.error({ queue: name, error: err.message }, 'Failed to clear queue');
     }
@@ -380,33 +406,37 @@ export function debugQueueState() {
 // --- Cleanup Queue and Worker ---
 const cleanupQueue = new Queue('cleanup', { connection: redis });
 
-const cleanupWorker = new Worker('cleanup', async (job) => {
-  workerLogger.info({ jobId: job.id, name: job.name, data: job.data }, 'Cleanup worker started');
-  if (job.name === 'deleteProcessingJobs') {
-    // Ensure DB instance is available for deleteProcessingJobs
-    let db = globalThis.db;
-    if (!db) {
-      const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
-      db = await getDbLocal();
-      globalThis.db = db;
+const cleanupWorker = new Worker(
+  'cleanup',
+  async (job) => {
+    workerLogger.info({ jobId: job.id, name: job.name, data: job.data }, 'Cleanup worker started');
+    if (job.name === 'deleteProcessingJobs') {
+      // Ensure DB instance is available for deleteProcessingJobs
+      let db = globalThis.db;
+      if (!db) {
+        const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
+        db = await getDbLocal();
+        globalThis.db = db;
+      }
+      return await deleteProcessingJobs(job.data, db);
+    } else if (job.name === 'deleteShowsAndCleanup') {
+      const { showIds } = job.data;
+      if (!Array.isArray(showIds) || showIds.length === 0) {
+        throw new Error('No showIds provided');
+      }
+      let db = globalThis.db;
+      if (!db) {
+        const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
+        db = await getDbLocal();
+        globalThis.db = db;
+      }
+      return await deleteShowsAndCleanup(showIds, db);
+    } else {
+      throw new Error('Unknown cleanup job type: ' + job.name);
     }
-    return await deleteProcessingJobs(job.data, db);
-  } else if (job.name === 'deleteShowsAndCleanup') {
-    const { showIds } = job.data;
-    if (!Array.isArray(showIds) || showIds.length === 0) {
-      throw new Error('No showIds provided');
-    }
-    let db = globalThis.db;
-    if (!db) {
-      const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
-      db = await getDbLocal();
-      globalThis.db = db;
-    }
-    return await deleteShowsAndCleanup(showIds, db);
-  } else {
-    throw new Error('Unknown cleanup job type: ' + job.name);
-  }
-}, { connection: redis });
+  },
+  { connection: redis },
+);
 
 cleanupWorker.on('completed', (job, result) => {
   workerLogger.info({ jobId: job.id, result }, 'Cleanup job completed');

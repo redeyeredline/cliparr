@@ -30,7 +30,9 @@ export async function startServer() {
     appLogger.info('✅ Redis connection verified');
     console.log('✅ Redis connection verified');
   } catch (error) {
-    appLogger.error('❌ Redis connection failed. Please ensure Redis is running: sudo systemctl start redis-server');
+    appLogger.error(
+      '❌ Redis connection failed. Please ensure Redis is running: sudo systemctl start redis-server',
+    );
     console.error('❌ Redis connection failed:', error.message);
     throw new Error('Redis not available');
   }

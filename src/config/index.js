@@ -33,8 +33,7 @@ const config = {
 
   // Database
   db: {
-    path: process.env.DB_PATH
-      || path.join(__dirname, '..', 'database', 'data', 'cliparr.db'),
+    path: process.env.DB_PATH || path.join(__dirname, '..', 'database', 'data', 'cliparr.db'),
   },
 
   // WebSocket

@@ -11,7 +11,13 @@ import {
   getSetting,
   setSetting,
 } from '../database/Db_Operations.js';
-import { updateWorkerLimits, pauseCpuWorkers, resumeCpuWorkers, pauseGpuWorkers, resumeGpuWorkers } from '../services/queue.js';
+import {
+  updateWorkerLimits,
+  pauseCpuWorkers,
+  resumeCpuWorkers,
+  pauseGpuWorkers,
+  resumeGpuWorkers,
+} from '../services/queue.js';
 import { appLogger } from '../services/logger.js';
 import os from 'os';
 import path from 'path';
@@ -179,8 +185,11 @@ router.post('/all', async (req, res) => {
       setSetting(db, 'sonarr_api_key', sonarr_api_key);
     }
     setSetting(db, 'output_directory', output_directory || '');
-    setSetting(db, 'min_confidence_threshold',
-      min_confidence_threshold !== undefined ? String(min_confidence_threshold) : '0.8');
+    setSetting(
+      db,
+      'min_confidence_threshold',
+      min_confidence_threshold !== undefined ? String(min_confidence_threshold) : '0.8',
+    );
     setSetting(db, 'backup_originals', backup_originals ? '1' : '0');
     setSetting(db, 'auto_process_verified', auto_process_verified ? '1' : '0');
     setSetting(db, 'auto_process_detections', auto_process_detections ? '1' : '0');
@@ -195,14 +204,25 @@ router.post('/all', async (req, res) => {
     }
     // Only update worker limits if present and valid
     if (cpu_worker_limit !== undefined && !isNaN(cpu_worker_limit)) {
-      setSetting(db, 'cpu_worker_limit', String(Math.max(1, Math.min(16, parseInt(cpu_worker_limit, 10)))));
+      setSetting(
+        db,
+        'cpu_worker_limit',
+        String(Math.max(1, Math.min(16, parseInt(cpu_worker_limit, 10)))),
+      );
     }
     if (gpu_worker_limit !== undefined && !isNaN(gpu_worker_limit)) {
-      setSetting(db, 'gpu_worker_limit', String(Math.max(1, Math.min(8, parseInt(gpu_worker_limit, 10)))));
+      setSetting(
+        db,
+        'gpu_worker_limit',
+        String(Math.max(1, Math.min(8, parseInt(gpu_worker_limit, 10)))),
+      );
     }
 
     // Update worker limits if CPU or GPU limits were changed
-    if ((cpu_worker_limit !== undefined && !isNaN(cpu_worker_limit)) || (gpu_worker_limit !== undefined && !isNaN(gpu_worker_limit))) {
+    if (
+      (cpu_worker_limit !== undefined && !isNaN(cpu_worker_limit)) ||
+      (gpu_worker_limit !== undefined && !isNaN(gpu_worker_limit))
+    ) {
       try {
         await updateWorkerLimits();
         appLogger.info('Worker limits updated successfully');

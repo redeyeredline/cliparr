@@ -3,13 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import {
-  Package,
-  Play,
-  CheckCircle2,
-  Clock,
-  Info,
-} from 'lucide-react';
+import { Package, Play, CheckCircle2, Clock, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ProcessingJob, MediaFile, ProcessingProfile } from '../entities/all';
 import { useToast } from '../ToastContext';
@@ -105,9 +99,7 @@ export default function BatchProcessor({
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-200">
-                Processing Profile
-              </label>
+              <label className="text-sm font-medium text-slate-200">Processing Profile</label>
               <Select value={selectedProfile} onValueChange={setSelectedProfile}>
                 <SelectTrigger className="rounded-lg bg-slate-900 text-slate-200 border-slate-700">
                   <SelectValue placeholder="Select processing profile" />
@@ -123,9 +115,7 @@ export default function BatchProcessor({
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-200">
-                Selected Jobs
-              </label>
+              <label className="text-sm font-medium text-slate-200">Selected Jobs</label>
               <div className="p-2 bg-slate-900 rounded-lg border border-slate-700 text-sm text-slate-200">
                 {selectedJobs.size} of {jobs.length} jobs selected
               </div>
@@ -204,7 +194,8 @@ export default function BatchProcessor({
                         </h3>
                         {mediaFile?.series_name && (
                           <p className="text-sm text-slate-400 truncate">
-                            {mediaFile.series_name} S{mediaFile.season?.toString().padStart(2, '0')}E{mediaFile.episode?.toString().padStart(2, '0')}
+                            {mediaFile.series_name} S{mediaFile.season?.toString().padStart(2, '0')}
+                            E{mediaFile.episode?.toString().padStart(2, '0')}
                           </p>
                         )}
                         <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
@@ -215,7 +206,8 @@ export default function BatchProcessor({
                           )}
                           {job.credits_start && job.credits_end && (
                             <span>
-                              Credits: {formatTime(job.credits_start)} - {formatTime(job.credits_end)}
+                              Credits: {formatTime(job.credits_start)} -{' '}
+                              {formatTime(job.credits_end)}
                             </span>
                           )}
                         </div>

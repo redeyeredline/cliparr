@@ -2,7 +2,7 @@
 // Provides navigation between pages and import modal with focus management and skip links.
 import React, { useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useImportModal } from '../../hooks/useImportModal';
+import { useImportModal } from '../../hooks/useImportModal.tsx';
 import { useKeyboardNavigation, useFocusRestoration } from '../../utils/keyboardNavigation';
 import { Home, Download, Settings, Zap, Cpu, Monitor, Play, Eye } from 'lucide-react';
 
@@ -30,14 +30,14 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
 
   // Keyboard shortcuts for navigation
   const shortcuts = {
-    'h': () => navigate('/'),
-    's': () => navigate('/settings'),
-    'i': () => openImportModal(),
-    'p': () => navigate('/processing'),
-    'r': () => navigate('/review'),
-    'y': () => navigate('/system'),
-    'w': () => navigate('/hardware'),
-    'Escape': () => {
+    h: () => navigate('/'),
+    s: () => navigate('/settings'),
+    i: () => openImportModal(),
+    p: () => navigate('/processing'),
+    r: () => navigate('/review'),
+    y: () => navigate('/system'),
+    w: () => navigate('/hardware'),
+    Escape: () => {
       // Close any open modals or return to previous page
       if (location.pathname !== '/') {
         navigate('/');
@@ -53,7 +53,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  const handleNavClick = (item: typeof navItems[0]) => {
+  const handleNavClick = (item: (typeof navItems)[0]) => {
     saveFocus();
     if (item.isImport) {
       openImportModal();
@@ -62,14 +62,14 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent, item: typeof navItems[0]) => {
+  const handleKeyPress = (e: React.KeyboardEvent, item: (typeof navItems)[0]) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleNavClick(item);
     }
   };
 
-  const getButtonClasses = (item: typeof navItems[0]) => {
+  const getButtonClasses = (item: (typeof navItems)[0]) => {
     const baseClasses = `
       group relative w-full flex items-center space-x-3 px-4 py-3 rounded-xl mb-2 
       transition-all duration-300 font-medium border shadow-lg
@@ -103,10 +103,14 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
       </a>
 
       {/* Left Sidebar */}
-      <aside className={`
+      <aside
+        className={`
         w-72 bg-gray-800/30 backdrop-blur-sm border-r border-gray-700/30 p-6 
         flex flex-col shadow-2xl
-      `} role="navigation" aria-label="Main navigation">
+      `}
+        role="navigation"
+        aria-label="Main navigation"
+      >
         {/* Logo */}
         <div className="mb-8">
           <button
@@ -149,10 +153,12 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
                   aria-current={isActive ? 'page' : undefined}
                 >
                   <div className="relative">
-                    <IconComponent className={`
+                    <IconComponent
+                      className={`
                       w-5 h-5 transition-all duration-300 
                       ${isActive ? 'text-blue-400' : 'text-gray-400 group-hover:text-white'}
-                    `} />
+                    `}
+                    />
                     {isActive && (
                       <div className="absolute inset-0 bg-blue-400/20 rounded-lg blur-sm"></div>
                     )}
@@ -161,10 +167,12 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
 
                   {/* Active indicator */}
                   {isActive && (
-                    <div className={`
+                    <div
+                      className={`
                       absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 
                       bg-gradient-to-b from-blue-500 to-purple-600 rounded-r-full
-                    `}></div>
+                    `}
+                    ></div>
                   )}
                 </button>
               );

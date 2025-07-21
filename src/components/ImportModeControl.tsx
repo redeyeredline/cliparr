@@ -73,13 +73,17 @@ function ImportModeControl({ value, onValueChange, disabled = false }: ImportMod
                 <div className="w-1.5 h-1.5 rounded-full bg-gray-900 m-auto" />
               )}
             </div>
-            <span className={`ml-2 font-medium ${
-              value === mode.key ? 'text-blue-200' : 'text-gray-400'
-            }`}>{mode.label}</span>
+            <span
+              className={`ml-2 font-medium ${
+                value === mode.key ? 'text-blue-200' : 'text-gray-400'
+              }`}
+            >
+              {mode.label}
+            </span>
           </div>
-          <span className={`text-sm ${
-            value === mode.key ? 'text-blue-200/90' : 'text-gray-500'
-          }`}>{mode.desc}</span>
+          <span className={`text-sm ${value === mode.key ? 'text-blue-200/90' : 'text-gray-500'}`}>
+            {mode.desc}
+          </span>
         </div>
       ))}
     </div>

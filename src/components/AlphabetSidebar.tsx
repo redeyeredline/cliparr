@@ -125,11 +125,7 @@ export default function AlphabetSidebar({
     usePad = MIN_PADDING;
     const topCount = Math.max(MIN_LETTERS_TOP, Math.floor((maxLetters - 1) / 2));
     const bottomCount = Math.max(MIN_LETTERS_BOTTOM, maxLetters - topCount - 1);
-    displayLetters = [
-      ...letters.slice(0, topCount),
-      ELLIPSIS,
-      ...letters.slice(-bottomCount),
-    ];
+    displayLetters = [...letters.slice(0, topCount), ELLIPSIS, ...letters.slice(-bottomCount)];
   }
 
   // Center the bar vertically if there's extra space
@@ -140,7 +136,9 @@ export default function AlphabetSidebar({
     <div ref={ref} style={{ ...sidebarStyle, justifyContent: justify }}>
       {displayLetters.map((letter, idx) =>
         letter === ELLIPSIS ? (
-          <div key={idx} style={getEllipsisStyle(useFont)}>{ELLIPSIS}</div>
+          <div key={idx} style={getEllipsisStyle(useFont)}>
+            {ELLIPSIS}
+          </div>
         ) : (
           <div
             key={letter}

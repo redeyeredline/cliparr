@@ -68,10 +68,10 @@ function insertEpisodeFile(db, episodeId, file) {
 function processShowData(db, show, episodes = [], files = []) {
   return db.transaction(() => {
     const showDbId = insertShow(db, show);
-    const seasonMap = new Map(), epMap = new Map();
+    const seasonMap = new Map(),
+      epMap = new Map();
     episodes.forEach((ep) => {
-      const sid = seasonMap.get(ep.seasonNumber)
-        || insertSeason(db, showDbId, ep.seasonNumber);
+      const sid = seasonMap.get(ep.seasonNumber) || insertSeason(db, showDbId, ep.seasonNumber);
       seasonMap.set(ep.seasonNumber, sid);
       epMap.set(ep.id, insertEpisode(db, sid, ep));
     });
@@ -107,7 +107,9 @@ function batchInsertShows(db, shows) {
 }
 
 function getImportedShows(db, page = 1, pageSize = 100) {
-  const p = Math.max(1, +page), sz = Math.max(1, +pageSize), offset = (p - 1) * sz;
+  const p = Math.max(1, +page),
+    sz = Math.max(1, +pageSize),
+    offset = (p - 1) * sz;
   const shows = timedQuery(
     db,
     `SELECT s.id, s.title, s.path
@@ -134,18 +136,24 @@ function withPerformanceLogging(name, fn) {
   try {
     dbLogger.info({ operation: name }, 'Start');
     const result = fn();
-    dbLogger.info({
-      operation: name,
-      duration: `${Number(process.hrtime.bigint() - start) / 1e6}ms`,
-      success: true,
-    }, 'Done');
+    dbLogger.info(
+      {
+        operation: name,
+        duration: `${Number(process.hrtime.bigint() - start) / 1e6}ms`,
+        success: true,
+      },
+      'Done',
+    );
     return result;
   } catch (err) {
-    dbLogger.error({
-      operation: name,
-      duration: `${Number(process.hrtime.bigint() - start) / 1e6}ms`,
-      error: err.message,
-    }, 'Fail');
+    dbLogger.error(
+      {
+        operation: name,
+        duration: `${Number(process.hrtime.bigint() - start) / 1e6}ms`,
+        error: err.message,
+      },
+      'Fail',
+    );
     throw err;
   }
 }
@@ -162,7 +170,12 @@ function getImportMode(db) {
 
 function setImportMode(db, mode) {
   try {
-    timedQuery(db, 'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['import_mode', mode], 'run');
+    timedQuery(
+      db,
+      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+      ['import_mode', mode],
+      'run',
+    );
   } catch (error) {
     dbLogger.error('Failed to set import mode:', error);
     throw error;
@@ -171,7 +184,12 @@ function setImportMode(db, mode) {
 
 function getPollingInterval(db) {
   try {
-    const row = timedQuery(db, 'SELECT value FROM settings WHERE key = ?', ['polling_interval'], 'get');
+    const row = timedQuery(
+      db,
+      'SELECT value FROM settings WHERE key = ?',
+      ['polling_interval'],
+      'get',
+    );
     return row ? parseInt(row.value, 10) : 900; // Default to 15 minutes (900 seconds)
   } catch (error) {
     dbLogger.error('Failed to get polling interval:', error);
@@ -183,7 +201,12 @@ function setPollingInterval(db, interval) {
   try {
     // Ensure interval is between 60 seconds (1 minute) and 86400 seconds (24 hours)
     const validInterval = Math.max(60, Math.min(86400, interval));
-    timedQuery(db, 'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['polling_interval', validInterval.toString()], 'run');
+    timedQuery(
+      db,
+      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+      ['polling_interval', validInterval.toString()],
+      'run',
+    );
   } catch (error) {
     dbLogger.error('Failed to set polling interval:', error);
     throw error;
@@ -374,12 +397,7 @@ function createProcessingJobsForShows(db, showIds) {
             confidence_score, 
             created_date
           ) VALUES (?, ?, ?, ?)`,
-          [
-            file.file_id,
-            'scanning',
-            0.0,
-            new Date().toISOString(),
-          ],
+          [file.file_id, 'scanning', 0.0, new Date().toISOString()],
           'run',
         );
         createdCount++;
@@ -452,8 +470,14 @@ function getProcessingJobById(db, jobId) {
 
 function updateProcessingJob(db, jobId, updateData) {
   const allowedFields = [
-    'status', 'confidence_score', 'intro_start', 'intro_end',
-    'credits_start', 'credits_end', 'manual_verified', 'processing_notes',
+    'status',
+    'confidence_score',
+    'intro_start',
+    'intro_end',
+    'credits_start',
+    'credits_end',
+    'manual_verified',
+    'processing_notes',
   ];
 
   const updates = [];
@@ -492,12 +516,7 @@ function getProcessingJobStats(db) {
     'all',
   );
 
-  const total = timedQuery(
-    db,
-    'SELECT COUNT(*) as count FROM processing_jobs',
-    [],
-    'get',
-  ).count;
+  const total = timedQuery(db, 'SELECT COUNT(*) as count FROM processing_jobs', [], 'get').count;
 
   return {
     total,

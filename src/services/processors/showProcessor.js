@@ -43,7 +43,10 @@ export async function processShowJob(job) {
       workerLogger.info({ showId }, 'No episode files found for show');
       await updateJobStatus(job.id, 'completed', 'No episode files to process');
       const end = new Date();
-      workerLogger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END');
+      workerLogger.info(
+        { jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 },
+        'processShowJob END',
+      );
       return { processed: 0, message: 'No episode files found' };
     }
 
@@ -128,21 +131,30 @@ export async function processShowJob(job) {
 
     workerLogger.info({ showId, successful, failed }, 'Show processing completed');
 
-    await updateJobStatus(job.id, 'completed', `Processed ${successful} files successfully, ${failed} failed`);
+    await updateJobStatus(
+      job.id,
+      'completed',
+      `Processed ${successful} files successfully, ${failed} failed`,
+    );
     const end = new Date();
-    workerLogger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END');
+    workerLogger.info(
+      { jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 },
+      'processShowJob END',
+    );
     return {
       processed: successful,
       failed,
       total: episodeFiles.length,
       message: `Processed ${successful}/${episodeFiles.length} files successfully`,
     };
-
   } catch (error) {
     workerLogger.error({ jobId: job.id, showId, error: error.message }, 'Show processing failed');
     await updateJobStatus(job.id, 'failed', `Processing failed: ${error.message}`);
     const end = new Date();
-    workerLogger.info({ jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 }, 'processShowJob END (FAILED)');
+    workerLogger.info(
+      { jobId: job.id, timestamp: end.toISOString(), durationSec: (end - start) / 1000 },
+      'processShowJob END (FAILED)',
+    );
     throw error;
   }
 }
@@ -188,12 +200,16 @@ async function processEpisodeFile(jobId, file, dbJobId, progressCallback) {
     }
 
     // Use the new robust fingerprint pipeline
-    const result = await processEpisodeAndTriggerSeasonDetection(file.id, {
-      chunkLength: 10,
-      overlap: 5,
-      thresholdPercent: 0.5, // Lowered threshold
-      marginSec: 5,
-    }, progressCallback);
+    const result = await processEpisodeAndTriggerSeasonDetection(
+      file.id,
+      {
+        chunkLength: 10,
+        overlap: 5,
+        thresholdPercent: 0.5, // Lowered threshold
+        marginSec: 5,
+      },
+      progressCallback,
+    );
 
     if (!result.success) {
       throw new Error(`Pipeline failed: ${result.reason || 'Unknown error'}`);
@@ -256,13 +272,16 @@ async function processEpisodeFile(jobId, file, dbJobId, progressCallback) {
     });
     workerLogger.info({ jobId, dbJobId }, 'Final completion broadcasted');
 
-    workerLogger.info({
-      jobId,
-      filePath: file.file_path,
-      confidence: segments.confidence,
-      method: seasonDetection.detection_method,
-      approvalStatus: seasonDetection.approval_status,
-    }, 'Episode file processing completed with robust pipeline');
+    workerLogger.info(
+      {
+        jobId,
+        filePath: file.file_path,
+        confidence: segments.confidence,
+        method: seasonDetection.detection_method,
+        approvalStatus: seasonDetection.approval_status,
+      },
+      'Episode file processing completed with robust pipeline',
+    );
 
     workerLogger.info({ jobId, dbJobId }, 'processEpisodeFile END');
     return {
@@ -271,7 +290,6 @@ async function processEpisodeFile(jobId, file, dbJobId, progressCallback) {
       segments,
       seasonDetection,
     };
-
   } catch (error) {
     workerLogger.error({ jobId, dbJobId, error: error.message }, 'processEpisodeFile ERROR');
     throw error;
@@ -318,13 +336,21 @@ export async function extractAudioFromFile(filePath) {
     tempDir = path.join(await getTempDir(), 'audio');
     await fs.mkdir(tempDir, { recursive: true });
   } catch (err) {
-    workerLogger.error({ filePath, tempDir, error: err.message }, 'Failed to create temp audio directory, falling back to /tmp/cliprr/audio');
+    workerLogger.error(
+      { filePath, tempDir, error: err.message },
+      'Failed to create temp audio directory, falling back to /tmp/cliprr/audio',
+    );
     tempDir = path.join('/tmp/cliprr', 'audio');
     try {
       await fs.mkdir(tempDir, { recursive: true });
     } catch (fallbackErr) {
-      workerLogger.error({ filePath, tempDir, error: fallbackErr.message }, 'Failed to create fallback temp audio directory');
-      throw new Error('Unable to create temp audio directory. Please check permissions for the temp directory in settings.');
+      workerLogger.error(
+        { filePath, tempDir, error: fallbackErr.message },
+        'Failed to create fallback temp audio directory',
+      );
+      throw new Error(
+        'Unable to create temp audio directory. Please check permissions for the temp directory in settings.',
+      );
     }
   }
 
@@ -333,24 +359,35 @@ export async function extractAudioFromFile(filePath) {
 
   // Build ffmpeg args: -i <input> -vn -acodec pcm_s16le -ar 44100 -ac 1 <output>
   const ffmpegArgs = [
-    '-i', filePath,
+    '-i',
+    filePath,
     '-vn',
-    '-acodec', 'pcm_s16le',
-    '-ar', '44100',
-    '-ac', '1',
+    '-acodec',
+    'pcm_s16le',
+    '-ar',
+    '44100',
+    '-ac',
+    '1',
     '-y', // Overwrite output if exists
     audioPath,
   ];
 
   // Logging for semaphore acquire/release
-  console.log(`[ffmpeg-semaphore] Waiting to acquire: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`);
+  console.log(
+    `[ffmpeg-semaphore] Waiting to acquire: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`,
+  );
   const value = await ffmpegSemaphore.acquire();
-  console.log(`[ffmpeg-semaphore] Acquired: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`);
+  console.log(
+    `[ffmpeg-semaphore] Acquired: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`,
+  );
   try {
     await new Promise((resolve, reject) => {
       execFile('ffmpeg', ffmpegArgs, (error, stdout, stderr) => {
         if (error) {
-          workerLogger.error({ filePath, error: error.message, stderr }, 'FFmpeg audio extraction failed');
+          workerLogger.error(
+            { filePath, error: error.message, stderr },
+            'FFmpeg audio extraction failed',
+          );
           return reject(new Error(`FFmpeg failed: ${stderr || error.message}`));
         }
         // workerLogger.info({ filePath, audioPath }, 'Audio extracted with FFmpeg');
@@ -359,7 +396,9 @@ export async function extractAudioFromFile(filePath) {
     });
   } finally {
     await ffmpegSemaphore.release(value);
-    console.log(`[ffmpeg-semaphore] Released: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`);
+    console.log(
+      `[ffmpeg-semaphore] Released: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`,
+    );
   }
 
   return audioPath;
@@ -378,7 +417,10 @@ export async function generateAudioFingerprint(audioPath) {
         // workerLogger.info({ audioPath, duration: result.duration }, 'Fingerprint generated');
         resolve(result); // { duration, fingerprint }
       } catch (e) {
-        workerLogger.error({ audioPath, error: e.message, stdout }, 'Failed to parse fpcalc output');
+        workerLogger.error(
+          { audioPath, error: e.message, stdout },
+          'Failed to parse fpcalc output',
+        );
         reject(e);
       }
     });
@@ -422,7 +464,8 @@ export async function detectAudioSegments(fingerprint, audioPath) {
 
   // Simple credits detection: look for patterns in last 2 minutes
   const creditsWindow = Math.min(120, duration * 0.1); // Last 2 minutes or 10% of duration
-  if (creditsWindow >= 30 && duration > 300) { // Only if total duration > 5 minutes
+  if (creditsWindow >= 30 && duration > 300) {
+    // Only if total duration > 5 minutes
     credits = {
       start: duration - creditsWindow,
       end: duration,
@@ -455,14 +498,18 @@ async function trimAudioSegments(segments, originalFilePath, jobId) {
   // workerLogger.info({ originalFilePath }, 'Trimming audio segments');
   // Use latest temp dir from DB
   const tempDir = await getTempDir();
-  const introPath = segments.intro ? {
-    ...segments.intro,
-    trimmedPath: path.join(tempDir, 'trimmed', `intro_${jobId}.mp4`),
-  } : null;
-  const creditsPath = segments.credits ? {
-    ...segments.credits,
-    trimmedPath: path.join(tempDir, 'trimmed', `credits_${jobId}.mp4`),
-  } : null;
+  const introPath = segments.intro
+    ? {
+        ...segments.intro,
+        trimmedPath: path.join(tempDir, 'trimmed', `intro_${jobId}.mp4`),
+      }
+    : null;
+  const creditsPath = segments.credits
+    ? {
+        ...segments.credits,
+        trimmedPath: path.join(tempDir, 'trimmed', `credits_${jobId}.mp4`),
+      }
+    : null;
   return {
     intro: introPath,
     credits: creditsPath,
@@ -513,23 +560,30 @@ async function cleanupTempFile(filePath) {
 export async function fingerprintEpisodeChunks(filePath, chunkLength = 10, overlap = 5) {
   const getAudioDuration = async (file) => {
     return new Promise((resolve, reject) => {
-      execFile('ffprobe', [
-        '-v', 'error',
-        '-show_entries', 'format=duration',
-        '-of', 'default=noprint_wrappers=1:nokey=1',
-        file,
-      ], (err, stdout) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(parseFloat(stdout));
-      });
+      execFile(
+        'ffprobe',
+        [
+          '-v',
+          'error',
+          '-show_entries',
+          'format=duration',
+          '-of',
+          'default=noprint_wrappers=1:nokey=1',
+          file,
+        ],
+        (err, stdout) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(parseFloat(stdout));
+        },
+      );
     });
   };
 
   const duration = await getAudioDuration(filePath);
   const results = [];
-  for (let start = 0; start < duration; start += (chunkLength - overlap)) {
+  for (let start = 0; start < duration; start += chunkLength - overlap) {
     const args = ['-json', '-length', String(chunkLength), '-offset', String(start), filePath];
     const fp = await new Promise((resolve, reject) => {
       execFile('fpcalc', args, (err, stdout) => {

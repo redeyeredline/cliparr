@@ -124,7 +124,12 @@ export default function Hardware() {
     setIsBenchmarking(true);
     setBenchmarkResults(null);
     setError(null);
-    setProgress({ stage: 'Starting', percent: 0, status: 'running', message: 'Starting benchmark...' });
+    setProgress({
+      stage: 'Starting',
+      percent: 0,
+      status: 'running',
+      message: 'Starting benchmark...',
+    });
     try {
       const response = await apiClient.runHardwareBenchmark();
       if (response.status === 'success') {
@@ -194,7 +199,9 @@ export default function Hardware() {
           <ProcessingProfiles
             profiles={profiles}
             hardwareInfo={hardwareInfo}
-            onRefresh={() => { /* intentionally left blank */ }}
+            onRefresh={() => {
+              /* intentionally left blank */
+            }}
           />
         </div>
 

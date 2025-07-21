@@ -9,7 +9,7 @@ import { wsClient } from '../services/websocket.frontend.js';
 import AlphabetSidebar from '../components/AlphabetSidebar';
 import { useToast } from '../components/ToastContext';
 import EmptyState from '../components/EmptyState.tsx';
-import { useShiftSelect } from '../utils/selectionUtils';
+import { useShiftSelect } from '../utils/selectionUtils.tsx';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface Show {
@@ -51,7 +51,11 @@ function HomePage() {
   const [shows, setShows] = useState<Show[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
-  const [scanStatus, setScanStatus] = useState<{ active: number; completed: number; failed: number }>({
+  const [scanStatus, setScanStatus] = useState<{
+    active: number;
+    completed: number;
+    failed: number;
+  }>({
     active: 0,
     completed: 0,
     failed: 0,
@@ -79,9 +83,10 @@ function HomePage() {
     if (!searchQuery) {
       return shows;
     }
-    return shows.filter((show) =>
-      show.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      show.path.toLowerCase().includes(searchQuery.toLowerCase()),
+    return shows.filter(
+      (show) =>
+        show.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        show.path.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }, [shows, searchQuery]);
 
@@ -199,7 +204,10 @@ function HomePage() {
     try {
       logger.info('Fetching shows from API...');
       const data = await apiClient.getShows();
-      logger.info({ showsCount: data.shows?.length, total: data.total }, 'Received shows data from API');
+      logger.info(
+        { showsCount: data.shows?.length, total: data.total },
+        'Received shows data from API',
+      );
       setShows(data.shows);
     } catch (err) {
       logger.error('Failed to fetch shows:', err);
@@ -481,7 +489,6 @@ function HomePage() {
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="flex-1 overflow-auto p-6">
         <div className="h-full flex flex-col">
-
           {/* Search Bar */}
           <div className="mb-5">
             <div className="relative">
@@ -511,11 +518,7 @@ function HomePage() {
             <div className="flex items-center space-x-6">
               <div className="text-sm text-gray-400">
                 <span className="text-white font-medium">{sortedShows.length}</span> shows
-                {searchQuery && (
-                  <span className="ml-2">
-                    (filtered from {shows.length})
-                  </span>
-                )}
+                {searchQuery && <span className="ml-2">(filtered from {shows.length})</span>}
               </div>
               {selected.length > 0 && (
                 <div className="text-sm text-blue-400">
@@ -601,8 +604,7 @@ function HomePage() {
                             <input
                               type="checkbox"
                               checked={
-                                selected.length === sortedShows.length &&
-                                sortedShows.length > 0
+                                selected.length === sortedShows.length && sortedShows.length > 0
                               }
                               onChange={handleSelectAll}
                               className={`
@@ -623,7 +625,9 @@ function HomePage() {
                           role="columnheader"
                           aria-sort={
                             sortKey === 'title'
-                              ? (sortDirection === 'asc' ? 'ascending' : 'descending')
+                              ? sortDirection === 'asc'
+                                ? 'ascending'
+                                : 'descending'
                               : 'none'
                           }
                         >
@@ -633,9 +637,11 @@ function HomePage() {
                               <ChevronUp
                                 className={`
                                   w-3 h-3 transition-colors duration-200 
-                                  ${sortKey === 'title' && sortDirection === 'asc'
-                ? 'text-blue-400'
-                : 'text-gray-500 group-hover:text-gray-400'}
+                                  ${
+                                    sortKey === 'title' && sortDirection === 'asc'
+                                      ? 'text-blue-400'
+                                      : 'text-gray-500 group-hover:text-gray-400'
+                                  }
                                 `}
                               />
                               <ChevronDown
@@ -658,7 +664,9 @@ function HomePage() {
                           role="columnheader"
                           aria-sort={
                             sortKey === 'path'
-                              ? (sortDirection === 'asc' ? 'ascending' : 'descending')
+                              ? sortDirection === 'asc'
+                                ? 'ascending'
+                                : 'descending'
                               : 'none'
                           }
                         >
@@ -696,9 +704,7 @@ function HomePage() {
                           }}
                           data-index={idx}
                           className={`group transition-all duration-200 hover:bg-gray-700/20 ${
-                            isSelected(show.id)
-                              ? 'bg-blue-500/10 border-l-4 border-blue-500'
-                              : ''
+                            isSelected(show.id) ? 'bg-blue-500/10 border-l-4 border-blue-500' : ''
                           }`}
                           role="row"
                           aria-selected={isSelected(show.id)}
@@ -753,10 +759,12 @@ function HomePage() {
                   {/* Empty State */}
                   {sortedShows.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                      <div className={`
+                      <div
+                        className={`
                         w-16 h-16 bg-gray-700/50 rounded-full flex items-center 
                         justify-center mb-4
-                      `}>
+                      `}
+                      >
                         <Search className="w-8 h-8" />
                       </div>
                       <p className="text-lg font-medium">No shows found</p>

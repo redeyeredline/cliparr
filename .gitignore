@@ -113,3 +113,11 @@ Thumbs.db
 ffmpeg-7.1.1.tar.bz2
 ffmpeg-7.1.1/
 lint-results.json
+.cursor
+.cursorrules
+.cursorignore
+ffmpeg-7.1.1.tar.bz2
+ffmpeg-7.1.1/
+lint-results.json
+.prettierrc
+.prettierignore

@@ -50,16 +50,15 @@ export default function FolderPickerModal({ isOpen, onClose, onSelect, initialPa
     const parts = currentPath.split('/').filter(Boolean);
     return (
       <div className="flex items-center gap-1 text-sm text-slate-300 mb-4">
-        <button onClick={() => handleNavigate('/')} className="hover:underline">/</button>
+        <button onClick={() => handleNavigate('/')} className="hover:underline">
+          /
+        </button>
         {parts.map((part, idx) => {
           const segmentPath = '/' + parts.slice(0, idx + 1).join('/');
           return (
             <React.Fragment key={segmentPath}>
               <ChevronRight className="inline w-4 h-4 mx-1 text-slate-500" />
-              <button
-                onClick={() => handleNavigate(segmentPath)}
-                className="hover:underline"
-              >
+              <button onClick={() => handleNavigate(segmentPath)} className="hover:underline">
                 {part}
               </button>
             </React.Fragment>

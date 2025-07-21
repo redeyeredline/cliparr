@@ -7,23 +7,34 @@ export async function removeFingerprintData(episodeFileId) {
     const db = await getDb();
 
     // Remove from episode_fingerprints table
-    const fingerprintResult = db.prepare(`
+    const fingerprintResult = db
+      .prepare(
+        `
       DELETE FROM episode_fingerprints 
       WHERE episode_file_id = ?
-    `).run(episodeFileId);
+    `,
+      )
+      .run(episodeFileId);
 
     // Remove from detection_results table
-    const detectionResult = db.prepare(`
+    const detectionResult = db
+      .prepare(
+        `
       DELETE FROM detection_results 
       WHERE episode_file_id = ?
-    `).run(episodeFileId);
+    `,
+      )
+      .run(episodeFileId);
 
     if (fingerprintResult.changes > 0 || detectionResult.changes > 0) {
-      workerLogger.info({
-        episodeFileId,
-        fingerprintsRemoved: fingerprintResult.changes,
-        detectionsRemoved: detectionResult.changes,
-      }, 'Removed fingerprint data from database');
+      workerLogger.info(
+        {
+          episodeFileId,
+          fingerprintsRemoved: fingerprintResult.changes,
+          detectionsRemoved: detectionResult.changes,
+        },
+        'Removed fingerprint data from database',
+      );
     }
   } catch (error) {
     workerLogger.warn({ episodeFileId, error: error.message }, 'Failed to remove fingerprint data');
@@ -36,16 +47,23 @@ export async function removeDetectionData(episodeFileId) {
     const db = await getDb();
 
     // Only remove from detection_results table, keep fingerprints
-    const detectionResult = db.prepare(`
+    const detectionResult = db
+      .prepare(
+        `
       DELETE FROM detection_results 
       WHERE episode_file_id = ?
-    `).run(episodeFileId);
+    `,
+      )
+      .run(episodeFileId);
 
     if (detectionResult.changes > 0) {
-      workerLogger.info({
-        episodeFileId,
-        detectionsRemoved: detectionResult.changes,
-      }, 'Removed detection results from database (fingerprints preserved)');
+      workerLogger.info(
+        {
+          episodeFileId,
+          detectionsRemoved: detectionResult.changes,
+        },
+        'Removed detection results from database (fingerprints preserved)',
+      );
     }
   } catch (error) {
     workerLogger.warn({ episodeFileId, error: error.message }, 'Failed to remove detection data');

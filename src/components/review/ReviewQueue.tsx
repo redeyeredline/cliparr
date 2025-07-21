@@ -28,11 +28,16 @@ export default function ReviewQueue({
 
   const getJobsForTab = (tab: string) => {
     switch (tab) {
-      case 'processing': return jobs.filter((j) => j.status === 'processing' || j.status === 'scanning');
-      case 'pending': return jobs.filter((j) => j.status === 'detected' && !j.manual_verified);
-      case 'verified': return jobs.filter((j) => j.manual_verified && j.status !== 'completed');
-      case 'completed': return jobs.filter((j) => j.status === 'completed');
-      default: return [];
+      case 'processing':
+        return jobs.filter((j) => j.status === 'processing' || j.status === 'scanning');
+      case 'pending':
+        return jobs.filter((j) => j.status === 'detected' && !j.manual_verified);
+      case 'verified':
+        return jobs.filter((j) => j.manual_verified && j.status !== 'completed');
+      case 'completed':
+        return jobs.filter((j) => j.status === 'completed');
+      default:
+        return [];
     }
   };
 
@@ -62,7 +67,8 @@ export default function ReviewQueue({
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold truncate text-sm text-white">{mediaFile.file_name}</h3>
             <p className="text-xs text-gray-400 truncate">
-              {mediaFile.series_name} • {formatDistanceToNow(new Date(job.created_date), { addSuffix: true })}
+              {mediaFile.series_name} •{' '}
+              {formatDistanceToNow(new Date(job.created_date), { addSuffix: true })}
             </p>
           </div>
           <Badge variant="outline" className="text-xs border-blue-700 text-blue-300 bg-gray-800/60">
@@ -77,7 +83,11 @@ export default function ReviewQueue({
     if (isLoading) {
       return (
         <div className="space-y-3 px-4">
-          {Array(5).fill(0).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+          {Array(5)
+            .fill(0)
+            .map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
         </div>
       );
     }
@@ -94,7 +104,9 @@ export default function ReviewQueue({
     return (
       <div className="space-y-2 p-2">
         <AnimatePresence>
-          {filteredJobs.map((job) => <JobItem key={job.id} job={job} />)}
+          {filteredJobs.map((job) => (
+            <JobItem key={job.id} job={job} />
+          ))}
         </AnimatePresence>
       </div>
     );
@@ -104,10 +116,30 @@ export default function ReviewQueue({
     <Tabs defaultValue="processing" className="flex-1 flex flex-col">
       <div className="px-4 pt-2">
         <TabsList className="grid w-full grid-cols-4 bg-gray-900/80 rounded-xl">
-          <TabsTrigger value="processing" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg">Processing</TabsTrigger>
-          <TabsTrigger value="pending" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg">Pending</TabsTrigger>
-          <TabsTrigger value="verified" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg">Verified</TabsTrigger>
-          <TabsTrigger value="completed" className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg">Done</TabsTrigger>
+          <TabsTrigger
+            value="processing"
+            className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg"
+          >
+            Processing
+          </TabsTrigger>
+          <TabsTrigger
+            value="pending"
+            className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg"
+          >
+            Pending
+          </TabsTrigger>
+          <TabsTrigger
+            value="verified"
+            className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg"
+          >
+            Verified
+          </TabsTrigger>
+          <TabsTrigger
+            value="completed"
+            className="data-[state=active]:bg-gray-800 data-[state=active]:text-white text-gray-300 rounded-lg"
+          >
+            Done
+          </TabsTrigger>
         </TabsList>
       </div>
       <TabsContent value="processing" className="flex-1 overflow-y-auto mt-0">

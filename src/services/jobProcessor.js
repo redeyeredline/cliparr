@@ -2,7 +2,12 @@
 // Job processing functions will be moved here from queue.js
 import { workerLogger } from './logger.js';
 import { getDb, getEpisodeFileById } from '../database/Db_Operations.js';
-import { processEpisodeFile, extractAudioFromFile, generateAudioFingerprint, detectAudioSegments } from '../services/processors/showProcessor.js';
+import {
+  processEpisodeFile,
+  extractAudioFromFile,
+  generateAudioFingerprint,
+  detectAudioSegments,
+} from '../services/processors/showProcessor.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 

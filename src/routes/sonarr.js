@@ -30,7 +30,9 @@ router.get('/unimported', async (req, res) => {
     const { shows: importedShows } = getImportedShows(db, 1, 10000);
     const importedSet = new Set(importedShows.map((show) => show.title + '|' + show.path));
 
-    const unimportedShows = allSonarrShows.filter((show) => !importedSet.has(show.title + '|' + show.path));
+    const unimportedShows = allSonarrShows.filter(
+      (show) => !importedSet.has(show.title + '|' + show.path),
+    );
 
     // Fetch episode counts for each unimported show
     const showsWithEpisodeCounts = await Promise.all(
@@ -79,13 +81,15 @@ async function importShowById(showId, req, wss, db) {
     // Send initial progress
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({
-          type: 'import_progress',
-          showId: null, // will be set after insert
-          status: 'started',
-          message: 'Starting import process...',
-          timestamp: new Date().toISOString(),
-        }));
+        client.send(
+          JSON.stringify({
+            type: 'import_progress',
+            showId: null, // will be set after insert
+            status: 'started',
+            message: 'Starting import process...',
+            timestamp: new Date().toISOString(),
+          }),
+        );
       }
     });
 
@@ -120,7 +124,9 @@ async function importShowById(showId, req, wss, db) {
           if (m) {
             const sNum = parseInt(m[1], 10);
             const eNum = parseInt(m[2], 10);
-            const epMatch = episodes.find((e) => e.seasonNumber === sNum && e.episodeNumber === eNum);
+            const epMatch = episodes.find(
+              (e) => e.seasonNumber === sNum && e.episodeNumber === eNum,
+            );
             if (epMatch) {
               epId = epMatch.id;
             }
@@ -169,13 +175,15 @@ async function importShowById(showId, req, wss, db) {
     // Send completion update with local DB show id
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({
-          type: 'import_progress',
-          showId: dbShowId,
-          status: 'completed',
-          message: 'Import completed successfully',
-          timestamp: new Date().toISOString(),
-        }));
+        client.send(
+          JSON.stringify({
+            type: 'import_progress',
+            showId: dbShowId,
+            status: 'completed',
+            message: 'Import completed successfully',
+            timestamp: new Date().toISOString(),
+          }),
+        );
       }
     });
 
@@ -185,13 +193,15 @@ async function importShowById(showId, req, wss, db) {
     // Send error update
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({
-          type: 'import_progress',
-          showId: dbShowId,
-          status: 'error',
-          message: 'Import failed: ' + error.message,
-          timestamp: new Date().toISOString(),
-        }));
+        client.send(
+          JSON.stringify({
+            type: 'import_progress',
+            showId: dbShowId,
+            status: 'error',
+            message: 'Import failed: ' + error.message,
+            timestamp: new Date().toISOString(),
+          }),
+        );
       }
     });
     return { success: false, showId: dbShowId, error: error.message };

@@ -7,10 +7,11 @@ class WebSocketClient {
     this.ws = null;
     this.listeners = new Map();
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
-    this.reconnectDelay = 5000;
+    this.baseReconnectDelay = 2000; // 2s
+    this.maxReconnectDelay = 60000; // 60s
     this.isConnecting = false;
     this.lastConnectionState = null;
+    this.reconnectTimeout = null;
   }
 
   connect() {
@@ -27,6 +28,10 @@ class WebSocketClient {
       this.ws.onopen = () => {
         this.reconnectAttempts = 0;
         this.isConnecting = false;
+        if (this.reconnectTimeout) {
+          clearTimeout(this.reconnectTimeout);
+          this.reconnectTimeout = null;
+        }
         if (this.lastConnectionState !== 'connected') {
           this.lastConnectionState = 'connected';
           this.notifyListeners('connection', { status: 'connected' });
@@ -40,11 +45,12 @@ class WebSocketClient {
           // Only log errors, not all messages
           if (data.type === 'job_update' && data.status === 'error') {
             // Suppress expected errors that occur during job deletion
-            if (data.error && (
-              data.error.includes('could not renew lock') ||
-              data.error.includes('Missing key for job') ||
-              data.error.includes('not found')
-            )) {
+            if (
+              data.error &&
+              (data.error.includes('could not renew lock') ||
+                data.error.includes('Missing key for job') ||
+                data.error.includes('not found'))
+            ) {
               // Don't log these expected errors
               return;
             }
@@ -75,17 +81,28 @@ class WebSocketClient {
           this.lastConnectionState = 'disconnected';
           this.notifyListeners('connection', { status: 'disconnected' });
         }
-
-        // Attempt to reconnect if not at max attempts
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          setTimeout(() => this.connect(), this.reconnectDelay);
-        }
+        // Exponential backoff with jitter for reconnection
+        this.reconnectAttempts++;
+        const expDelay = Math.min(
+          this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
+          this.maxReconnectDelay,
+        );
+        // Add jitter: random between 0.5x and 1.5x of expDelay
+        const jitter = expDelay * (0.5 + Math.random());
+        this.reconnectTimeout = setTimeout(() => this.connect(), jitter);
       };
     } catch (error) {
       logger.error('[WebSocketClient] Failed to create WebSocket connection:', error);
       this.isConnecting = false;
       this.notifyListeners('error', error);
+      // Try reconnecting with backoff
+      this.reconnectAttempts++;
+      const expDelay = Math.min(
+        this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
+        this.maxReconnectDelay,
+      );
+      const jitter = expDelay * (0.5 + Math.random());
+      this.reconnectTimeout = setTimeout(() => this.connect(), jitter);
     }
   }
 

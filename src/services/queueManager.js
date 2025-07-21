@@ -155,7 +155,10 @@ export async function initializeQueues() {
             workerLogger.warn('Could not fetch job for dbJobId:', { jobId, err });
           }
         }
-        workerLogger.info({ jobId, dbJobId, progress: data }, '[QueueEvents] Broadcasting job update');
+        workerLogger.info(
+          { jobId, dbJobId, progress: data },
+          '[QueueEvents] Broadcasting job update',
+        );
         broadcastJobUpdate({
           type: 'job_update',
           jobId,
@@ -165,7 +168,9 @@ export async function initializeQueues() {
         });
       });
     }
-    workerLogger.info(`Queue initialization completed. ${initializedQueues.length}/${Object.keys(QUEUE_CONFIG).length} queues initialized successfully.`);
+    workerLogger.info(
+      `Queue initialization completed. ${initializedQueues.length}/${Object.keys(QUEUE_CONFIG).length} queues initialized successfully.`,
+    );
     if (initializedQueues.length === 0) {
       throw new Error('No queues were initialized successfully');
     }
@@ -182,26 +187,38 @@ export async function startQueues() {
     const startedWorkers = [];
     for (const [name, config] of Object.entries(QUEUE_CONFIG)) {
       try {
-        workerLogger.info(`Starting worker for queue: ${config.name} with concurrency ${config.concurrency}`);
-        const worker = new Worker(config.name, async (job) => {
-          const { processJob } = await import('./jobProcessor.js');
-          return await processJob(job.name, job);
-        }, {
-          connection: redis,
-          concurrency: config.concurrency,
-          stalledInterval: 60000,
-          maxStalledCount: 2,
-        });
-        workerLogger.info(`Worker instance created for ${name} with concurrency: ${config.concurrency}`);
+        workerLogger.info(
+          `Starting worker for queue: ${config.name} with concurrency ${config.concurrency}`,
+        );
+        const worker = new Worker(
+          config.name,
+          async (job) => {
+            const { processJob } = await import('./jobProcessor.js');
+            return await processJob(job.name, job);
+          },
+          {
+            connection: redis,
+            concurrency: config.concurrency,
+            stalledInterval: 60000,
+            maxStalledCount: 2,
+          },
+        );
+        workerLogger.info(
+          `Worker instance created for ${name} with concurrency: ${config.concurrency}`,
+        );
         setupWorkerEvents(worker, name);
         workers[name] = worker;
         startedWorkers.push(name);
-        workerLogger.info(`Worker for ${name} started successfully with concurrency ${config.concurrency}`);
+        workerLogger.info(
+          `Worker for ${name} started successfully with concurrency ${config.concurrency}`,
+        );
       } catch (error) {
         workerLogger.error(`Failed to start worker for ${name}:`, error);
       }
     }
-    workerLogger.info(`Worker startup completed. ${startedWorkers.length}/${Object.keys(QUEUE_CONFIG).length} workers started successfully.`);
+    workerLogger.info(
+      `Worker startup completed. ${startedWorkers.length}/${Object.keys(QUEUE_CONFIG).length} workers started successfully.`,
+    );
     if (startedWorkers.length === 0) {
       throw new Error('No workers were started successfully');
     }
@@ -257,12 +274,7 @@ export async function ensureQueuesInitialized() {
 
 export async function pauseCpuWorkers() {
   for (const [name, worker] of Object.entries(workers)) {
-    if ([
-      'audio-extraction',
-      'fingerprinting',
-      'detection',
-      'episode-processing',
-    ].includes(name)) {
+    if (['audio-extraction', 'fingerprinting', 'detection', 'episode-processing'].includes(name)) {
       if (worker && typeof worker.pause === 'function') {
         await worker.pause(true);
         workerLogger.info(`CPU worker ${name} paused`);
@@ -273,12 +285,7 @@ export async function pauseCpuWorkers() {
 
 export async function resumeCpuWorkers() {
   for (const [name, worker] of Object.entries(workers)) {
-    if ([
-      'audio-extraction',
-      'fingerprinting',
-      'detection',
-      'episode-processing',
-    ].includes(name)) {
+    if (['audio-extraction', 'fingerprinting', 'detection', 'episode-processing'].includes(name)) {
       if (worker && typeof worker.resume === 'function') {
         await worker.resume();
         workerLogger.info(`CPU worker ${name} resumed`);

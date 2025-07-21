@@ -21,7 +21,10 @@ export default function ReviewStats({ jobs }: ReviewStatsProps) {
   return (
     <div className="flex gap-4">
       {stats.map((stat) => (
-        <div key={stat.label} className="border border-gray-700/30 rounded-2xl shadow-2xl bg-gray-800/30 backdrop-blur-sm">
+        <div
+          key={stat.label}
+          className="border border-gray-700/30 rounded-2xl shadow-2xl bg-gray-800/30 backdrop-blur-sm"
+        >
           <div className="p-4">
             <div className="flex items-center gap-3">
               <stat.icon className={`w-5 h-5 ${stat.color}`} />

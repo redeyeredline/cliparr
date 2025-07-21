@@ -3,7 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Play,
   Pause,
@@ -20,6 +26,7 @@ import { ProcessingJob, MediaFile, ProcessingProfile } from '../entities/all';
 import { ProcessingJobEntity } from '../entities/ProcessingJob';
 import { apiClient } from '../../integration/api-client';
 import { FixedSizeList as VirtualList } from 'react-window';
+import { filterJobsByCategory } from '@/utils/jobFilters.tsx';
 
 interface ProcessingQueueProps {
   jobs: ProcessingJob[];
@@ -32,7 +39,10 @@ interface ProcessingQueueProps {
   setSelected: (ids: (string | number)[]) => void;
   onBulkDelete?: () => Promise<void>;
   bulkDeleteLoading?: boolean;
-  jobProgress?: Record<string, { progress: number; fps: number; currentFile: any; updated: number }>;
+  jobProgress?: Record<
+    string,
+    { progress: number; fps: number; currentFile: any; updated: number }
+  >;
 }
 
 export default function ProcessingQueue({
@@ -52,7 +62,17 @@ export default function ProcessingQueue({
   const [selectAllLoading, setSelectAllLoading] = useState(false);
   const [allJobIds, setAllJobIds] = useState<(string | number)[]>([]);
   const jobsWithId = jobs.filter((job) => job.id !== undefined && job.id !== null);
-  const filteredJobs = jobsWithId.filter((job) => filter === 'all' || job.status === filter);
+  // Update dropdown filter options and logic
+  const filterOptions = [
+    { value: 'all', label: 'All Jobs' },
+    { value: 'queued', label: 'Queued' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'failed', label: 'Failed' },
+  ];
+
+  // Use the filterJobsByCategory utility for filtering
+  const filteredJobs = filterJobsByCategory(jobsWithId, filter as any);
   console.log('ProcessingQueue render:', { isLoading, jobs, filteredJobs });
   const [cpuLimit, setCpuLimit] = useState<number>(2);
   const [gpuLimit, setGpuLimit] = useState<number>(1);
@@ -126,24 +146,11 @@ export default function ProcessingQueue({
 
   // Selection logic - now based on allJobIds instead of filteredJobs
   const allSelected = allJobIds.length > 0 && selected.length === allJobIds.length;
-  const handleSelectAll = async () => {
+  const handleSelectAll = () => {
     if (allSelected) {
       setSelected([]);
     } else {
-      setSelectAllLoading(true);
-      try {
-        // Always fetch all job IDs from the backend
-        const ids = await ProcessingJobEntity.getAllIds('all');
-        setAllJobIds(ids);
-        setSelected([...ids.filter((id) => id !== undefined && id !== null)]);
-      } catch (error) {
-        console.error('Error fetching all job IDs:', error);
-        // Fallback to using filtered jobs
-        setAllJobIds(filteredJobs.map((job) => job.id!));
-        setSelected(filteredJobs.map((job) => job.id!));
-      } finally {
-        setSelectAllLoading(false);
-      }
+      setSelected(filteredJobs.map((job) => job.id!));
     }
   };
 
@@ -216,9 +223,7 @@ export default function ProcessingQueue({
             </div>
             {selected.length > 0 && onBulkDelete && (
               <div className="flex items-center gap-2 ml-4">
-                <span className="text-xs text-slate-300">
-                  {selected.length} selected
-                </span>
+                <span className="text-xs text-slate-300">{selected.length} selected</span>
                 <Button
                   onClick={onBulkDelete}
                   size="sm"
@@ -229,7 +234,26 @@ export default function ProcessingQueue({
                   <Trash2 className="w-3 h-3 mr-1" />
                   <span>{bulkDeleteLoading ? 'Deleting...' : 'Delete'}</span>
                   {bulkDeleteLoading && (
-                    <svg className="animate-spin ml-2 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+                    <svg
+                      className="animate-spin ml-2 h-3 w-3 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8z"
+                      ></path>
+                    </svg>
                   )}
                 </Button>
               </div>
@@ -270,7 +294,11 @@ export default function ProcessingQueue({
                 aria-label={cpuPaused ? 'Resume CPU workers' : 'Pause CPU workers'}
                 title={cpuPaused ? 'Resume CPU workers' : 'Pause CPU workers'}
               >
-                {cpuPaused ? <Play className="w-3 h-3 text-white" /> : <Pause className="w-3 h-3 text-white" />}
+                {cpuPaused ? (
+                  <Play className="w-3 h-3 text-white" />
+                ) : (
+                  <Pause className="w-3 h-3 text-white" />
+                )}
               </button>
             </div>
             {/* GPU Controls */}
@@ -306,12 +334,18 @@ export default function ProcessingQueue({
                 aria-label={gpuPaused ? 'Resume GPU workers' : 'Pause GPU workers'}
                 title={gpuPaused ? 'Resume GPU workers' : 'Pause GPU workers'}
               >
-                {gpuPaused ? <Play className="w-3 h-3 text-white" /> : <Pause className="w-3 h-3 text-white" />}
+                {gpuPaused ? (
+                  <Play className="w-3 h-3 text-white" />
+                ) : (
+                  <Pause className="w-3 h-3 text-white" />
+                )}
               </button>
             </div>
             {/* Save/Loading indicator with fixed width */}
             <div className="w-6 flex items-center justify-center">
-              {workerSaving === 'saving' && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
+              {workerSaving === 'saving' && (
+                <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+              )}
               {workerSaving === 'saved' && <CheckCircle2 className="w-4 h-4 text-green-400" />}
             </div>
           </div>
@@ -321,11 +355,11 @@ export default function ProcessingQueue({
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent className="bg-slate-900 text-slate-200 border-slate-700">
-              <SelectItem value="all">All Jobs</SelectItem>
-              <SelectItem value="processing">Processing</SelectItem>
-              <SelectItem value="verified">Queued (Verified)</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
+              {filterOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -375,15 +409,19 @@ export default function ProcessingQueue({
                           {mediaFile?.file_name || 'Loading...'}
                         </h3>
                         <div className="flex items-center gap-2">
-                          <Badge className={`${config.color} capitalize rounded-full px-3 py-1 text-xs font-semibold border border-slate-700`}> <StatusIcon className="w-3 h-3 mr-1.5" /> {job.status}
+                          <Badge
+                            className={`${config.color} capitalize rounded-full px-3 py-1 text-xs font-semibold border border-slate-700`}
+                          >
+                            {' '}
+                            <StatusIcon className="w-3 h-3 mr-1.5" /> {job.status}
                           </Badge>
-                          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs border-slate-700 text-slate-200">
+                          <Badge
+                            variant="outline"
+                            className="rounded-full px-3 py-1 text-xs border-slate-700 text-slate-200"
+                          >
                             Profile: {profiles.find((p) => p.id === job.profile_id)?.name || 'Auto'}
                           </Badge>
                         </div>
-                        {job.status === 'processing' && (
-                          <Progress value={Math.random() * 80 + 10} className="h-2 mt-2 rounded-full bg-slate-700" />
-                        )}
                       </div>
                       {job.status === 'processing' && (
                         <Button

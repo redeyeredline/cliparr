@@ -2,7 +2,7 @@
 // Provides a searchable interface for selecting and importing unimported shows with shift-select support.
 import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 import { Download, X, Check, ChevronUp, ChevronDown } from 'lucide-react';
-import { useShiftSelect } from '../utils/selectionUtils';
+import { useShiftSelect } from '../utils/selectionUtils.tsx';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle } from '@/components/ui/card';
 
 export interface Show {
@@ -156,7 +156,9 @@ export default function ImportModal({
                         <div className="flex items-center justify-center">
                           <input
                             type="checkbox"
-                            checked={sortedShows.length > 0 && selected.length === sortedShows.length}
+                            checked={
+                              sortedShows.length > 0 && selected.length === sortedShows.length
+                            }
                             onChange={handleSelectAll}
                             className="w-4 h-4 text-blue-600 bg-gray-900/40 border-white/20 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
                             aria-label="Select all shows"
@@ -173,9 +175,7 @@ export default function ImportModal({
                       <tr
                         key={show.id}
                         className={`group transition-all duration-200 hover:bg-gray-800/40 ${
-                          isSelected(show.id)
-                            ? 'bg-blue-500/10 border-l-4 border-blue-500'
-                            : ''
+                          isSelected(show.id) ? 'bg-blue-500/10 border-l-4 border-blue-500' : ''
                         }`}
                         role="row"
                         aria-selected={isSelected(show.id)}
@@ -185,7 +185,9 @@ export default function ImportModal({
                             <input
                               type="checkbox"
                               checked={isSelected(show.id)}
-                              onChange={(e) => handleToggle(show.id, e.nativeEvent as unknown as React.MouseEvent)}
+                              onChange={(e) =>
+                                handleToggle(show.id, e.nativeEvent as unknown as React.MouseEvent)
+                              }
                               className="w-4 h-4 text-blue-600 bg-gray-900/40 border-white/20 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
                             />
                           </div>
@@ -194,10 +196,14 @@ export default function ImportModal({
                           <div className="flex items-center justify-between w-full">
                             <div className="flex items-center">
                               <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                              <div className="text-white font-medium text-lg drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]">{show.title}</div>
+                              <div className="text-white font-medium text-lg drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]">
+                                {show.title}
+                              </div>
                             </div>
                             {show.episodeFileCount === 0 && (
-                              <span className="text-red-400 text-sm font-semibold whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]">No downloaded files in Sonarr</span>
+                              <span className="text-red-400 text-sm font-semibold whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]">
+                                No downloaded files in Sonarr
+                              </span>
                             )}
                           </div>
                         </td>

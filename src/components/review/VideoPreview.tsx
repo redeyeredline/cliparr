@@ -34,7 +34,14 @@ const formatTime = (seconds: number, totalDuration: number) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-const TimelineEditor = ({ title, icon: Icon, range, onRangeChange, totalDuration, color }: TimelineEditorProps) => (
+const TimelineEditor = ({
+  title,
+  icon: Icon,
+  range,
+  onRangeChange,
+  totalDuration,
+  color,
+}: TimelineEditorProps) => (
   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-center gap-3">
@@ -57,7 +64,13 @@ const TimelineEditor = ({ title, icon: Icon, range, onRangeChange, totalDuration
   </motion.div>
 );
 
-export default function VideoPreview({ job, mediaFile, onVerify, onUpdateTimestamps, onSkip }: VideoPreviewProps) {
+export default function VideoPreview({
+  job,
+  mediaFile,
+  onVerify,
+  onUpdateTimestamps,
+  onSkip,
+}: VideoPreviewProps) {
   const [intro, setIntro] = useState<[number, number]>([0, 0]);
   const [credits, setCredits] = useState<[number, number]>([0, 0]);
   const [hasChanges, setHasChanges] = useState(false);
@@ -111,7 +124,10 @@ export default function VideoPreview({ job, mediaFile, onVerify, onUpdateTimesta
     <div className="h-full flex flex-col border border-gray-700/30 shadow-2xl bg-gray-800/30 rounded-2xl backdrop-blur-sm">
       <div className="p-6 border-b border-gray-700/30">
         <div className="truncate text-2xl font-bold text-white">{mediaFile.file_name}</div>
-        <p className="text-gray-400">{mediaFile.series_name} S{mediaFile.season?.toString().padStart(2, '0')}E{mediaFile.episode?.toString().padStart(2, '0')}</p>
+        <p className="text-gray-400">
+          {mediaFile.series_name} S{mediaFile.season?.toString().padStart(2, '0')}E
+          {mediaFile.episode?.toString().padStart(2, '0')}
+        </p>
       </div>
       <div className="flex-1 flex flex-col gap-8 p-6">
         {/* Video Player Placeholder */}
@@ -154,11 +170,18 @@ export default function VideoPreview({ job, mediaFile, onVerify, onUpdateTimesta
           Skip
         </Button>
         {hasChanges && (
-          <Button variant="outline" onClick={handleSaveChanges} className="border-blue-700 text-blue-300">
+          <Button
+            variant="outline"
+            onClick={handleSaveChanges}
+            className="border-blue-700 text-blue-300"
+          >
             Save Changes
           </Button>
         )}
-        <Button onClick={() => onVerify(job.id!, true)} className="bg-emerald-700 hover:bg-emerald-800 text-white">
+        <Button
+          onClick={() => onVerify(job.id!, true)}
+          className="bg-emerald-700 hover:bg-emerald-800 text-white"
+        >
           <Check className="w-4 h-4 mr-2" />
           Approve
         </Button>

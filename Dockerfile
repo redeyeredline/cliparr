@@ -70,6 +70,9 @@ RUN chmod +x docker-start.sh && \
     mkdir -p data logs temp src/database/data && \
     npm rebuild better-sqlite3
 
+# Ensure dist directory is present (from frontend build)
+RUN if [ ! -d /app/dist ]; then echo 'ERROR: /app/dist missing. Frontend build failed.'; exit 1; fi
+
 EXPOSE 8484
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

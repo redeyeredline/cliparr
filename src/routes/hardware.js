@@ -83,7 +83,9 @@ router.get('/info', async (req, res) => {
     res.json({ status: 'success', data: hardwareInfo });
   } catch (error) {
     logger.error('Failed to get hardware info:', error);
-    res.status(500).json({ status: 'error', error: 'Failed to get hardware info', details: error.message });
+    res
+      .status(500)
+      .json({ status: 'error', error: 'Failed to get hardware info', details: error.message });
   }
 });
 
@@ -97,7 +99,9 @@ router.post('/detect', async (req, res) => {
     res.json({ status: 'success', data: hardwareInfo, timestamp: new Date().toISOString() });
   } catch (error) {
     logger.error('Hardware detection failed:', error);
-    res.status(500).json({ status: 'error', error: 'Hardware detection failed', details: error.message });
+    res
+      .status(500)
+      .json({ status: 'error', error: 'Hardware detection failed', details: error.message });
   }
 });
 
@@ -113,7 +117,9 @@ router.get('/benchmark/results', async (req, res) => {
     res.json({ status: 'success', data: results });
   } catch (error) {
     logger.error('Failed to get benchmark results:', error);
-    res.status(500).json({ status: 'error', error: 'Failed to get benchmark results', details: error.message });
+    res
+      .status(500)
+      .json({ status: 'error', error: 'Failed to get benchmark results', details: error.message });
   }
 });
 
@@ -131,11 +137,13 @@ router.post('/benchmark', async (req, res) => {
       }
       wss.clients.forEach((client) => {
         if (client.readyState === 1) {
-          client.send(JSON.stringify({
-            type: 'benchmark_progress',
-            ...progress,
-            timestamp: new Date().toISOString(),
-          }));
+          client.send(
+            JSON.stringify({
+              type: 'benchmark_progress',
+              ...progress,
+              timestamp: new Date().toISOString(),
+            }),
+          );
         }
       });
     };
@@ -159,7 +167,9 @@ router.post('/benchmark', async (req, res) => {
     });
   } catch (error) {
     logger.error('Hardware benchmark failed:', error);
-    res.status(500).json({ status: 'error', error: 'Hardware benchmark failed', details: error.message });
+    res
+      .status(500)
+      .json({ status: 'error', error: 'Hardware benchmark failed', details: error.message });
   }
 });
 
@@ -226,7 +236,6 @@ async function benchmarkCPU() {
     const cpuScore = Math.round(baseScore + speedBonus);
 
     return Math.max(500, Math.min(5000, cpuScore)); // Clamp between 500-5000
-
   } catch (error) {
     console.error('CPU benchmark failed:', error);
     return 1000; // Fallback score
@@ -256,7 +265,9 @@ async function benchmarkGPU() {
     }
 
     // Generate a test video and encode it
-    await execAsync(`ffmpeg -f lavfi -i testsrc=duration=10:size=1280x720:rate=30 -c:v ${encoder} -preset fast -t 10 "${testFile}" 2>/dev/null`);
+    await execAsync(
+      `ffmpeg -f lavfi -i testsrc=duration=10:size=1280x720:rate=30 -c:v ${encoder} -preset fast -t 10 "${testFile}" 2>/dev/null`,
+    );
 
     const endTime = process.hrtime.bigint();
     const duration = Number(endTime - startTime) / 1000000; // Convert to milliseconds
@@ -275,7 +286,6 @@ async function benchmarkGPU() {
     const gpuScore = Math.round(baseScore + speedBonus);
 
     return Math.max(1000, Math.min(10000, gpuScore)); // Clamp between 1000-10000
-
   } catch (error) {
     console.error('GPU benchmark failed:', error);
     return 0; // No GPU acceleration
@@ -318,7 +328,6 @@ async function benchmarkMemory() {
     const bandwidth = Math.round((dataProcessed / duration) * 1000); // MB/s
 
     return Math.max(10, Math.min(100, bandwidth)); // Clamp between 10-100 MB/s
-
   } catch (error) {
     console.error('Memory benchmark failed:', error);
     return 25; // Fallback bandwidth
@@ -345,7 +354,10 @@ async function benchmarkEncoding(sendProgress) {
     const tempDir = await getTempDir();
     await fsp.mkdir(tempDir, { recursive: true });
 
-    const testFile = path.join(tempDir, `encoding_benchmark_${codec}_${resLabel}_${Date.now()}.mp4`);
+    const testFile = path.join(
+      tempDir,
+      `encoding_benchmark_${codec}_${resLabel}_${Date.now()}.mp4`,
+    );
     try {
       const { stderr } = await execAsync(
         `ffmpeg -f lavfi -i testsrc=duration=${duration}:size=${resSize}:rate=30 -c:v ${encoder} -preset fast -t ${duration} -y "${testFile}"`,
@@ -389,17 +401,37 @@ async function benchmarkEncoding(sendProgress) {
     results.h264_cpu[res.label] = await runFfmpegTest('h264_cpu', 'libx264', res.label, res.size);
     // H.264 GPU (NVENC or QSV)
     if (hardwareInfo.nvenc_support) {
-      results.h264_gpu[res.label] = await runFfmpegTest('h264_gpu', 'h264_nvenc', res.label, res.size);
+      results.h264_gpu[res.label] = await runFfmpegTest(
+        'h264_gpu',
+        'h264_nvenc',
+        res.label,
+        res.size,
+      );
     } else if (hardwareInfo.qsv_support) {
-      results.h264_gpu[res.label] = await runFfmpegTest('h264_gpu', 'h264_qsv', res.label, res.size);
+      results.h264_gpu[res.label] = await runFfmpegTest(
+        'h264_gpu',
+        'h264_qsv',
+        res.label,
+        res.size,
+      );
     }
     // H.265 CPU
     results.h265_cpu[res.label] = await runFfmpegTest('h265_cpu', 'libx265', res.label, res.size);
     // H.265 GPU (NVENC or QSV)
     if (hardwareInfo.nvenc_support) {
-      results.h265_gpu[res.label] = await runFfmpegTest('h265_gpu', 'hevc_nvenc', res.label, res.size);
+      results.h265_gpu[res.label] = await runFfmpegTest(
+        'h265_gpu',
+        'hevc_nvenc',
+        res.label,
+        res.size,
+      );
     } else if (hardwareInfo.qsv_support) {
-      results.h265_gpu[res.label] = await runFfmpegTest('h265_gpu', 'hevc_qsv', res.label, res.size);
+      results.h265_gpu[res.label] = await runFfmpegTest(
+        'h265_gpu',
+        'hevc_qsv',
+        res.label,
+        res.size,
+      );
     }
   }
 
@@ -479,13 +511,17 @@ async function detectHardware() {
 async function detectGPU() {
   try {
     // Try to detect NVIDIA GPU first
-    const { stdout: nvidiaOutput } = await execAsync('nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null || echo ""');
+    const { stdout: nvidiaOutput } = await execAsync(
+      'nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null || echo ""',
+    );
     if (nvidiaOutput.trim()) {
       return nvidiaOutput.trim();
     }
 
     // Try to detect GPU via lspci
-    const { stdout: lspciOutput } = await execAsync('lspci | grep -i "vga|3d|display" | head -1 2>/dev/null || echo ""');
+    const { stdout: lspciOutput } = await execAsync(
+      'lspci | grep -i "vga|3d|display" | head -1 2>/dev/null || echo ""',
+    );
     if (lspciOutput.trim()) {
       // Extract GPU name from lspci output
       const match = lspciOutput.match(/:\s*(.+)$/);
@@ -494,7 +530,9 @@ async function detectGPU() {
 
     // Try to detect via /proc/gpuinfo (for some systems)
     try {
-      const { stdout: gpuinfoOutput } = await execAsync('cat /proc/gpuinfo 2>/dev/null | grep "Model" | head -1 || echo ""');
+      const { stdout: gpuinfoOutput } = await execAsync(
+        'cat /proc/gpuinfo 2>/dev/null | grep "Model" | head -1 || echo ""',
+      );
       if (gpuinfoOutput.trim()) {
         const match = gpuinfoOutput.match(/Model:\s*(.+)$/);
         return match ? match[1].trim() : null;
@@ -513,14 +551,18 @@ async function detectGPU() {
 async function detectCPU() {
   try {
     // Try to get CPU info from /proc/cpuinfo
-    const { stdout: cpuinfoOutput } = await execAsync('cat /proc/cpuinfo 2>/dev/null | grep "model name" | head -1 || echo ""');
+    const { stdout: cpuinfoOutput } = await execAsync(
+      'cat /proc/cpuinfo 2>/dev/null | grep "model name" | head -1 || echo ""',
+    );
     if (cpuinfoOutput.trim()) {
       const match = cpuinfoOutput.match(/model name\s*:\s*(.*)/i);
       return match ? match[1].trim() : null;
     }
 
     // Fallback: try lscpu
-    const { stdout: lscpuOutput } = await execAsync('lscpu 2>/dev/null | grep "Model name" | head -1 || echo ""');
+    const { stdout: lscpuOutput } = await execAsync(
+      'lscpu 2>/dev/null | grep "Model name" | head -1 || echo ""',
+    );
     if (lscpuOutput.trim()) {
       const match = lscpuOutput.match(/Model name:\s*(.*)/i);
       return match ? match[1].trim() : null;
@@ -528,7 +570,9 @@ async function detectCPU() {
 
     // Fallback: try sysctl on macOS
     try {
-      const { stdout: sysctlOutput } = await execAsync('sysctl -n machdep.cpu.brand_string 2>/dev/null || echo ""');
+      const { stdout: sysctlOutput } = await execAsync(
+        'sysctl -n machdep.cpu.brand_string 2>/dev/null || echo ""',
+      );
       if (sysctlOutput.trim()) {
         return sysctlOutput.trim();
       }
@@ -552,7 +596,9 @@ async function detectFFmpeg() {
 
   try {
     // Get FFmpeg version
-    const { stdout: versionOutput } = await execAsync('ffmpeg -version 2>/dev/null | head -1 || echo ""');
+    const { stdout: versionOutput } = await execAsync(
+      'ffmpeg -version 2>/dev/null | head -1 || echo ""',
+    );
     if (versionOutput.trim()) {
       const versionMatch = versionOutput.match(/ffmpeg version ([^\s]+)/);
       result.version = versionMatch ? versionMatch[1] : null;
@@ -560,7 +606,9 @@ async function detectFFmpeg() {
 
     // Test NVENC support by actually trying to encode
     try {
-      await execAsync('ffmpeg -f lavfi -i testsrc=duration=1:size=320x240:rate=1 -c:v h264_nvenc -t 1 -f null - 2>/dev/null');
+      await execAsync(
+        'ffmpeg -f lavfi -i testsrc=duration=1:size=320x240:rate=1 -c:v h264_nvenc -t 1 -f null - 2>/dev/null',
+      );
       result.nvenc_support = true;
     } catch (e) {
       result.nvenc_support = false;
@@ -568,7 +616,9 @@ async function detectFFmpeg() {
 
     // Test QSV support by actually trying to encode
     try {
-      const { stderr } = await execAsync('ffmpeg -f lavfi -i testsrc=duration=1:size=320x240:rate=1 -c:v h264_qsv -t 1 -f null - 2>&1');
+      const { stderr } = await execAsync(
+        'ffmpeg -f lavfi -i testsrc=duration=1:size=320x240:rate=1 -c:v h264_qsv -t 1 -f null - 2>&1',
+      );
       // Check if the encoding actually succeeded by looking for successful output
       if (stderr.includes('Conversion failed!') || stderr.includes('Error while opening encoder')) {
         result.qsv_support = false;
@@ -578,7 +628,6 @@ async function detectFFmpeg() {
     } catch (e) {
       result.qsv_support = false;
     }
-
   } catch (error) {
     console.error('FFmpeg detection failed:', error);
   }
