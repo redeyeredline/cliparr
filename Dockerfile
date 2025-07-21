@@ -50,7 +50,8 @@ RUN apt-get update && apt-get install -y \
     curl ca-certificates gnupg build-essential \
     libva-drm2 libva-x11-2 \
     libva-glx2 libnuma1 libx264-163 libx265-199 libvpx7 \
-    libopus0 libvorbis0a libmp3lame0 libfdk-aac2 libflac8 && \
+    libopus0 libvorbis0a libmp3lame0 libfdk-aac2 libflac8 \
+    libvorbisenc2 libvdpau1 && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && npm install -g npm@11.4.2 && \
     # Install Redis 6.2+ from Redis repository
@@ -62,7 +63,10 @@ RUN apt-get update && apt-get install -y \
 
 # Copy ffmpeg binaries
 COPY --from=ffmpeg-build /ffmpeg-static /usr/local
-
+# Ensure ffmpeg binary is in PATH and libraries are found
+ENV PATH="/usr/local/bin:${PATH}"
+ENV LD_LIBRARY_PATH=/usr/local/lib
+RUN ldconfig
 # Copy app and start script
 COPY --from=app-build /app /app
 WORKDIR /app
