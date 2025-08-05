@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
     cd nv-codec-headers && make install && cd .. && \
     ./configure \
         --prefix=/usr/local \
+        --extra-version=cliparr \
         --enable-gpl --enable-nonfree --enable-version3 --enable-shared \
         --enable-pthreads \
         --enable-libx264 --enable-libx265 --enable-libvpx \
