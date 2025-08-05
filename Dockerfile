@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y \
     echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb jammy main" | tee /etc/apt/sources.list.d/redis.list && \
     apt-get update && \
     apt-get install -y redis-server && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists/* 
 
 # --- Bring in prebuilt FFmpeg ---
 COPY --from=ffmpeg /usr/local /usr/local
