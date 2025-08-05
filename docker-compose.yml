@@ -4,7 +4,7 @@ services:
     image: ghcr.io/redeyeredline/cliparr:latest   # <-- pre-built image pushed from CI
     container_name: cliparr
     restart: unless-stopped
- 
+
     # --- networking ---
     ports:
       - "8484:8484"          # HTTP / WebSocket
