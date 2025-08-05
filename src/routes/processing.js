@@ -36,7 +36,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import config from '../config/index.js';
 import { activeFfmpegJobs } from '../services/fingerprintPipeline.js';
-import { deleteProcessingJobs } from '../services/cleanupService.js';
+import { deleteProcessingJobs, cleanupScanningJobs } from '../services/cleanupService.js';
 
 const router = express.Router();
 
@@ -189,14 +189,19 @@ router.get('/status', async (req, res) => {
   const logger = req.app.get('logger');
 
   try {
-    const [dbStats, queueStatus] = await Promise.all([getProcessingJobStats(db), getQueueStatus()]);
+    const [dbStats, queueStatusObj] = await Promise.all([
+      getProcessingJobStats(db),
+      getQueueStatus(),
+    ]);
 
-    const totalActive = queueStatus.reduce((sum, queue) => sum + queue.active, 0);
-    const totalWaiting = queueStatus.reduce((sum, queue) => sum + queue.waiting, 0);
+    const queueList = Object.values(queueStatusObj);
+
+    const totalActive = queueList.reduce((sum, queue) => sum + queue.active, 0);
+    const totalWaiting = queueList.reduce((sum, queue) => sum + queue.waiting, 0);
 
     res.json({
       database: dbStats,
-      queues: queueStatus,
+      queues: queueStatusObj,
       summary: {
         totalActive,
         totalWaiting,
@@ -410,6 +415,35 @@ router.post('/cleanup-jobs-for-shows', async (req, res) => {
     res
       .status(500)
       .json({ error: 'Failed to cleanup jobs for shows', details: error && error.message });
+  }
+});
+
+// Add cleanup scanning jobs endpoint
+router.post('/cleanup-scanning-jobs', async (req, res) => {
+  try {
+    const db = req.app.get('db');
+    console.log('[API] Cleanup scanning jobs endpoint called');
+
+    const result = await cleanupScanningJobs(db);
+
+    if (result.success) {
+      res.json({
+        success: true,
+        deletedCount: result.deletedCount,
+        message: `Successfully deleted ${result.deletedCount} scanning jobs`,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to cleanup scanning jobs',
+      });
+    }
+  } catch (error) {
+    console.error('[API] Error in cleanup scanning jobs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error during cleanup',
+    });
   }
 });
 

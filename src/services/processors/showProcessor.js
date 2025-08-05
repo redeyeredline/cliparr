@@ -160,40 +160,40 @@ export async function processShowJob(job) {
 }
 
 async function processEpisodeFile(jobId, file, dbJobId, progressCallback) {
-  workerLogger.info({ jobId, dbJobId }, 'processEpisodeFile START');
+  workerLogger.info({ jobId, dbJobId, filePath: file.file_path }, 'processEpisodeFile START');
   try {
     if (progressCallback) {
       progressCallback(5, 'Starting episode processing...');
     }
-
+    workerLogger.info({ jobId, dbJobId, filePath: file.file_path }, 'Step: Audio extraction');
     // 1. Audio extraction
     if (progressCallback) {
       progressCallback(10, 'Extracting audio...');
     }
     // (Assume extractAudioFromFile is called here if needed)
     // await extractAudioFromFile(file.file_path);
-
+    workerLogger.info({ jobId, dbJobId, filePath: file.file_path }, 'Step: Fingerprinting');
     // 2. Fingerprinting
     if (progressCallback) {
       progressCallback(30, 'Generating audio fingerprint...');
     }
     // (Assume generateAudioFingerprint is called here if needed)
     // await generateAudioFingerprint(audioPath);
-
+    workerLogger.info({ jobId, dbJobId, filePath: file.file_path }, 'Step: Segment detection');
     // 3. Segment detection
     if (progressCallback) {
       progressCallback(60, 'Detecting audio segments...');
     }
     // (Assume detectAudioSegments is called here if needed)
     // await detectAudioSegments(fingerprint, audioPath);
-
+    workerLogger.info({ jobId, dbJobId, filePath: file.file_path }, 'Step: Update processing results');
     // 4. Update processing results
     if (progressCallback) {
       progressCallback(80, 'Updating processing results...');
     }
     // (Assume updateProcessingResults is called here)
     // await updateProcessingResults(file.id, results);
-
+    workerLogger.info({ jobId, dbJobId, filePath: file.file_path }, 'Step: Completion');
     // 5. Completion
     if (progressCallback) {
       progressCallback(100, 'Episode processing complete.');
@@ -328,8 +328,7 @@ async function getTempDir() {
 }
 
 export async function extractAudioFromFile(filePath) {
-  // workerLogger.info({ filePath }, 'Extracting audio from file');
-
+  workerLogger.info({ filePath }, 'Starting extractAudioFromFile');
   // Use latest temp dir from DB
   let tempDir;
   try {
@@ -380,25 +379,24 @@ export async function extractAudioFromFile(filePath) {
   console.log(
     `[ffmpeg-semaphore] Acquired: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`,
   );
+  workerLogger.info({ filePath, ffmpegArgs }, 'Invoking FFmpeg for audio extraction');
   try {
     await new Promise((resolve, reject) => {
       execFile('ffmpeg', ffmpegArgs, (error, stdout, stderr) => {
         if (error) {
           workerLogger.error(
-            { filePath, error: error.message, stderr },
+            { filePath, error: error.message, stderr, ffmpegArgs },
             'FFmpeg audio extraction failed',
           );
           return reject(new Error(`FFmpeg failed: ${stderr || error.message}`));
         }
-        // workerLogger.info({ filePath, audioPath }, 'Audio extracted with FFmpeg');
+        workerLogger.info({ filePath, audioPath, ffmpegArgs }, 'Audio extracted with FFmpeg');
         resolve();
       });
     });
   } finally {
     await ffmpegSemaphore.release(value);
-    console.log(
-      `[ffmpeg-semaphore] Released: ${filePath} PID: ${process.pid} at ${new Date().toISOString()}`,
-    );
+    workerLogger.info({ filePath }, 'Released ffmpegSemaphore after extraction');
   }
 
   return audioPath;
@@ -523,9 +521,18 @@ async function updateProcessingResults(fileId, results) {
   const job = db.prepare('SELECT id FROM processing_jobs WHERE media_file_id = ?').get(fileId);
 
   if (job) {
+    workerLogger.info({ fileId, jobId: job.id }, 'Found processing job, updating results');
+    console.log('[updateProcessingResults] Found processing job:', { fileId, jobId: job.id });
     await updateProcessingJob(db, job.id, results);
+    workerLogger.info({ fileId, jobId: job.id }, 'Processing job updated successfully');
+    console.log('[updateProcessingResults] Processing job updated successfully:', { fileId, jobId: job.id });
   } else {
     workerLogger.warn({ fileId }, 'No processing job found for file');
+    console.log('[updateProcessingResults] No processing job found for file:', { fileId });
+    
+    // Log all jobs for this file to help debug
+    const allJobs = db.prepare('SELECT id, status, media_file_id FROM processing_jobs WHERE media_file_id = ?').all(fileId);
+    console.log('[updateProcessingResults] All jobs for file:', { fileId, jobs: allJobs });
   }
 }
 

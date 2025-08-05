@@ -14,29 +14,41 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 export async function processJob(jobType, jobOrData) {
-  switch (jobType) {
-    case 'episode-processing': {
-      const db = await getDb();
-      const episodeFileId = jobOrData.data.episodeFileId;
-      const dbJobId = jobOrData.data.dbJobId;
-      // Fetch the episode file record by its ID
-      const file = await getEpisodeFileById(db, episodeFileId);
-      if (!file) {
-        workerLogger.error(`Episode file not found for ID: ${episodeFileId}`);
-        throw new Error(`Episode file not found for ID: ${episodeFileId}`);
+  workerLogger.info({ jobType, jobId: jobOrData?.id, data: jobOrData?.data }, 'Picked up job for processing');
+  try {
+    switch (jobType) {
+      case 'episode-processing': {
+        const db = await getDb();
+        const episodeFileId = jobOrData.data.episodeFileId;
+        const dbJobId = jobOrData.data.dbJobId;
+        workerLogger.info({ jobType, jobId: jobOrData.id, episodeFileId, dbJobId }, 'Processing episode-processing job');
+        // Fetch the episode file record by its ID
+        const file = await getEpisodeFileById(db, episodeFileId);
+        if (!file) {
+          workerLogger.error(`Episode file not found for ID: ${episodeFileId}`);
+          throw new Error(`Episode file not found for ID: ${episodeFileId}`);
+        }
+        return await processEpisodeFile(jobOrData.id, file, dbJobId);
       }
-      return await processEpisodeFile(jobOrData.id, file, dbJobId);
+      case 'audio-extraction':
+        workerLogger.info({ jobType, jobId: jobOrData.id }, 'Processing audio-extraction job');
+        return await processAudioExtraction(jobOrData);
+      case 'fingerprinting':
+        workerLogger.info({ jobType, jobId: jobOrData.id }, 'Processing fingerprinting job');
+        return await processFingerprinting(jobOrData);
+      case 'detection':
+        workerLogger.info({ jobType, jobId: jobOrData.id }, 'Processing detection job');
+        return await processDetection(jobOrData);
+      case 'trimming':
+        workerLogger.info({ jobType, jobId: jobOrData.id }, 'Processing trimming job');
+        return await processTrimming(jobOrData);
+      default:
+        workerLogger.error({ jobType, jobId: jobOrData?.id }, 'Unknown job type');
+        throw new Error(`Unknown job type: ${jobType}`);
     }
-    case 'audio-extraction':
-      return await processAudioExtraction(jobOrData);
-    case 'fingerprinting':
-      return await processFingerprinting(jobOrData);
-    case 'detection':
-      return await processDetection(jobOrData);
-    case 'trimming':
-      return await processTrimming(jobOrData);
-    default:
-      throw new Error(`Unknown job type: ${jobType}`);
+  } catch (error) {
+    workerLogger.error({ jobType, jobId: jobOrData?.id, error: error.message, stack: error.stack }, 'Error processing job');
+    throw error;
   }
 }
 

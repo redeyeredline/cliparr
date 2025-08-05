@@ -5,23 +5,33 @@ import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { deleteProcessingJobs, deleteShowsAndCleanup } from './cleanupService.js';
 
-// Redis connection
-const redis = new Redis({
-  host: 'localhost',
-  port: 6379,
-  maxRetriesPerRequest: null,
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
-});
+// Remove the separate Redis connection - use shared queues from queueManager.js
+// const redis = new Redis({
+//   host: 'localhost',
+//   port: 6379,
+//   maxRetriesPerRequest: null,
+//   retryDelayOnFailover: 100,
+//   enableReadyCheck: false,
+// });
 
 // These will be imported from queueManager.js
 let queues = {};
 let workers = {};
 
+// Cleanup queue variables
+let cleanupQueue = null;
+let cleanupWorker = null;
+
 // Function to set queues and workers (will be called from main queue.js)
 export function setQueueReferences(queueRefs, workerRefs) {
   queues = queueRefs;
   workers = workerRefs;
+  console.log('[queueOperations] setQueueReferences called with queues:', Object.keys(queueRefs));
+  // Initialize cleanup queue if it exists in the shared queues
+  if (queueRefs['cleanup']) {
+    cleanupQueue = queueRefs['cleanup'];
+    cleanupWorker = workerRefs['cleanup'];
+  }
 }
 
 // Ensure queues are initialized before use
@@ -31,85 +41,71 @@ async function ensureQueuesInitialized() {
   workerLogger.info('Current workers object:', workers);
   workerLogger.info('Queues object keys:', Object.keys(queues));
   workerLogger.info('Queues object length:', Object.keys(queues).length);
+  console.log('[queueOperations] ensureQueuesInitialized - queues keys:', Object.keys(queues));
 
   // Check if the episode-processing queue specifically exists
   if (!queues['episode-processing']) {
     workerLogger.warn('Episode processing queue not found, attempting to initialize queues...');
+    console.warn('[queueOperations] Episode processing queue not found, attempting to initialize queues...');
     try {
       // This will be imported from queueManager.js
       const { initializeQueues, startQueues } = await import('./queueManager.js');
       await initializeQueues();
       await startQueues();
       workerLogger.info('Queues initialized successfully in ensureQueuesInitialized');
+      console.log('[queueOperations] Queues initialized successfully in ensureQueuesInitialized');
     } catch (error) {
       workerLogger.error('Failed to initialize queues in ensureQueuesInitialized:', error);
+      console.error('[queueOperations] Failed to initialize queues in ensureQueuesInitialized:', error);
       throw error;
     }
   } else {
     workerLogger.info('Episode processing queue already exists');
+    console.log('[queueOperations] Episode processing queue already exists');
   }
 }
 
 // Enqueue a show processing job
 export async function enqueueEpisodeProcessing(episodeFileAndJobIds) {
   await ensureQueuesInitialized();
+
+  // Update scanning jobs to processing status instead of deleting them
+  try {
+    const { getDb } = await import('../database/Db_Operations.js');
+    const db = await getDb();
+    const scanningJobs = db.prepare('SELECT COUNT(*) as count FROM processing_jobs WHERE status = ?').get('scanning');
+    console.log('[enqueueEpisodeProcessing] Database scanning jobs count:', scanningJobs.count);
+
+    // Update scanning jobs to processing status instead of deleting them
+    if (scanningJobs.count > 0) {
+      console.log('[enqueueEpisodeProcessing] Updating', scanningJobs.count, 'scanning jobs to processing status');
+      const updated = db.prepare('UPDATE processing_jobs SET status = ? WHERE status = ?').run('processing', 'scanning');
+      console.log('[enqueueEpisodeProcessing] Updated', updated.changes, 'jobs to processing status');
+    }
+  } catch (dbError) {
+    console.error('[enqueueEpisodeProcessing] Error updating job status:', dbError);
+  }
+
   const queue = queues['episode-processing'];
+  console.log('[enqueueEpisodeProcessing] Queue reference:', queue);
+  console.log('[enqueueEpisodeProcessing] Queue type:', typeof queue);
+  console.log('[enqueueEpisodeProcessing] Queue constructor:', queue?.constructor?.name);
   if (!queue) {
     const debugState = debugQueueState();
     workerLogger.error('Episode processing queue not found. Debug state:', debugState);
+    console.error('[enqueueEpisodeProcessing] Episode processing queue not found. Debug state:', debugState);
     throw new Error('Episode processing queue not initialized');
   }
 
-  // Validate input
-  if (!Array.isArray(episodeFileAndJobIds)) {
-    throw new Error('episodeFileAndJobIds must be an array');
-  }
-
-  workerLogger.info(
-    'enqueueEpisodeProcessing called with episodeFileAndJobIds:',
-    episodeFileAndJobIds.map((e) => ({
-      ...e,
-      dbJobIdType: typeof e.dbJobId,
-      episodeFileIdType: typeof e.episodeFileId,
-    })),
-  );
   const jobIds = [];
-
   for (const { episodeFileId, dbJobId } of episodeFileAndJobIds) {
-    workerLogger.info('Processing episode:', {
-      episodeFileId,
-      dbJobId,
-      dbJobIdType: typeof dbJobId,
-      episodeFileIdType: typeof episodeFileId,
-    });
-
-    // Enhanced validation
-    if (!episodeFileId || !dbJobId) {
-      workerLogger.warn('Skipping invalid episodeFileId/dbJobId:', { episodeFileId, dbJobId });
-      continue;
-    }
-
-    // Ensure both values are numbers or can be converted to numbers
-    const numericEpisodeFileId = Number(episodeFileId);
-    const numericDbJobId = Number(dbJobId);
-
-    if (isNaN(numericEpisodeFileId) || isNaN(numericDbJobId)) {
-      workerLogger.warn('Skipping non-numeric IDs:', {
-        episodeFileId,
-        dbJobId,
-        numericEpisodeFileId,
-        numericDbJobId,
-      });
-      continue;
-    }
-
     try {
       const jobData = {
-        episodeFileId: numericEpisodeFileId,
-        dbJobId: String(numericDbJobId),
+        episodeFileId,
+        dbJobId: String(dbJobId),
       };
       const jobOpts = {
-        jobId: `epjob-${numericDbJobId}`,
+        jobId: `epjob-${dbJobId}`,
         priority: 10,
         attempts: 3,
         backoff: {
@@ -117,46 +113,32 @@ export async function enqueueEpisodeProcessing(episodeFileAndJobIds) {
           delay: 5000,
         },
       };
-      workerLogger.info('Adding job to queue:', { jobData, jobOpts });
-
-      // dbJobId is required for all jobs
+      // Debug: print the full queue object and its properties
+      console.log('[enqueueEpisodeProcessing] FULL QUEUE OBJECT:', JSON.stringify(queue, null, 2));
+      console.log('[enqueueEpisodeProcessing] queue keys:', Object.keys(queue));
+      console.log('[enqueueEpisodeProcessing] queue.opts:', queue.opts);
+      console.log('[enqueueEpisodeProcessing] About to call queue.add()...');
+      console.log('[enqueueEpisodeProcessing] Queue name:', queue.name);
+      console.log('[enqueueEpisodeProcessing] Adding job to queue name: episode-processing');
+      console.log('[enqueueEpisodeProcessing] Queue qualifiedName:', queue.qualifiedName);
+      console.log('[enqueueEpisodeProcessing] Queue opts:', queue.opts);
       const job = await queue.add('episode-processing', jobData, jobOpts);
-
+      console.log('[enqueueEpisodeProcessing] queue.add() completed successfully');
+      console.log('[enqueueEpisodeProcessing] Job added successfully:', { jobId: job.id, originalDbJobId: dbJobId });
       workerLogger.info('Job added successfully:', { jobId: job.id, originalDbJobId: dbJobId });
       jobIds.push(job.id);
-    } catch (error) {
-      let errorDetails = {};
-      try {
-        errorDetails = Object.getOwnPropertyNames(error).reduce((acc, key) => {
-          acc[key] = error[key];
-          return acc;
-        }, {});
-      } catch (e) {}
-      console.error('BULLMQ ERROR DETAILS:', {
-        episodeFileId,
-        dbJobId,
-        numericEpisodeFileId,
-        numericDbJobId,
-        errorMessage: error.message,
-        errorStack: error.stack,
-        errorType: error.constructor ? error.constructor.name : undefined,
-        errorDetails: JSON.stringify(errorDetails),
+    } catch (addError) {
+      console.error('[enqueueEpisodeProcessing] queue.add() failed:', addError);
+      console.error('[enqueueEpisodeProcessing] Error details:', {
+        message: addError.message,
+        stack: addError.stack,
+        name: addError.name,
       });
-      workerLogger.error('Failed to add job to queue:', {
-        episodeFileId,
-        dbJobId,
-        numericEpisodeFileId,
-        numericDbJobId,
-        error: error.message,
-        stack: error.stack,
-        errorType: error.constructor ? error.constructor.name : undefined,
-        errorDetails: JSON.stringify(errorDetails),
-      });
-      throw error;
+      throw addError;
     }
   }
-
   workerLogger.info('All jobs enqueued successfully:', { jobIds });
+  console.log('[enqueueEpisodeProcessing] All jobs enqueued successfully:', { jobIds });
   return jobIds;
 }
 
@@ -404,46 +386,62 @@ export function debugQueueState() {
 }
 
 // --- Cleanup Queue and Worker ---
-const cleanupQueue = new Queue('cleanup', { connection: redis });
+// Use the shared Redis connection from queueManager instead of a separate one
 
-const cleanupWorker = new Worker(
-  'cleanup',
-  async (job) => {
-    workerLogger.info({ jobId: job.id, name: job.name, data: job.data }, 'Cleanup worker started');
-    if (job.name === 'deleteProcessingJobs') {
-      // Ensure DB instance is available for deleteProcessingJobs
-      let db = globalThis.db;
-      if (!db) {
-        const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
-        db = await getDbLocal();
-        globalThis.db = db;
-      }
-      return await deleteProcessingJobs(job.data, db);
-    } else if (job.name === 'deleteShowsAndCleanup') {
-      const { showIds } = job.data;
-      if (!Array.isArray(showIds) || showIds.length === 0) {
-        throw new Error('No showIds provided');
-      }
-      let db = globalThis.db;
-      if (!db) {
-        const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
-        db = await getDbLocal();
-        globalThis.db = db;
-      }
-      return await deleteShowsAndCleanup(showIds, db);
-    } else {
-      throw new Error('Unknown cleanup job type: ' + job.name);
+// Initialize cleanup queue when queues are set
+async function initializeCleanupQueue() {
+  if (!cleanupQueue && queues['cleanup']) {
+    cleanupQueue = queues['cleanup'];
+    cleanupWorker = workers['cleanup'];
+  } else if (!cleanupQueue) {
+    // Create cleanup queue using the same Redis connection as other queues
+    const { getQueues } = await import('./queueManager.js');
+    const sharedQueues = getQueues();
+    if (sharedQueues['episode-processing']) {
+      // Use the same Redis connection as the episode-processing queue
+      const redisConnection = sharedQueues['episode-processing'].client;
+      cleanupQueue = new Queue('cleanup', { connection: redisConnection });
+      cleanupWorker = new Worker(
+        'cleanup',
+        async (job) => {
+          workerLogger.info({ jobId: job.id, name: job.name, data: job.data }, 'Cleanup worker started');
+          if (job.name === 'deleteProcessingJobs') {
+            // Ensure DB instance is available for deleteProcessingJobs
+            let db = globalThis.db;
+            if (!db) {
+              const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
+              db = await getDbLocal();
+              globalThis.db = db;
+            }
+            return await deleteProcessingJobs(job.data, db);
+          } else if (job.name === 'deleteShowsAndCleanup') {
+            const { showIds } = job.data;
+            if (!Array.isArray(showIds) || showIds.length === 0) {
+              throw new Error('No showIds provided');
+            }
+            let db = globalThis.db;
+            if (!db) {
+              const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
+              db = await getDbLocal();
+              globalThis.db = db;
+            }
+            return await deleteShowsAndCleanup(showIds, db);
+          } else {
+            throw new Error('Unknown cleanup job type: ' + job.name);
+          }
+        },
+        { connection: redisConnection },
+      );
+
+      cleanupWorker.on('completed', (job, result) => {
+        workerLogger.info({ jobId: job.id, result }, 'Cleanup job completed');
+      });
+      cleanupWorker.on('failed', (job, err) => {
+        workerLogger.error({ jobId: job.id, error: err && err.message }, 'Cleanup job failed');
+      });
     }
-  },
-  { connection: redis },
-);
-
-cleanupWorker.on('completed', (job, result) => {
-  workerLogger.info({ jobId: job.id, result }, 'Cleanup job completed');
-});
-cleanupWorker.on('failed', (job, err) => {
-  workerLogger.error({ jobId: job.id, error: err && err.message }, 'Cleanup job failed');
-});
+  }
+}
 
 /**
  * Enqueue a cleanup job.
@@ -452,6 +450,13 @@ cleanupWorker.on('failed', (job, err) => {
  * @returns {Promise<string>} jobId
  */
 export async function enqueueCleanupJob(type, data) {
+  if (!cleanupQueue) {
+    // Try to initialize cleanup queue
+    initializeCleanupQueue();
+  }
+  if (!cleanupQueue) {
+    throw new Error('Cleanup queue not available');
+  }
   const job = await cleanupQueue.add(type, data, { removeOnComplete: true, removeOnFail: false });
   workerLogger.info({ jobId: job.id, type, data }, 'Enqueued cleanup job');
   return job.id;

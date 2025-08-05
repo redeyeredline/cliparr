@@ -16,7 +16,7 @@ function getCachedStmt(db, sql) {
   return stmt;
 }
 
-async function getDb(dbPath = 'src/database/data/cliparr.db') {
+async function getDb(dbPath = '/app/data/cliparr.db') {
   return getDatabaseSingleton(dbPath);
 }
 
@@ -347,65 +347,72 @@ function deleteShowsByIds(db, ids) {
 
 function createProcessingJobsForShows(db, showIds) {
   if (!Array.isArray(showIds) || showIds.length === 0) {
+    console.warn('[createProcessingJobsForShows] Invalid showIds:', showIds);
     return 0;
   }
 
-  return db.transaction(() => {
-    const placeholders = showIds.map(() => '?').join(',');
+  try {
+    return db.transaction(() => {
+      const placeholders = showIds.map(() => '?').join(',');
 
-    // Get all episode files for the specified shows
-    const episodeFiles = timedQuery(
-      db,
-      `SELECT 
-         ef.id as file_id,
-         ef.file_path,
-         ef.size,
-         e.id as episode_id,
-         e.title as episode_title,
-         e.episode_number,
-         s.season_number,
-         sh.title as show_title
-       FROM episode_files ef
-       JOIN episodes e ON ef.episode_id = e.id
-       JOIN seasons s ON e.season_id = s.id
-       JOIN shows sh ON s.show_id = sh.id
-       WHERE sh.id IN (${placeholders})
-       ORDER BY sh.title, s.season_number, e.episode_number`,
-      showIds,
-      'all',
-    );
-
-    let createdCount = 0;
-
-    // Create processing jobs for each file
-    for (const file of episodeFiles) {
-      // Check if a processing job already exists for this file
-      const existingJob = timedQuery(
+      // Get all episode files for the specified shows
+      const episodeFiles = timedQuery(
         db,
-        'SELECT id FROM processing_jobs WHERE media_file_id = ?',
-        [file.file_id],
-        'get',
+        `SELECT 
+           ef.id as file_id,
+           ef.file_path,
+           ef.size,
+           e.id as episode_id,
+           e.title as episode_title,
+           e.episode_number,
+           s.season_number,
+           sh.title as show_title
+         FROM episode_files ef
+         JOIN episodes e ON ef.episode_id = e.id
+         JOIN seasons s ON e.season_id = s.id
+         JOIN shows sh ON s.show_id = sh.id
+         WHERE sh.id IN (${placeholders})
+         ORDER BY sh.title, s.season_number, e.episode_number`,
+        showIds,
+        'all',
       );
+      console.log('[createProcessingJobsForShows] Found episode files:', episodeFiles.length);
 
-      if (!existingJob) {
-        // Create a new processing job
-        timedQuery(
+      let createdCount = 0;
+
+      // Create processing jobs for each file
+      for (const file of episodeFiles) {
+        // Check if a processing job already exists for this file
+        const existingJob = timedQuery(
           db,
-          `INSERT INTO processing_jobs (
-            media_file_id, 
-            status, 
-            confidence_score, 
-            created_date
-          ) VALUES (?, ?, ?, ?)`,
-          [file.file_id, 'scanning', 0.0, new Date().toISOString()],
-          'run',
+          'SELECT id FROM processing_jobs WHERE media_file_id = ?',
+          [file.file_id],
+          'get',
         );
-        createdCount++;
-      }
-    }
 
-    return createdCount;
-  })();
+        if (!existingJob) {
+          // Create a new processing job
+          timedQuery(
+            db,
+            `INSERT INTO processing_jobs (
+              media_file_id, 
+              status, 
+              confidence_score, 
+              created_date
+            ) VALUES (?, ?, ?, ?)`,
+            [file.file_id, 'scanning', 0.0, new Date().toISOString()],
+            'run',
+          );
+          createdCount++;
+        }
+      }
+      console.log('[createProcessingJobsForShows] Created jobs:', createdCount);
+      return createdCount;
+    })();
+  } catch (err) {
+    console.error('[createProcessingJobsForShows] Error:', err);
+    return 0;
+  }
 }
 
 function getProcessingJobs(db, options = {}) {

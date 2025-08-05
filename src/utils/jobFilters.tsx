@@ -11,8 +11,8 @@ export function filterJobsByCategory(
     case 'processing':
       return jobs.filter((j) => j.status === 'processing' || j.status === 'scanning');
     case 'queued':
-      // Show jobs that are detected or verified (not running, completed, or failed)
-      return jobs.filter((j) => j.status === 'detected' || j.status === 'verified');
+      // Show jobs that are detected, verified, or scanning (not running, completed, or failed)
+      return jobs.filter((j) => j.status === 'detected' || j.status === 'verified' || j.status === 'scanning');
     case 'pending':
       return jobs.filter((j) => j.status === 'detected' && !j.manual_verified);
     case 'verified':

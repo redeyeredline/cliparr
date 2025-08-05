@@ -98,6 +98,8 @@ router.post('/scan', async (req, res) => {
   const db = req.app.get('db');
   const { showIds } = req.body;
 
+  console.log('[SCAN] Received scan request:', { showIds });
+
   appLogger.info('Scan request received:', {
     showIds,
     type: typeof showIds,
@@ -111,8 +113,10 @@ router.post('/scan', async (req, res) => {
 
   try {
     appLogger.info('Creating processing jobs for shows...', { showIds });
+    console.log('[SCAN] Creating processing jobs for shows:', { showIds });
     const scannedCount = createProcessingJobsForShows(db, showIds);
     appLogger.info('Processing jobs created:', { scannedCount });
+    console.log('[SCAN] Processing jobs created:', { scannedCount });
 
     appLogger.info('Getting episode file IDs and job IDs...');
     let episodeFileAndJobIds = getEpisodeFileIdAndJobIdForShows(db, showIds);
@@ -124,12 +128,17 @@ router.post('/scan', async (req, res) => {
         episodeFileIdType: typeof e.episodeFileId,
       })),
     });
+    console.log('[SCAN] Episode file and job IDs:', episodeFileAndJobIds);
 
     // Enhanced filtering and validation
     episodeFileAndJobIds = episodeFileAndJobIds.filter((e) => {
       const isValid = e.dbJobId !== null && e.episodeFileId !== null;
       if (!isValid) {
         appLogger.warn('Filtering out invalid entry:', {
+          episodeFileId: e.episodeFileId,
+          dbJobId: e.dbJobId,
+        });
+        console.warn('[SCAN] Filtering out invalid entry:', {
           episodeFileId: e.episodeFileId,
           dbJobId: e.dbJobId,
         });
@@ -140,38 +149,19 @@ router.post('/scan', async (req, res) => {
       count: episodeFileAndJobIds.length,
       data: episodeFileAndJobIds,
     });
+    console.log('[SCAN] Filtered episode file and job IDs:', episodeFileAndJobIds);
 
     if (episodeFileAndJobIds.length === 0) {
       appLogger.warn('No valid processing jobs found for selected shows', { showIds });
+      console.warn('[SCAN] No valid processing jobs found for selected shows:', { showIds });
       return res.status(400).json({ error: 'No valid processing jobs found for selected shows.' });
     }
 
-    // Additional validation before enqueuing
-    const validEntries = episodeFileAndJobIds.filter((e) => {
-      const episodeFileId = Number(e.episodeFileId);
-      const dbJobId = Number(e.dbJobId);
-      const isValid = !isNaN(episodeFileId) && !isNaN(dbJobId) && episodeFileId > 0 && dbJobId > 0;
-      if (!isValid) {
-        appLogger.warn('Filtering out non-numeric or zero IDs:', {
-          episodeFileId: e.episodeFileId,
-          dbJobId: e.dbJobId,
-          numericEpisodeFileId: episodeFileId,
-          numericDbJobId: dbJobId,
-        });
-      }
-      return isValid;
-    });
-
-    if (validEntries.length === 0) {
-      appLogger.warn('No valid numeric processing jobs found for selected shows', { showIds });
-      return res
-        .status(400)
-        .json({ error: 'No valid numeric processing jobs found for selected shows.' });
-    }
-
-    appLogger.info('Enqueuing episode processing jobs...', { validEntries });
-    const enqueuedJobIds = await enqueueEpisodeProcessing(validEntries);
+    appLogger.info('Enqueuing episode processing jobs...', { episodeFileAndJobIds });
+    console.log('[SCAN] Enqueuing episode processing jobs:', episodeFileAndJobIds);
+    const enqueuedJobIds = await enqueueEpisodeProcessing(episodeFileAndJobIds);
     appLogger.info('Episode processing jobs enqueued:', { enqueuedJobIds });
+    console.log('[SCAN] Episode processing jobs enqueued:', enqueuedJobIds);
 
     res.json({
       success: true,
@@ -194,12 +184,11 @@ router.post('/scan', async (req, res) => {
       errorType: err.constructor ? err.constructor.name : undefined,
       errorDetails: JSON.stringify(errorDetails),
     });
-    res
-      .status(500)
-      .json({
-        error: err && err.message ? err.message : 'Unknown error',
-        stack: err && err.stack ? err.stack : undefined,
-      });
+    console.error('[SCAN] Failed to scan shows:', err);
+    res.status(500).json({
+      error: err && err.message ? err.message : 'Unknown error',
+      stack: err && err.stack ? err.stack : undefined,
+    });
   }
 });
 
@@ -323,18 +312,13 @@ router.get('/:showId/segments', async (req, res) => {
       FROM detection_results
       WHERE show_id = ?
     `;
-
     const params = [parseInt(showId)];
-
     if (season && !isNaN(parseInt(season))) {
       sql += ' AND season_number = ?';
       params.push(parseInt(season));
     }
-
     sql += ' ORDER BY season_number, episode_number';
-
     const results = db.prepare(sql).all(...params);
-
     // Parse JSON data for stingers and segments
     const processedResults = results.map((row) => ({
       ...row,
@@ -343,7 +327,6 @@ router.get('/:showId/segments', async (req, res) => {
       stingers_data: undefined, // Remove raw data
       segments_data: undefined, // Remove raw data
     }));
-
     appLogger.info(
       {
         showId,
@@ -352,7 +335,6 @@ router.get('/:showId/segments', async (req, res) => {
       },
       'Retrieved detailed segment information',
     );
-
     res.json({
       success: true,
       showId: parseInt(showId),

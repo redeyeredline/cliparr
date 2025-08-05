@@ -22,6 +22,43 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 /**
+ * Simple function to directly clean up scanning jobs from database
+ * This bypasses all the complex queue logic and just deletes from DB
+ */
+export async function cleanupScanningJobs(dbOverride = null) {
+  const db = dbOverride || globalThis.db || null;
+  
+  if (!db) {
+    console.error('[cleanupScanningJobs] No database connection available');
+    return { success: false, deletedCount: 0 };
+  }
+  
+  try {
+    // Count scanning jobs
+    const scanningJobs = db.prepare('SELECT COUNT(*) as count FROM processing_jobs WHERE status = ?').get('scanning');
+    console.log('[cleanupScanningJobs] Found', scanningJobs.count, 'scanning jobs in database');
+    
+    if (scanningJobs.count > 0) {
+      // Delete scanning jobs directly
+      const deleted = db.prepare('DELETE FROM processing_jobs WHERE status = ?').run('scanning');
+      console.log('[cleanupScanningJobs] Successfully deleted', deleted.changes, 'scanning jobs from database');
+      
+      // Verify deletion
+      const remainingJobs = db.prepare('SELECT COUNT(*) as count FROM processing_jobs WHERE status = ?').get('scanning');
+      console.log('[cleanupScanningJobs] Remaining scanning jobs:', remainingJobs.count);
+      
+      return { success: true, deletedCount: deleted.changes };
+    } else {
+      console.log('[cleanupScanningJobs] No scanning jobs found to delete');
+      return { success: true, deletedCount: 0 };
+    }
+  } catch (error) {
+    console.error('[cleanupScanningJobs] Error cleaning scanning jobs:', error);
+    return { success: false, deletedCount: 0, error: error.message };
+  }
+}
+
+/**
  * Delete jobs from BullMQ/Redis and the DB (with temp file cleanup) for the given job IDs.
  * @param {Array<string|number>|object} jobIdsOrOptions
  * @param {object} dbOverride - The database instance to use (optional)
@@ -31,6 +68,23 @@ export async function deleteProcessingJobs(jobIdsOrOptions, dbOverride) {
   let jobIds = [];
   const db = dbOverride || globalThis.db || null;
   const BATCH_SIZE = 1000;
+
+  // Add direct cleanup of scanning jobs
+  if (db) {
+    try {
+      const scanningJobs = db.prepare('SELECT COUNT(*) as count FROM processing_jobs WHERE status = ?').get('scanning');
+      console.log('[deleteProcessingJobs] Found', scanningJobs.count, 'scanning jobs in database');
+
+      if (scanningJobs.count > 0) {
+        console.log('[deleteProcessingJobs] Directly deleting scanning jobs from database');
+        const deleted = db.prepare('DELETE FROM processing_jobs WHERE status = ?').run('scanning');
+        console.log('[deleteProcessingJobs] Deleted', deleted.changes, 'scanning jobs from database');
+      }
+    } catch (dbError) {
+      console.error('[deleteProcessingJobs] Error cleaning scanning jobs:', dbError);
+    }
+  }
+
   if (jobIdsOrOptions && jobIdsOrOptions.all) {
     // Fast path: pause workers, kill processes, remove all jobs from queues, flush Redis, then resume workers
     await pauseCpuWorkers();

@@ -71,7 +71,7 @@ export default function ProcessingQueue({
     { value: 'failed', label: 'Failed' },
   ];
 
-  // Use the filterJobsByCategory utility for filtering
+  // Show all jobs by default, filter by dropdown selection
   const filteredJobs = filterJobsByCategory(jobsWithId, filter as any);
   console.log('ProcessingQueue render:', { isLoading, jobs, filteredJobs });
   const [cpuLimit, setCpuLimit] = useState<number>(2);
@@ -355,10 +355,8 @@ export default function ProcessingQueue({
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent className="bg-slate-900 text-slate-200 border-slate-700">
-              {filterOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
+              {filterOptions.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>

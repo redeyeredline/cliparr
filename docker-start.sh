@@ -28,6 +28,13 @@ redis-server --daemonize yes --bind 127.0.0.1 --port 6379
 # Wait a moment for Redis to start
 sleep 2
 
+# Wait for Redis to be ready
+until redis-cli ping | grep -q "PONG"; do
+  echo "Waiting for Redis to start..."
+  sleep 1
+done
+echo "Redis is ready!"
+
 # Verify Redis is running
 if ! redis-cli ping | grep -q "PONG"; then
     echo "❌ Redis failed to start"

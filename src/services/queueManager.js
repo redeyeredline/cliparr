@@ -6,14 +6,8 @@ import { broadcastJobUpdate, broadcastQueueStatus } from './websocket.js';
 import { Queue, Worker, QueueEvents } from 'bullmq';
 import Redis from 'ioredis';
 
-// Redis connection
-const redis = new Redis({
-  host: 'localhost',
-  port: 6379,
-  maxRetriesPerRequest: null,
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
-});
+// Replace the redis instance with a plain connection object
+const redisConnection = 'redis://localhost:6379';
 
 let QUEUE_CONFIG = {};
 const queues = {};
@@ -73,6 +67,13 @@ export async function updateQueueConfig() {
         backoff: 1000,
         timeout: 120000,
       },
+      cleanup: {
+        name: 'cleanup',
+        concurrency: 1,
+        retries: 1,
+        backoff: 1000,
+        timeout: 60000,
+      },
     };
     workerLogger.info('Queue configuration updated:', QUEUE_CONFIG);
   } catch (error) {
@@ -113,117 +114,181 @@ export async function updateQueueConfig() {
         backoff: 1000,
         timeout: 120000,
       },
+      cleanup: {
+        name: 'cleanup',
+        concurrency: 1,
+        retries: 1,
+        backoff: 1000,
+        timeout: 60000,
+      },
     };
   }
 }
 
 export async function initializeQueues() {
   workerLogger.info('Starting queue initialization...');
+  console.log('[queueManager] initializeQueues called');
   try {
     try {
-      await redis.ping();
+      // Use a temporary ioredis instance for ping
+      const testRedis = new Redis(redisConnection);
+      await testRedis.ping();
+      await testRedis.quit();
       workerLogger.info('Redis connection test successful');
+      console.log('[queueManager] Redis connection test successful');
     } catch (redisError) {
       workerLogger.error('Redis connection test failed:', redisError);
+      console.error('[queueManager] Redis connection test failed:', redisError);
       throw new Error(`Redis connection failed: ${redisError.message}`);
     }
     await updateQueueConfig();
+    console.log('[queueManager] Queue config updated');
     const initializedQueues = [];
     for (const [_name, config] of Object.entries(QUEUE_CONFIG)) {
       try {
         workerLogger.info(`Initializing queue: ${config.name}`);
-        const queue = new Queue(config.name, { connection: redis });
+        console.log(`[queueManager] Initializing queue: ${config.name}`);
+        const queue = new Queue(config.name, { 
+          connection: redisConnection,
+          defaultJobOptions: {
+            removeOnComplete: false,
+            removeOnFail: false,
+          }
+        });
+        console.log(`[queueManager] Queue ${config.name} created with opts:`, queue.opts);
         queues[config.name] = queue;
         initializedQueues.push(config.name);
         workerLogger.info(`Queue ${config.name} initialized successfully`);
+        console.log(`[queueManager] Queue ${config.name} initialized successfully`);
       } catch (error) {
         workerLogger.error(`Failed to initialize queue ${config.name}:`, error);
+        console.error(`[queueManager] Failed to initialize queue ${config.name}:`, error);
       }
     }
     if (!episodeProcessingQueueEvents) {
-      episodeProcessingQueueEvents = new QueueEvents('episode-processing', { connection: redis });
+      episodeProcessingQueueEvents = new QueueEvents('episode-processing', { connection: redisConnection });
       episodeProcessingQueueEvents.on('progress', async ({ jobId, data }) => {
         workerLogger.info('[QueueEvents] Progress event:', { jobId, data });
-        const queue = queues['episode-processing'];
-        let dbJobId;
-        if (queue) {
-          try {
-            const job = await queue.getJob(jobId);
-            dbJobId = job?.data?.dbJobId;
-            workerLogger.info({ jobId, dbJobId }, '[QueueEvents] Fetched job for progress event');
-          } catch (err) {
-            workerLogger.warn('Could not fetch job for dbJobId:', { jobId, err });
-          }
-        }
-        workerLogger.info(
-          { jobId, dbJobId, progress: data },
-          '[QueueEvents] Broadcasting job update',
-        );
-        broadcastJobUpdate({
-          type: 'job_update',
-          jobId,
-          dbJobId,
-          progress: data,
-          status: 'processing',
-        });
       });
     }
     workerLogger.info(
       `Queue initialization completed. ${initializedQueues.length}/${Object.keys(QUEUE_CONFIG).length} queues initialized successfully.`,
     );
+    console.log(`[queueManager] Queue initialization completed. ${initializedQueues.length}/${Object.keys(QUEUE_CONFIG).length} queues initialized successfully.`);
     if (initializedQueues.length === 0) {
       throw new Error('No queues were initialized successfully');
     }
   } catch (error) {
     workerLogger.error('Failed to initialize queues:', error);
+    console.error('[queueManager] Failed to initialize queues:', error);
     throw error;
   }
 }
 
 export async function startQueues() {
   workerLogger.info('Starting queue workers...');
+  console.log('[queueManager] startQueues called');
   try {
     await updateQueueConfig();
+    console.log('[queueManager] Queue config updated (startQueues)');
     const startedWorkers = [];
     for (const [name, config] of Object.entries(QUEUE_CONFIG)) {
       try {
         workerLogger.info(
           `Starting worker for queue: ${config.name} with concurrency ${config.concurrency}`,
         );
-        const worker = new Worker(
-          config.name,
-          async (job) => {
-            const { processJob } = await import('./jobProcessor.js');
-            return await processJob(job.name, job);
-          },
-          {
-            connection: redis,
-            concurrency: config.concurrency,
-            stalledInterval: 60000,
-            maxStalledCount: 2,
-          },
-        );
+        console.log(`[queueManager] Starting worker for queue: ${config.name} with concurrency ${config.concurrency}`);
+        
+        let worker;
+        if (config.name === 'cleanup') {
+          // Special worker for cleanup jobs
+          const { deleteProcessingJobs, deleteShowsAndCleanup } = await import('./cleanupService.js');
+          worker = new Worker(
+            config.name,
+            async (job) => {
+              workerLogger.info({ jobId: job.id, name: job.name, data: job.data }, 'Cleanup worker started');
+              if (job.name === 'deleteProcessingJobs') {
+                // Ensure DB instance is available for deleteProcessingJobs
+                let db = globalThis.db;
+                if (!db) {
+                  const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
+                  db = await getDbLocal();
+                  globalThis.db = db;
+                }
+                return await deleteProcessingJobs(job.data, db);
+              } else if (job.name === 'deleteShowsAndCleanup') {
+                const { showIds } = job.data;
+                if (!Array.isArray(showIds) || showIds.length === 0) {
+                  throw new Error('No showIds provided');
+                }
+                let db = globalThis.db;
+                if (!db) {
+                  const { getDb: getDbLocal } = await import('../database/Db_Operations.js');
+                  db = await getDbLocal();
+                  globalThis.db = db;
+                }
+                return await deleteShowsAndCleanup(showIds, db);
+              } else {
+                throw new Error('Unknown cleanup job type: ' + job.name);
+              }
+            },
+            {
+              connection: redisConnection,
+              concurrency: config.concurrency,
+              stalledInterval: 60000,
+              maxStalledCount: 2,
+            },
+          );
+          
+          worker.on('completed', (job, result) => {
+            workerLogger.info({ jobId: job.id, result }, 'Cleanup job completed');
+          });
+          worker.on('failed', (job, err) => {
+            workerLogger.error({ jobId: job.id, error: err && err.message }, 'Cleanup job failed');
+          });
+        } else {
+          // Standard worker for other job types
+          worker = new Worker(
+            config.name,
+            async (job) => {
+              const { processJob } = await import('./jobProcessor.js');
+              return await processJob(job.name, job);
+            },
+            {
+              connection: redisConnection,
+              concurrency: config.concurrency,
+              stalledInterval: 60000,
+              maxStalledCount: 2,
+            },
+          );
+        }
+        
         workerLogger.info(
           `Worker instance created for ${name} with concurrency: ${config.concurrency}`,
         );
+        console.log(`[queueManager] Worker instance created for ${name} with concurrency: ${config.concurrency}`);
         setupWorkerEvents(worker, name);
         workers[name] = worker;
         startedWorkers.push(name);
         workerLogger.info(
           `Worker for ${name} started successfully with concurrency ${config.concurrency}`,
         );
+        console.log(`[queueManager] Worker for ${name} started successfully with concurrency ${config.concurrency}`);
       } catch (error) {
         workerLogger.error(`Failed to start worker for ${name}:`, error);
+        console.error(`[queueManager] Failed to start worker for ${name}:`, error);
       }
     }
     workerLogger.info(
       `Worker startup completed. ${startedWorkers.length}/${Object.keys(QUEUE_CONFIG).length} workers started successfully.`,
     );
+    console.log(`[queueManager] Worker startup completed. ${startedWorkers.length}/${Object.keys(QUEUE_CONFIG).length} workers started successfully.`);
     if (startedWorkers.length === 0) {
       throw new Error('No workers were started successfully');
     }
   } catch (error) {
     workerLogger.error('Failed to start queue workers:', error);
+    console.error('[queueManager] Failed to start queue workers:', error);
     throw error;
   }
 }
@@ -233,7 +298,7 @@ export async function stopQueues() {
     await worker.close();
     workerLogger.info(`Worker ${name} stopped`);
   }
-  await redis.quit();
+  await redisConnection.quit();
   workerLogger.info('All queues stopped');
 }
 

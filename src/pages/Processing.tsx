@@ -568,7 +568,7 @@ export default function Processing() {
               <TabsContent value="queue" className="flex-1 flex flex-col min-h-0 mt-6">
                 <div className="flex-1 flex flex-col min-h-0 overflow-auto">
                   <ProcessingQueue
-                    jobs={queuedJobs}
+                    jobs={jobs}
                     mediaFiles={mediaFiles}
                     profiles={[]} // Removed profiles prop
                     onStopProcessing={stopProcessing}

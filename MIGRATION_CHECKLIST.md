@@ -463,3 +463,9 @@ Let me know if you want a more complete code sample for the clustering step or t
 
 possible UI for review is to have cards for each show with card images and you click on the show and then its broken down by either season or by confidence % and you can then look at whatevers in like 90+ and 80+ etc then theres a way to view and change the thing manually and then approve them for clipping from there or to select all from the whole card and submit for clipping.
   if done by season use the season images from plex for card images
+
+
+
+
+[INFO|soularr|L78] 2025-07-27T18:00:34-0700: Average sequence match ratio: 0.8940753695238904
+try to get our verify rate similar to this decimal value
