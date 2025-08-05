@@ -4,6 +4,7 @@
 set -euo pipefail
 
 MSG=${1:-"sync changes"}
+BRANCH=$(git symbolic-ref --short -q HEAD)
 
 git add -A
 if git diff --cached --quiet; then
@@ -12,4 +13,4 @@ if git diff --cached --quiet; then
 fi
 
 git commit -m "$MSG"
-git push origin main
+git push origin "$BRANCH"
