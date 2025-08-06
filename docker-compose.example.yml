@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   cliparr:
-    image: ghcr.io/redeyeredline/cliparr-dev:latest
+    image: ghcr.io/redeyeredline/cliparr:latest
     container_name: cliparr
     restart: unless-stopped
     ports:

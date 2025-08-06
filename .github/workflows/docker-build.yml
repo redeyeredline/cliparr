@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: redeyeredline/cliparr-dev
+  IMAGE_NAME: redeyeredline/cliparr
 
 jobs:
   build:
@@ -51,7 +51,7 @@ jobs:
         platforms: linux/amd64,linux/arm64
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
-          ghcr.io/redeyeredline/cliparr-dev:latest
+          ghcr.io/redeyeredline/cliparr:latest
           ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
