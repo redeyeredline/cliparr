@@ -592,7 +592,7 @@ export default function Processing() {
               <TabsContent value="monitor" className="flex-1 flex flex-col min-h-0 mt-6">
                 <div className="flex-1 flex flex-col min-h-0 overflow-auto">
                   <ProcessingMonitor
-                    activeProcesses={activeProcesses}
+                    activeProcesses={displayedActiveProcesses}
                     mediaFiles={mediaFiles}
                     jobProgress={jobProgress}
                   />
