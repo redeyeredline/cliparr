@@ -65,6 +65,10 @@ export function createApp({ db, logger: _logger = appLogger, wss }) {
     next();
   });
 
+  // Serve static files from the React build
+  const distPath = path.join(__dirname, '..', 'dist');
+  app.use(express.static(distPath));
+
   // Handle client-side routing - serve index.html for all non-API routes
   app.use((req, res, next) => {
     // Skip API routes that actually exist
@@ -82,10 +86,6 @@ export function createApp({ db, logger: _logger = appLogger, wss }) {
     // Serve index.html for all other routes (client-side routing)
     res.sendFile(path.join(distPath, 'index.html'));
   });
-
-  // Serve static files from the React build
-  const distPath = path.join(__dirname, '..', 'dist');
-  app.use(express.static(distPath));
 
   // Catch-all unmatched route logger
   app.use((req, res, _next) => {
