@@ -83,13 +83,19 @@ export function createApp({ db, logger: _logger = appLogger, wss }) {
       return next();
     }
 
-    // Serve index.html for all other routes (client-side routing)
-    res.sendFile(path.join(distPath, 'index.html'));
+    // For all other routes, serve index.html (client-side routing)
+    // This handles page refreshes on client-side routes
+    res.sendFile(path.join(distPath, 'index.html'), (err) => {
+      if (err) {
+        console.error('Error serving index.html:', err);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
   });
 
-  // Catch-all unmatched route logger
+  // Catch-all unmatched route logger (only for API routes that don't exist)
   app.use((req, res, _next) => {
-    console.error('UNMATCHED ROUTE:', req.method, req.url);
+    console.error('UNMATCHED API ROUTE:', req.method, req.url);
     res.status(404).json({ error: 'Not found' });
   });
 
