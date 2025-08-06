@@ -40,6 +40,27 @@ You can change this mode at any time from the Settings page.
   - All services (backend, frontend, Redis, SQLite) are unified and accessible via a single port (default: 8484).
   - No need to run Vite dev server or separate backend process.
 
+## Docker Images
+
+Two pre-built images are published on GitHub Container Registry:
+
+| Tag | Purpose | Size |
+|-----|---------|------|
+| `ghcr.io/redeyeredline/cliparr:latest` | CPU-only build (no CUDA, works on any host) | ~350 MB |
+| `ghcr.io/redeyeredline/cliparr:nvidia` | Includes NVIDIA NVENC / CUDA support | ~550 MB |
+
+Choose the tag that matches your host capabilities. Example with docker-compose:
+```yaml
+services:
+  cliparr:
+    image: ghcr.io/redeyeredline/cliparr:latest        # or :nvidia
+    ports:
+      - "8484:8484"
+    # … other options …
+```
+
+---
+
 ## Installation
 1. Clone the repository.
 2. Navigate to the project directory.
