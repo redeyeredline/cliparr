@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -27,6 +27,96 @@ import { ProcessingJobEntity } from '../entities/ProcessingJob';
 import { apiClient } from '../../integration/api-client';
 import { FixedSizeList as VirtualList } from 'react-window';
 import { filterJobsByCategory } from '@/utils/jobFilters.tsx';
+
+// Memoized job item component to prevent unnecessary re-renders
+const JobItem = memo(({ 
+  job, 
+  mediaFile, 
+  profiles, 
+  selected, 
+  onRowSelect, 
+  onStopProcessing, 
+  onDeleteJob, 
+  statusConfig 
+}: {
+  job: ProcessingJob;
+  mediaFile?: MediaFile;
+  profiles: ProcessingProfile[];
+  selected: (string | number)[];
+  onRowSelect: (jobId: string | number) => void;
+  onStopProcessing: (jobId: string | number) => Promise<void>;
+  onDeleteJob: (jobId: string | number) => Promise<void>;
+  statusConfig: any;
+}) => {
+  const config = statusConfig[job.status as keyof typeof statusConfig] || {
+    color: 'bg-slate-700 text-slate-200',
+    icon: Clock,
+  };
+  const StatusIcon = config.icon;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      className="p-5 border-0 rounded-xl shadow-md bg-slate-900/80 hover:scale-[1.01] transition-transform duration-200 cursor-pointer"
+    >
+      <div className="flex items-start gap-4">
+        <input
+          type="checkbox"
+          checked={selected.includes(job.id!)}
+          onChange={() => onRowSelect(job.id!)}
+          className="w-4 h-4 mt-2 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
+          title="Select job"
+          disabled={job.id === undefined || job.id === null}
+        />
+        <div className="flex-1 space-y-2">
+          <h3 className="font-semibold text-white text-base">
+            {mediaFile?.file_name || 'Loading...'}
+          </h3>
+          <div className="flex items-center gap-2">
+            <Badge
+              className={`${config.color} capitalize rounded-full px-3 py-1 text-xs font-semibold border border-slate-700`}
+            >
+              {' '}
+              <StatusIcon className="w-3 h-3 mr-1.5" /> {job.status}
+            </Badge>
+            <Badge
+              variant="outline"
+              className="rounded-full px-3 py-1 text-xs border-slate-700 text-slate-200"
+            >
+              Profile: {profiles.find((p) => p.id === job.profile_id)?.name || 'Auto'}
+            </Badge>
+          </div>
+        </div>
+        {job.status === 'processing' && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onStopProcessing(job.id!)}
+            className="rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200"
+          >
+            <Pause className="w-5 h-5" />
+          </Button>
+        )}
+        {job.status === 'completed' && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onDeleteJob(job.id!)}
+            className="rounded-full bg-slate-800 hover:bg-red-700 text-red-400"
+            title="Remove job"
+          >
+            <Trash2 className="w-5 h-5" />
+          </Button>
+        )}
+      </div>
+    </motion.div>
+  );
+});
+
+JobItem.displayName = 'JobItem';
 
 interface ProcessingQueueProps {
   jobs: ProcessingJob[];
@@ -379,72 +469,18 @@ export default function ProcessingQueue({
             {({ index, style }) => {
               const job = filteredJobs[index];
               const mediaFile = getMediaFile(job.media_file_id);
-              const config = statusConfig[job.status as keyof typeof statusConfig] || {
-                color: 'bg-slate-700 text-slate-200',
-                icon: Clock,
-              };
-              const StatusIcon = config.icon;
               return (
-                <div style={style} key={job.id}>
-                  <motion.div
-                    layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="p-5 border-0 rounded-xl shadow-md bg-slate-900/80 hover:scale-[1.01] transition-transform duration-200 cursor-pointer"
-                  >
-                    <div className="flex items-start gap-4">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(job.id!)}
-                        onChange={() => handleRowSelect(job.id!)}
-                        className="w-4 h-4 mt-2 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
-                        title="Select job"
-                        disabled={job.id === undefined || job.id === null}
-                      />
-                      <div className="flex-1 space-y-2">
-                        <h3 className="font-semibold text-white text-base">
-                          {mediaFile?.file_name || 'Loading...'}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            className={`${config.color} capitalize rounded-full px-3 py-1 text-xs font-semibold border border-slate-700`}
-                          >
-                            {' '}
-                            <StatusIcon className="w-3 h-3 mr-1.5" /> {job.status}
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className="rounded-full px-3 py-1 text-xs border-slate-700 text-slate-200"
-                          >
-                            Profile: {profiles.find((p) => p.id === job.profile_id)?.name || 'Auto'}
-                          </Badge>
-                        </div>
-                      </div>
-                      {job.status === 'processing' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onStopProcessing(job.id!)}
-                          className="rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200"
-                        >
-                          <Pause className="w-5 h-5" />
-                        </Button>
-                      )}
-                      {job.status === 'completed' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onDeleteJob(job.id!)}
-                          className="rounded-full bg-slate-800 hover:bg-red-700 text-red-400"
-                          title="Remove job"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </Button>
-                      )}
-                    </div>
-                  </motion.div>
-                </div>
+                <JobItem
+                  key={job.id}
+                  job={job}
+                  mediaFile={mediaFile}
+                  profiles={profiles}
+                  selected={selected}
+                  onRowSelect={handleRowSelect}
+                  onStopProcessing={onStopProcessing}
+                  onDeleteJob={onDeleteJob}
+                  statusConfig={statusConfig}
+                />
               );
             }}
           </VirtualList>

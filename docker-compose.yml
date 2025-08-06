@@ -15,7 +15,7 @@ services:
       # Change this to your preferred data location
       - /opt/dockerdata/cliparr/data:/app/data
       # Media files - CHANGE THIS to your media directory
-      - /opt/dockerdata/media:/media
+      - /opt/slowerdrive/media:/media
     environment:
       - PORT=8484
       - NVIDIA_VISIBLE_DEVICES=all

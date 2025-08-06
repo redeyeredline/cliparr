@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ProcessingJob,
   ProcessingJobEntity,
@@ -61,6 +61,32 @@ export default function Processing() {
     Record<string, { progress: number; fps: number; currentFile: CurrentFile; updated: number }>
   >({});
 
+  // Debounced job updates to prevent excessive re-renders
+  const jobUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingJobUpdates = useRef<Map<string, any>>(new Map());
+
+  const debouncedUpdateJobs = useCallback(() => {
+    if (jobUpdateTimeoutRef.current) {
+      clearTimeout(jobUpdateTimeoutRef.current);
+    }
+    
+    jobUpdateTimeoutRef.current = setTimeout(() => {
+      if (pendingJobUpdates.current.size > 0) {
+        setJobs((prevJobs) => {
+          const updated = [...prevJobs];
+          pendingJobUpdates.current.forEach((update, jobId) => {
+            const index = updated.findIndex(job => normalizeId(job.id) === jobId);
+            if (index !== -1) {
+              updated[index] = { ...updated[index], ...update };
+            }
+          });
+          pendingJobUpdates.current.clear();
+          return updated;
+        });
+      }
+    }, 100); // Debounce to 100ms
+  }, []);
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -101,16 +127,16 @@ export default function Processing() {
   const activeWorkerLimit = episodeQueueStatus?.active ?? 1; // default to 1 worker if unknown
   const displayedActiveProcesses = activeProcesses.slice(0, Math.max(activeWorkerLimit, 1));
 
+  // Helper to normalize job IDs (strip 'epjob-' prefix)
+  const normalizeId = useCallback((id: string | number | undefined) =>
+    id ? id.toString().replace(/^epjob-/, '') : '', []);
+
   // WebSocket event handlers
   useEffect(() => {
     // Add a simple message logger to debug all incoming messages
     const handleAllMessages = (_data: unknown) => {
       /* intentionally left blank */
     };
-
-    // Helper to normalize job IDs (strip 'epjob-' prefix)
-    const normalizeId = (id: string | number | undefined) =>
-      id ? id.toString().replace(/^epjob-/, '') : '';
 
     const handleJobUpdate = (data: unknown) => {
       // Handle job updates - these come directly without a 'type' field
@@ -158,25 +184,14 @@ export default function Processing() {
               return copy;
             });
           }
-          // Update the specific job in the state
-          setJobs((prevJobs) => {
-            const updated = prevJobs.map((job) => {
-              if (!job) {
-                return job;
-              }
-              if (normalizeId(job.id) === normalizeId(jobData.dbJobId)) {
-                return {
-                  ...job,
-                  status: jobData.status,
-                  processing_notes:
-                    jobData.error || jobData.result?.message || job.processing_notes,
-                  updated_date: new Date().toISOString(),
-                };
-              }
-              return job;
-            });
-            return updated;
+          // Use debounced job updates to prevent excessive re-renders
+          const jobId = normalizeId(jobData.dbJobId);
+          pendingJobUpdates.current.set(jobId, {
+            status: jobData.status,
+            processing_notes: jobData.error || jobData.result?.message || '',
+            updated_date: new Date().toISOString(),
           });
+          debouncedUpdateJobs();
 
           // Show toast notification for important updates
           if (jobData.status === 'completed') {
@@ -248,24 +263,14 @@ export default function Processing() {
                 return copy;
               });
             }
-            // Update the specific job in the state
-            setJobs((prevJobs) => {
-              return prevJobs.map((job) => {
-                if (!job) {
-                  return job;
-                }
-                if (normalizeId(job.id) === normalizeId(legacyJobData.dbJobId)) {
-                  return {
-                    ...job,
-                    status: legacyJobData.status,
-                    processing_notes:
-                      legacyJobData.error || legacyJobData.result?.message || job.processing_notes,
-                    updated_date: new Date().toISOString(),
-                  };
-                }
-                return job;
-              });
+            // Use debounced job updates to prevent excessive re-renders
+            const jobId = normalizeId(legacyJobData.dbJobId);
+            pendingJobUpdates.current.set(jobId, {
+              status: legacyJobData.status,
+              processing_notes: legacyJobData.error || legacyJobData.result?.message || '',
+              updated_date: new Date().toISOString(),
             });
+            debouncedUpdateJobs();
 
             // Show toast notification for important updates
             if (legacyJobData.status === 'completed') {
@@ -332,6 +337,11 @@ export default function Processing() {
       wsClient.removeEventListener('message', handleJobUpdate);
       wsClient.removeEventListener('message', handleQueueStatus);
       wsClient.removeEventListener('message', handleProcessingStatus);
+      
+      // Clean up timeout
+      if (jobUpdateTimeoutRef.current) {
+        clearTimeout(jobUpdateTimeoutRef.current);
+      }
     };
   }, [toast, jobs, loadData]);
 
