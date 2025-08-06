@@ -71,20 +71,42 @@ export function createApp({ db, logger: _logger = appLogger, wss }) {
 
   // Handle client-side routing - serve index.html for all non-API routes
   app.use((req, res, next) => {
-    // Skip API routes that actually exist
-    if (
-      req.path.startsWith('/health') ||
-      req.path.startsWith('/shows') ||
-      req.path.startsWith('/sonarr') ||
-      req.path.startsWith('/settings') ||
-      req.path.startsWith('/hardware') ||
-      req.path.startsWith('/processing')
-    ) {
+    // Define API route prefixes that are mounted in the app
+    const apiRoutePrefixes = [
+      '/health',
+      '/shows',
+      '/sonarr',
+      '/settings',
+      '/hardware',
+      '/processing'
+    ];
+    
+    // Check if this is an API route
+    // An API route is one that starts with an API prefix AND has additional segments
+    // OR is exactly the API prefix but has a trailing slash
+    const isApiRoute = apiRoutePrefixes.some(prefix => {
+      if (req.path.startsWith(prefix)) {
+        // If it's exactly the prefix, it's a client-side route
+        if (req.path === prefix) {
+          return false;
+        }
+        // If it's the prefix with a trailing slash, it's a client-side route
+        if (req.path === prefix + '/') {
+          return false;
+        }
+        // If it has additional segments, it's an API route
+        return true;
+      }
+      return false;
+    });
+    
+    if (isApiRoute) {
+      // For API routes, continue to the next middleware (API handlers)
       return next();
     }
 
     // For all other routes, serve index.html (client-side routing)
-    // This handles page refreshes on client-side routes
+    // This handles page refreshes on client-side routes like /processing, /hardware, /settings, /system, /review, etc.
     res.sendFile(path.join(distPath, 'index.html'), (err) => {
       if (err) {
         console.error('Error serving index.html:', err);
