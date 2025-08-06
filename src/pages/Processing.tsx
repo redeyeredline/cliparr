@@ -163,10 +163,20 @@ export default function Processing() {
           // Check if this job exists in our current jobs array (normalize IDs)
           const existingJob = jobs.find((j) => normalizeId(j.id) === normalizeId(jobData.dbJobId));
 
-          // If job doesn't exist in our array, reload data to get latest jobs
+          // If job doesn't exist in our array, add it to the jobs array instead of reloading
           if (!existingJob) {
-            loadData();
-            return; // Exit early, let the reload handle the update
+            // Create a minimal job object for the new job
+            const newJob = {
+              id: jobData.dbJobId,
+              status: jobData.status,
+              processing_notes: jobData.error || jobData.result?.message || '',
+              updated_date: new Date().toISOString(),
+              created_date: new Date().toISOString(),
+              media_file_id: 0, // Will be updated when we get more data
+            } as ProcessingJob;
+            
+            setJobs(prevJobs => [newJob, ...prevJobs]);
+            return; // Exit early, the new job is now in the array
           }
 
           // Track real-time progress/fps for processing jobs with immediate updates
@@ -246,10 +256,20 @@ export default function Processing() {
               (j) => normalizeId(j.id) === normalizeId(legacyJobData.dbJobId),
             );
 
-            // If job doesn't exist in our array, reload data to get latest jobs
+            // If job doesn't exist in our array, add it to the jobs array instead of reloading
             if (!existingJob) {
-              loadData();
-              return; // Exit early, let the reload handle the update
+              // Create a minimal job object for the new job
+              const newJob = {
+                id: legacyJobData.dbJobId,
+                status: legacyJobData.status,
+                processing_notes: legacyJobData.error || legacyJobData.result?.message || '',
+                updated_date: new Date().toISOString(),
+                created_date: new Date().toISOString(),
+                media_file_id: 0, // Will be updated when we get more data
+              } as ProcessingJob;
+              
+              setJobs(prevJobs => [newJob, ...prevJobs]);
+              return; // Exit early, the new job is now in the array
             }
 
             // Track real-time progress/fps for processing jobs
@@ -373,7 +393,14 @@ export default function Processing() {
           }),
         ),
       );
-      await loadData();
+      // Update the jobs in the local array instead of reloading
+      setJobs(prevJobs => 
+        prevJobs.map(job => 
+          jobIds.includes(job.id)
+            ? { ...job, status: 'processing', processing_notes: `Batch processing started with profile ${profileId}` }
+            : job
+        )
+      );
     } catch {
       console.error('Error starting batch processing:');
     }
@@ -385,7 +412,14 @@ export default function Processing() {
         status: 'detected',
         processing_notes: 'Processing stopped by user',
       });
-      await loadData();
+      // Update the job in the local array instead of reloading
+      setJobs(prevJobs => 
+        prevJobs.map(job => 
+          job.id === jobId 
+            ? { ...job, status: 'detected', processing_notes: 'Processing stopped by user' }
+            : job
+        )
+      );
     } catch {
       console.error('Error stopping processing:');
     }
@@ -396,7 +430,8 @@ export default function Processing() {
     try {
       await ProcessingJobEntity.delete(jobId);
       setSelected((ids) => ids.filter((id) => id !== jobId));
-      await loadData();
+      // Remove the job from the local array instead of reloading
+      setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
       toast({ type: 'success', message: 'Job deleted' });
     } catch {
       toast({ type: 'error', message: 'Failed to delete job' });
