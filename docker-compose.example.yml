@@ -2,6 +2,9 @@ version: '3.8'
 
 services:
   cliparr:
+# Choose the image variant that matches your host capabilities:
+    # - CPU-only: ghcr.io/redeyeredline/cliparr:latest
+    # - NVIDIA (CUDA/NVENC): ghcr.io/redeyeredline/cliparr:nvidia
     image: ghcr.io/redeyeredline/cliparr:latest
     container_name: cliparr
     restart: unless-stopped

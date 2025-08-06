@@ -107,6 +107,10 @@ Thumbs.db
 # Docker
 .dockerignore
 
+docker-compose.yml
+docker-compose.prod.yml
+docker-composeold.yml
+
 # Backup files
 *.bak
 *.backup
