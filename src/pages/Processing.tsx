@@ -53,7 +53,7 @@ export default function Processing() {
   // Remove activeProcesses state, use derived values instead
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Update the state type
-  const [queueStatus, setQueueStatus] = useState<QueueStatusType[] | null>(null);
+  const [queueStatus, setQueueStatus] = useState<QueueStatusType[]>([]);
   const [selected, setSelected] = useState<(string | number)[]>([]);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
   const toast = useToast();
