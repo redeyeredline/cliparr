@@ -11,8 +11,10 @@ const wsLogStream = fs.createWriteStream('websocket.log', { flags: 'a' });
 let messageQueue = [];
 
 // Redis pub/sub setup
-const redisPub = new Redis({ host: 'localhost', port: 6379 });
-const redisSub = new Redis({ host: 'localhost', port: 6379 });
+const redisHost = process.env.REDIS_HOST || 'localhost';
+const redisPort = process.env.REDIS_PORT || 6379;
+const redisPub = new Redis({ host: redisHost, port: redisPort });
+const redisSub = new Redis({ host: redisHost, port: redisPort });
 const REDIS_CHANNEL = 'ws:broadcast';
 
 // Helper to broadcast to all clients (internal use only)

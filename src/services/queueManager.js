@@ -7,7 +7,10 @@ import { Queue, Worker, QueueEvents } from 'bullmq';
 import Redis from 'ioredis';
 
 // Replace the redis instance with a plain connection object
-const redisConnection = 'redis://localhost:6379';
+// Allow Redis connection to be configured via environment
+const redisHost = process.env.REDIS_HOST || 'localhost';
+const redisPort = process.env.REDIS_PORT || 6379;
+const redisConnection = `redis://${redisHost}:${redisPort}`;
 
 let QUEUE_CONFIG = {};
 const queues = {};
@@ -148,12 +151,12 @@ export async function initializeQueues() {
       try {
         workerLogger.info(`Initializing queue: ${config.name}`);
         console.log(`[queueManager] Initializing queue: ${config.name}`);
-        const queue = new Queue(config.name, { 
+        const queue = new Queue(config.name, {
           connection: redisConnection,
           defaultJobOptions: {
             removeOnComplete: false,
             removeOnFail: false,
-          }
+          },
         });
         console.log(`[queueManager] Queue ${config.name} created with opts:`, queue.opts);
         queues[config.name] = queue;
@@ -198,7 +201,7 @@ export async function startQueues() {
           `Starting worker for queue: ${config.name} with concurrency ${config.concurrency}`,
         );
         console.log(`[queueManager] Starting worker for queue: ${config.name} with concurrency ${config.concurrency}`);
-        
+
         let worker;
         if (config.name === 'cleanup') {
           // Special worker for cleanup jobs
@@ -239,7 +242,7 @@ export async function startQueues() {
               maxStalledCount: 2,
             },
           );
-          
+
           worker.on('completed', (job, result) => {
             workerLogger.info({ jobId: job.id, result }, 'Cleanup job completed');
           });
@@ -262,7 +265,7 @@ export async function startQueues() {
             },
           );
         }
-        
+
         workerLogger.info(
           `Worker instance created for ${name} with concurrency: ${config.concurrency}`,
         );

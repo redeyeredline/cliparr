@@ -1,6 +1,7 @@
 // jobProcessor.js
 // Job processing functions will be moved here from queue.js
 import { workerLogger } from './logger.js';
+import { broadcastJobUpdate } from './websocket.js';
 import { getDb, getEpisodeFileById } from '../database/Db_Operations.js';
 import {
   processEpisodeFile,
@@ -28,7 +29,31 @@ export async function processJob(jobType, jobOrData) {
           workerLogger.error(`Episode file not found for ID: ${episodeFileId}`);
           throw new Error(`Episode file not found for ID: ${episodeFileId}`);
         }
-        return await processEpisodeFile(jobOrData.id, file, dbJobId);
+        // Define a progress callback to emit granular updates via WebSocket
+        const progressCallback = (progress, message) => {
+          try {
+            broadcastJobUpdate({
+              type: 'job_update',
+              jobId: jobOrData.id,
+              dbJobId,
+              status: 'processing',
+              progress,
+              currentFile: {
+                fileId: file.id,
+                filePath: file.file_path,
+                episode: file.episode_title,
+                season: file.season_number,
+                show: file.show_title,
+              },
+              message,
+            });
+          } catch (err) {
+            // Don't let broadcast errors crash the worker
+            workerLogger.warn({ jobId: jobOrData.id, err: err && err.message }, 'Failed to broadcast progress update');
+          }
+        };
+
+        return await processEpisodeFile(jobOrData.id, file, dbJobId, progressCallback);
       }
       case 'audio-extraction':
         workerLogger.info({ jobType, jobId: jobOrData.id }, 'Processing audio-extraction job');
