@@ -9,36 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  ffmpeg:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build & push FFmpeg layer
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/ffmpeg.Dockerfile
-          push: true
-          tags: ghcr.io/redeyeredline/cliparr/ffmpeg-static:7.1.1
-      - name: Make FFmpeg package public
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          sudo apt-get update -y && sudo apt-get install -y gh
-          gh api -X PATCH "/user/packages/container/cliparr%2Fffmpeg-static" -f visibility=public
-
   cliparr:
-    needs: ffmpeg
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -59,6 +30,6 @@ jobs:
           push: true
           tags: ghcr.io/redeyeredline/cliparr:latest
           build-args: |
-            FFMPEG_IMAGE=ghcr.io/redeyeredline/cliparr/ffmpeg-static:7.1.1
+            FFMPEG_IMAGE=ghcr.io/redeyeredline/ffmpeg-static:7.1.1
           cache-from: type=registry,ref=ghcr.io/redeyeredline/cliparr:cache
           cache-to: type=registry,ref=ghcr.io/redeyeredline/cliparr:cache,mode=max

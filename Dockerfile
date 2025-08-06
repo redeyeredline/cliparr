@@ -4,7 +4,7 @@
 # Provide an FFmpeg image once (built separately with docker/ffmpeg.Dockerfile),
 # push it to your registry, and reference it here so we skip the long compile.
 # Update the tag when you rebuild FFmpeg.
-ARG FFMPEG_IMAGE=ghcr.io/redeyeredline/cliparr/ffmpeg-static:7.1.1
+ARG FFMPEG_IMAGE=ghcr.io/redeyeredline/ffmpeg-static:7.1.1
 FROM ${FFMPEG_IMAGE} AS ffmpeg
 
 # --------  Application build layer --------
