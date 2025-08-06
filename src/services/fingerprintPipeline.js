@@ -23,15 +23,50 @@ const { ceil, round } = lodash;
 // Track active ffmpeg jobs for UI progress
 export const activeFfmpegJobs = {};
 
-// Throttled progress callback to prevent excessive WebSocket messages
-function createThrottledProgressCallback(originalCallback, throttleMs = 1000) {
+// Progress interpolation for smooth updates
+function createInterpolatedProgressCallback(originalCallback, throttleMs = 200) {
   let lastCall = 0;
   let lastProgress = -1;
-
+  let targetProgress = 0;
+  let interpolationTimer = null;
+  
+  const interpolate = () => {
+    if (lastProgress < targetProgress) {
+      lastProgress = Math.min(targetProgress, lastProgress + 1);
+      if (originalCallback) {
+        originalCallback(lastProgress, `Processing... ${lastProgress}%`);
+      }
+      
+      if (lastProgress < targetProgress) {
+        interpolationTimer = setTimeout(interpolate, 100); // 1% every 100ms
+      }
+    }
+  };
+  
   return (progress, message) => {
     const now = Date.now();
-    // Only call if enough time has passed AND progress has changed significantly
-    if (now - lastCall >= throttleMs && Math.abs(progress - lastProgress) >= 5) {
+    targetProgress = progress;
+    
+    // Always start interpolation for smooth progress, regardless of jump size
+    if (now - lastCall >= throttleMs) {
+      if (interpolationTimer) {
+        clearTimeout(interpolationTimer);
+      }
+      interpolationTimer = setTimeout(interpolate, 50);
+      lastCall = now;
+    }
+  };
+}
+
+// Throttled progress callback to prevent excessive WebSocket messages
+function createThrottledProgressCallback(originalCallback, throttleMs = 200) {
+  let lastCall = 0;
+  let lastProgress = -1;
+  
+  return (progress, message) => {
+    const now = Date.now();
+    // Allow more frequent updates with smaller thresholds for smoother progress
+    if (now - lastCall >= throttleMs && Math.abs(progress - lastProgress) >= 1) {
       lastCall = now;
       lastProgress = progress;
       if (originalCallback) {
@@ -213,7 +248,7 @@ async function extractAudioFromFile(filePath, tempDir, episodeFileId) {
   const t0 = Date.now();
   let lastPercent = 0;
   let lastBroadcastTime = 0;
-  const BROADCAST_THROTTLE_MS = 1000; // Only broadcast progress every 1 second
+  const BROADCAST_THROTTLE_MS = 200; // Broadcast progress every 200ms for smoother updates
   
   try {
     await new Promise((resolve, reject) => {
@@ -243,7 +278,7 @@ async function extractAudioFromFile(filePath, tempDir, episodeFileId) {
               `Audio extraction progress: ${percent}%`,
             );
             
-            // Throttle WebSocket broadcasts to prevent excessive messages
+            // Send progress updates more frequently for smoother experience
             const now = Date.now();
             if (now - lastBroadcastTime >= BROADCAST_THROTTLE_MS && typeof broadcastJobUpdate === 'function' && episodeFileId) {
               lastBroadcastTime = now;
@@ -403,7 +438,7 @@ async function fingerprintEpisodeChunks(
   progressCallback = null,
 ) {
   // Create throttled progress callback to prevent excessive WebSocket messages
-  const throttledProgressCallback = progressCallback ? createThrottledProgressCallback(progressCallback, 1000) : null;
+  const throttledProgressCallback = progressCallback ? createThrottledProgressCallback(progressCallback, 200) : null;
   const getAudioDuration = async (file) => {
     return new Promise((resolve, reject) => {
       execFile(
@@ -1325,8 +1360,8 @@ export async function processEpisodeAndTriggerSeasonDetection(
   options = {},
   progressCallback = null,
 ) {
-  // Create throttled progress callback to prevent excessive WebSocket messages
-  const throttledProgressCallback = progressCallback ? createThrottledProgressCallback(progressCallback, 1000) : null;
+  // Create interpolated progress callback for smooth 1% increments
+  const interpolatedProgressCallback = progressCallback ? createInterpolatedProgressCallback(progressCallback, 200) : null;
   const startTime = Date.now();
 
   try {
@@ -1353,8 +1388,8 @@ export async function processEpisodeAndTriggerSeasonDetection(
     }
 
     // Analyze file state
-    if (throttledProgressCallback) {
-      throttledProgressCallback(2, 'Analyzing file state...');
+    if (interpolatedProgressCallback) {
+      interpolatedProgressCallback(2, 'Analyzing file state...');
     }
     const fileState = await analyzeFileState(filePath);
 
@@ -1366,21 +1401,21 @@ export async function processEpisodeAndTriggerSeasonDetection(
 
     try {
       // Extract audio
-      if (throttledProgressCallback) {
-        throttledProgressCallback(5, 'Starting audio extraction...');
+      if (interpolatedProgressCallback) {
+        interpolatedProgressCallback(5, 'Starting audio extraction...');
       }
       workerLogger.info({ episodeFileId, filePath }, 'Starting audio extraction...');
       const audioPath = await extractAudioFromFile(filePath, tempDir, episodeFileId);
-      if (throttledProgressCallback) {
-        throttledProgressCallback(15, 'Audio extraction completed');
+      if (interpolatedProgressCallback) {
+        interpolatedProgressCallback(15, 'Audio extraction completed');
       }
       workerLogger.info({ episodeFileId, audioPath }, 'Audio extraction completed');
 
       // Generate fingerprints
       const chunkLength = options.chunkLength || 30;
       const overlap = options.overlap || 20;
-      if (throttledProgressCallback) {
-        throttledProgressCallback(20, 'Starting fingerprint generation...');
+      if (interpolatedProgressCallback) {
+        interpolatedProgressCallback(20, 'Starting fingerprint generation...');
       }
       workerLogger.info(
         { episodeFileId, chunkLength, overlap },
@@ -1391,10 +1426,10 @@ export async function processEpisodeAndTriggerSeasonDetection(
         chunkLength,
         overlap,
         episodeFileId,
-        throttledProgressCallback,
+        interpolatedProgressCallback,
       );
-      if (throttledProgressCallback) {
-        throttledProgressCallback(70, 'Fingerprint generation completed');
+      if (interpolatedProgressCallback) {
+        interpolatedProgressCallback(70, 'Fingerprint generation completed');
       }
       workerLogger.info(
         {
@@ -1407,8 +1442,8 @@ export async function processEpisodeAndTriggerSeasonDetection(
       );
 
       // Store fingerprints
-      if (throttledProgressCallback) {
-        throttledProgressCallback(75, 'Storing fingerprints...');
+      if (interpolatedProgressCallback) {
+        interpolatedProgressCallback(75, 'Storing fingerprints...');
       }
       await storeEpisodeFingerprints(
         show_id,
@@ -1419,13 +1454,13 @@ export async function processEpisodeAndTriggerSeasonDetection(
         fileState.duration,
         fileState.fileSize,
       );
-      if (throttledProgressCallback) {
-        throttledProgressCallback(80, 'Fingerprints stored');
+      if (interpolatedProgressCallback) {
+        interpolatedProgressCallback(80, 'Fingerprints stored');
       }
 
       // Trigger season batch detection
-      if (throttledProgressCallback) {
-        throttledProgressCallback(85, 'Starting season detection...');
+      if (interpolatedProgressCallback) {
+        interpolatedProgressCallback(85, 'Starting season detection...');
       }
       workerLogger.info({ episodeFileId, show_id, season_number }, 'Starting season detection...');
       const seasonDetectionResult = await detectIntroAndCreditsForSeason(
@@ -1433,8 +1468,8 @@ export async function processEpisodeAndTriggerSeasonDetection(
         season_number,
         options,
       );
-      if (throttledProgressCallback) {
-        throttledProgressCallback(95, 'Season detection completed');
+      if (interpolatedProgressCallback) {
+        interpolatedProgressCallback(95, 'Season detection completed');
       }
 
       const duration = Date.now() - startTime;

@@ -64,6 +64,7 @@ export default function Processing() {
   // Debounced job updates to prevent excessive re-renders
   const jobUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingJobUpdates = useRef<Map<string, any>>(new Map());
+  const animationFrameRef = useRef<number | null>(null);
 
   const debouncedUpdateJobs = useCallback(() => {
     if (jobUpdateTimeoutRef.current) {
@@ -72,19 +73,26 @@ export default function Processing() {
     
     jobUpdateTimeoutRef.current = setTimeout(() => {
       if (pendingJobUpdates.current.size > 0) {
-        setJobs((prevJobs) => {
-          const updated = [...prevJobs];
-          pendingJobUpdates.current.forEach((update, jobId) => {
-            const index = updated.findIndex(job => normalizeId(job.id) === jobId);
-            if (index !== -1) {
-              updated[index] = { ...updated[index], ...update };
-            }
+        // Use requestAnimationFrame for optimal rendering performance
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        
+        animationFrameRef.current = requestAnimationFrame(() => {
+          setJobs((prevJobs) => {
+            const updated = [...prevJobs];
+            pendingJobUpdates.current.forEach((update, jobId) => {
+              const index = updated.findIndex(job => normalizeId(job.id) === jobId);
+              if (index !== -1) {
+                updated[index] = { ...updated[index], ...update };
+              }
+            });
+            pendingJobUpdates.current.clear();
+            return updated;
           });
-          pendingJobUpdates.current.clear();
-          return updated;
         });
       }
-    }, 100); // Debounce to 100ms
+    }, 50); // Reduced debounce to 50ms for more responsive updates
   }, []);
 
   const loadData = useCallback(async () => {
@@ -161,12 +169,13 @@ export default function Processing() {
             return; // Exit early, let the reload handle the update
           }
 
-          // Track real-time progress/fps for processing jobs
+          // Track real-time progress/fps for processing jobs with immediate updates
           if (jobData.status === 'processing' && jobData.progress !== undefined) {
             setJobProgress((prev) => {
+              const jobId = normalizeId(jobData.dbJobId) || '';
               const newProgress = {
                 ...prev,
-                [normalizeId(jobData.dbJobId) || '']: {
+                [jobId]: {
                   progress: jobData.progress,
                   fps: jobData.fps,
                   currentFile: jobData.currentFile,
@@ -341,6 +350,9 @@ export default function Processing() {
       // Clean up timeout
       if (jobUpdateTimeoutRef.current) {
         clearTimeout(jobUpdateTimeoutRef.current);
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
     };
   }, [toast, jobs, loadData]);
