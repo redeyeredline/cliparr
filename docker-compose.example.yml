@@ -18,11 +18,14 @@ services:
       - /mnt/media:/media:ro
     environment:
       - PORT=8484
-    # Enable NVIDIA GPU access (Docker Compose v2+)
-    # device_requests:
-    #   - driver: nvidia
-    #     count: all
-    #     capabilities: [gpu]
+    # Enable NVIDIA GPU access (Compose specification)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
     # environment:
     #   - NVIDIA_VISIBLE_DEVICES=all
     #   - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility

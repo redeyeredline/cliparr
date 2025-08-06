@@ -20,11 +20,14 @@ services:
       - PORT=8484
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
-    # Enable NVIDIA GPU access (Docker Compose v2+)
-    device_requests:
-      - driver: nvidia
-        count: all
-        capabilities: [gpu]
+    # Enable NVIDIA GPU access (Compose specification)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     # Device mapping for VA-API/Intel QuickSync (optional)
     devices:
       - /dev/dri:/dev/dri
