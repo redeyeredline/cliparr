@@ -242,7 +242,6 @@ export async function startQueues() {
               maxStalledCount: 2,
             },
           );
-
           worker.on('completed', (job, result) => {
             workerLogger.info({ jobId: job.id, result }, 'Cleanup job completed');
           });
