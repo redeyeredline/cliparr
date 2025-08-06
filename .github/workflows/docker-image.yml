@@ -3,9 +3,7 @@ name: "Build and Publish Docker image"
 on:
   push:
     branches: [ "main" ]
-    paths:
-      - "**/*"
-      - "!README.md"  # ignore docs-only edits
+    tags: [ "*" ]
   workflow_dispatch:
 
 jobs:
@@ -29,8 +27,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/redeyeredline/cliparr:latest
             ghcr.io/redeyeredline/cliparr:nvidia
+            ghcr.io/redeyeredline/cliparr:${{ github.ref_name }}
           build-args: |
             FFMPEG_IMAGE=ghcr.io/redeyeredline/ffmpeg-static:7.1.1
           cache-from: type=registry,ref=ghcr.io/redeyeredline/cliparr:cache
