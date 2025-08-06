@@ -558,7 +558,7 @@ export default function Processing() {
             <Tabs defaultValue="queue" className="flex-1 flex flex-col min-h-0">
               <TabsList className="grid w-full grid-cols-4 bg-slate-800/90 backdrop-blur-md border border-slate-700">
                 <TabsTrigger value="queue" className="text-white">
-                  Queue
+                  All Jobs
                 </TabsTrigger>
                 <TabsTrigger value="monitor" className="text-white">
                   Monitor
