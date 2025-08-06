@@ -27,6 +27,7 @@ jobs:
           context: .
           push: true
           tags: |
+            ghcr.io/redeyeredline/cliparr:latest
             ghcr.io/redeyeredline/cliparr:nvidia
             ghcr.io/redeyeredline/cliparr:${{ github.ref_name }}
           build-args: |
