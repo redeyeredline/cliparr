@@ -10,6 +10,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProcessingQueue from '../components/processing/ProcessingQueue';
+
+// Memoized ProcessingQueue to prevent unnecessary re-renders
+const MemoizedProcessingQueue = React.memo(ProcessingQueue);
 import AudioAnalyzer from '../components/processing/AudioAnalyzer';
 import ProcessingMonitor from '../components/processing/ProcessingMonitor';
 import BatchProcessor from '../components/processing/BatchProcessor';
@@ -120,20 +123,25 @@ export default function Processing() {
   // Derive job lists for each tab/category
   const now = Date.now();
   // Determine jobs that are truly "running" based on recent progress heartbeat
-  const activeProcesses = jobs.filter(
-    (j) =>
-      j.status === 'processing' &&
-      (!jobProgress[j.id as string | number] ||
-        now - jobProgress[j.id as string | number].updated < 20000)
+  const activeProcesses = React.useMemo(() => 
+    jobs.filter(
+      (j) =>
+        j.status === 'processing' &&
+        (!jobProgress[j.id as string | number] ||
+          now - jobProgress[j.id as string | number].updated < 20000)
+    ), [jobs, jobProgress, now]
   );
-  const queuedJobs = filterJobsByCategory(jobs, 'queued');
-  const completedJobs = filterJobsByCategory(jobs, 'completed');
-  const failedJobs = filterJobsByCategory(jobs, 'failed');
+  const queuedJobs = React.useMemo(() => filterJobsByCategory(jobs, 'queued'), [jobs]);
+  const completedJobs = React.useMemo(() => filterJobsByCategory(jobs, 'completed'), [jobs]);
+  const failedJobs = React.useMemo(() => filterJobsByCategory(jobs, 'failed'), [jobs]);
 
   // Limit displayed active processes to the number of concurrently running workers
   const episodeQueueStatus = queueStatus.find((q) => q.name === 'episode-processing');
   const activeWorkerLimit = episodeQueueStatus?.active ?? 1; // default to 1 worker if unknown
-  const displayedActiveProcesses = activeProcesses.slice(0, Math.max(activeWorkerLimit, 1));
+  const displayedActiveProcesses = React.useMemo(() => 
+    activeProcesses.slice(0, Math.max(activeWorkerLimit, 1)), 
+    [activeProcesses, activeWorkerLimit]
+  );
 
   // Helper to normalize job IDs (strip 'epjob-' prefix)
   const normalizeId = useCallback((id: string | number | undefined) =>
@@ -516,9 +524,11 @@ export default function Processing() {
           }
           await new Promise((resolve) => setTimeout(resolve, 2000));
         }
-        await loadData();
+        // Remove deleted jobs from the local array instead of reloading
+        setJobs(prevJobs => prevJobs.filter(job => !selected.includes(job.id)));
       } else {
-        await loadData();
+        // Remove deleted jobs from the local array instead of reloading
+        setJobs(prevJobs => prevJobs.filter(job => !selected.includes(job.id)));
         toast({ type: 'success', message: 'Selected jobs deleted' });
       }
     } catch {
@@ -619,7 +629,7 @@ export default function Processing() {
 
               <TabsContent value="queue" className="flex-1 flex flex-col min-h-0 mt-6">
                 <div className="flex-1 flex flex-col min-h-0 overflow-auto">
-                  <ProcessingQueue
+                  <MemoizedProcessingQueue
                     jobs={jobs}
                     mediaFiles={mediaFiles}
                     profiles={[]} // Removed profiles prop
