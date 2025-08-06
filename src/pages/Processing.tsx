@@ -491,18 +491,7 @@ export default function Processing() {
             <div className="flex items-center gap-4">
               <h1 className="text-3xl font-bold text-white">Processing</h1>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => {
-                  wsClient.send({ type: 'test', message: 'Test from Processing page' });
-                }}
-                variant="outline"
-                size="sm"
-                className="text-white border-slate-600 hover:bg-slate-700"
-              >
-                Test WebSocket
-              </Button>
-            </div>
+
           </div>
           {/* Queue Status Overview */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 flex-shrink-0">
