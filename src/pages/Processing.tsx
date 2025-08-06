@@ -85,15 +85,21 @@ export default function Processing() {
 
   // Derive job lists for each tab/category
   const now = Date.now();
+  // Determine jobs that are truly "running" based on recent progress heartbeat
   const activeProcesses = jobs.filter(
     (j) =>
-      (j.status === 'processing' || j.status === 'scanning') &&
-      jobProgress[j.id as string | number] &&
-      now - jobProgress[j.id as string | number].updated < 10000
+      j.status === 'processing' &&
+      (!jobProgress[j.id as string | number] ||
+        now - jobProgress[j.id as string | number].updated < 20000)
   );
   const queuedJobs = filterJobsByCategory(jobs, 'queued');
   const completedJobs = filterJobsByCategory(jobs, 'completed');
   const failedJobs = filterJobsByCategory(jobs, 'failed');
+
+  // Limit displayed active processes to the number of concurrently running workers
+  const episodeQueueStatus = queueStatus.find((q) => q.name === 'episode-processing');
+  const activeWorkerLimit = episodeQueueStatus?.active ?? 1; // default to 1 worker if unknown
+  const displayedActiveProcesses = activeProcesses.slice(0, Math.max(activeWorkerLimit, 1));
 
   // WebSocket event handlers
   useEffect(() => {
@@ -508,15 +514,15 @@ export default function Processing() {
               <Card className="border-0 rounded-2xl shadow-lg bg-slate-800/90 backdrop-blur-md">
                 <CardHeader>
                   <CardTitle className="text-lg font-bold text-white">
-                    Active Processes ({activeProcesses.length})
+                    Active Processes ({displayedActiveProcesses.length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {activeProcesses.length === 0 ? (
+                  {displayedActiveProcesses.length === 0 ? (
                     <p className="text-slate-500 text-center py-4">No active processes</p>
                   ) : (
                     <div className="space-y-3">
-                      {activeProcesses.slice(0, 5).map((process) => (
+                      {displayedActiveProcesses.map((process) => (
                         <div
                           key={process.id}
                           className="p-3 bg-slate-900/50 rounded-lg border border-slate-700"
@@ -535,7 +541,7 @@ export default function Processing() {
                           )}
                         </div>
                       ))}
-                      {activeProcesses.length > 5 && (
+                      {activeProcesses.length > displayedActiveProcesses.length && (
                         <p className="text-xs text-slate-500 text-center">
                           +{activeProcesses.length - 5} more processes
                         </p>

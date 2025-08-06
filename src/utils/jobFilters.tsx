@@ -9,7 +9,7 @@ export function filterJobsByCategory(
 ): ProcessingJob[] {
   switch (category) {
     case 'processing':
-      return jobs.filter((j) => j.status === 'processing' || j.status === 'scanning');
+      return jobs.filter((j) => j.status === 'processing');
     case 'queued':
       // Show jobs that are detected, verified, or scanning (not running, completed, or failed)
       return jobs.filter((j) => j.status === 'detected' || j.status === 'verified' || j.status === 'scanning');
