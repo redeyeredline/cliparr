@@ -30,6 +30,12 @@ jobs:
           file: docker/ffmpeg.Dockerfile
           push: true
           tags: ghcr.io/redeyeredline/cliparr/ffmpeg-static:7.1.1
+      - name: Make FFmpeg package public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y gh
+          gh api -X PATCH "/user/packages/container/cliparr%2Fffmpeg-static" -f visibility=public
 
   cliparr:
     needs: ffmpeg
