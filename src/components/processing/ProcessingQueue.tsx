@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, memo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -28,8 +28,8 @@ import { apiClient } from '../../integration/api-client';
 import { FixedSizeList as VirtualList } from 'react-window';
 import { filterJobsByCategory } from '@/utils/jobFilters.tsx';
 
-// Memoized job item component to prevent unnecessary re-renders
-const JobItem = memo(({ 
+// Individual episode entity component with isolated updates
+const EpisodeEntity = memo(({ 
   job, 
   mediaFile, 
   profiles, 
@@ -37,7 +37,9 @@ const JobItem = memo(({
   onRowSelect, 
   onStopProcessing, 
   onDeleteJob, 
-  statusConfig 
+  statusConfig,
+  jobProgress,
+  isProcessing
 }: {
   job: ProcessingJob;
   mediaFile?: MediaFile;
@@ -47,12 +49,19 @@ const JobItem = memo(({
   onStopProcessing: (jobId: string | number) => Promise<void>;
   onDeleteJob: (jobId: string | number) => Promise<void>;
   statusConfig: any;
+  jobProgress?: Record<string, { progress: number; fps: number; currentFile: any; updated: number }>;
+  isProcessing: boolean;
 }) => {
   const config = statusConfig[job.status as keyof typeof statusConfig] || {
     color: 'bg-slate-700 text-slate-200',
     icon: Clock,
   };
   const StatusIcon = config.icon;
+
+  // Get real-time progress for this specific job
+  const realTimeProgress = jobProgress?.[job.id as string | number];
+  const progressPercent = realTimeProgress?.progress || 0;
+  const isCurrentlyProcessing = isProcessing && job.status === 'processing';
 
   return (
     <motion.div
@@ -89,6 +98,20 @@ const JobItem = memo(({
               Profile: {profiles.find((p) => p.id === job.profile_id)?.name || 'Auto'}
             </Badge>
           </div>
+          {/* Show progress bar only for processing jobs */}
+          {isCurrentlyProcessing && (
+            <div className="mt-2">
+              <div className="flex items-center gap-2 mb-1">
+                <Progress value={progressPercent} className="flex-1 h-2 rounded-full bg-slate-700" />
+                <span className="text-xs font-medium text-slate-200">{progressPercent}%</span>
+              </div>
+              {realTimeProgress?.fps && (
+                <div className="text-xs text-slate-400">
+                  FPS: {realTimeProgress.fps}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         {job.status === 'processing' && (
           <Button
@@ -116,7 +139,7 @@ const JobItem = memo(({
   );
 });
 
-JobItem.displayName = 'JobItem';
+EpisodeEntity.displayName = 'EpisodeEntity';
 
 interface ProcessingQueueProps {
   jobs: ProcessingJob[];
@@ -152,6 +175,7 @@ export default function ProcessingQueue({
   const [selectAllLoading, setSelectAllLoading] = useState(false);
   const [allJobIds, setAllJobIds] = useState<(string | number)[]>([]);
   const jobsWithId = jobs.filter((job) => job.id !== undefined && job.id !== null);
+  
   // Update dropdown filter options and logic
   const filterOptions = [
     { value: 'all', label: 'All Jobs' },
@@ -163,7 +187,10 @@ export default function ProcessingQueue({
 
   // Show all jobs by default, filter by dropdown selection
   const filteredJobs = filterJobsByCategory(jobsWithId, filter as any);
-  console.log('ProcessingQueue render:', { isLoading, jobs, filteredJobs });
+  
+  // Determine if any jobs are currently processing
+  const isProcessing = jobs.some(job => job.status === 'processing');
+  
   const [cpuLimit, setCpuLimit] = useState<number>(2);
   const [gpuLimit, setGpuLimit] = useState<number>(1);
   const [cpuPaused, setCpuPaused] = useState(false);
@@ -223,9 +250,9 @@ export default function ProcessingQueue({
     }
   };
 
-  const getMediaFile = (mediaFileId: string | number): MediaFile | undefined => {
+  const getMediaFile = useCallback((mediaFileId: string | number): MediaFile | undefined => {
     return mediaFiles.find((f) => f.id === mediaFileId);
-  };
+  }, [mediaFiles]);
 
   const statusConfig = {
     processing: { color: 'bg-blue-100 text-blue-700', icon: Play },
@@ -470,17 +497,21 @@ export default function ProcessingQueue({
               const job = filteredJobs[index];
               const mediaFile = getMediaFile(job.media_file_id);
               return (
-                <JobItem
-                  key={job.id}
-                  job={job}
-                  mediaFile={mediaFile}
-                  profiles={profiles}
-                  selected={selected}
-                  onRowSelect={handleRowSelect}
-                  onStopProcessing={onStopProcessing}
-                  onDeleteJob={onDeleteJob}
-                  statusConfig={statusConfig}
-                />
+                <div style={style}>
+                  <EpisodeEntity
+                    key={job.id}
+                    job={job}
+                    mediaFile={mediaFile}
+                    profiles={profiles}
+                    selected={selected}
+                    onRowSelect={handleRowSelect}
+                    onStopProcessing={onStopProcessing}
+                    onDeleteJob={onDeleteJob}
+                    statusConfig={statusConfig}
+                    jobProgress={jobProgress}
+                    isProcessing={isProcessing}
+                  />
+                </div>
               );
             }}
           </VirtualList>

@@ -10,9 +10,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProcessingQueue from '../components/processing/ProcessingQueue';
-
-// Memoized ProcessingQueue to prevent unnecessary re-renders
-const MemoizedProcessingQueue = React.memo(ProcessingQueue);
 import AudioAnalyzer from '../components/processing/AudioAnalyzer';
 import ProcessingMonitor from '../components/processing/ProcessingMonitor';
 import BatchProcessor from '../components/processing/BatchProcessor';
@@ -64,7 +61,7 @@ export default function Processing() {
     Record<string, { progress: number; fps: number; currentFile: CurrentFile; updated: number }>
   >({});
 
-  // Debounced job updates to prevent excessive re-renders
+  // Optimized job updates to prevent excessive re-renders
   const jobUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingJobUpdates = useRef<Map<string, any>>(new Map());
   const animationFrameRef = useRef<number | null>(null);
@@ -87,7 +84,14 @@ export default function Processing() {
             pendingJobUpdates.current.forEach((update, jobId) => {
               const index = updated.findIndex(job => normalizeId(job.id) === jobId);
               if (index !== -1) {
-                updated[index] = { ...updated[index], ...update };
+                // Only update if there are actual changes to prevent unnecessary re-renders
+                const currentJob = updated[index];
+                const hasChanges = Object.keys(update).some(key => 
+                  currentJob[key as keyof ProcessingJob] !== update[key]
+                );
+                if (hasChanges) {
+                  updated[index] = { ...currentJob, ...update };
+                }
               }
             });
             pendingJobUpdates.current.clear();
@@ -95,7 +99,7 @@ export default function Processing() {
           });
         });
       }
-    }, 50); // Reduced debounce to 50ms for more responsive updates
+    }, 1000); // Increased debounce to 1 second to prevent excessive re-renders
   }, []);
 
   const loadData = useCallback(async () => {
@@ -123,25 +127,20 @@ export default function Processing() {
   // Derive job lists for each tab/category
   const now = Date.now();
   // Determine jobs that are truly "running" based on recent progress heartbeat
-  const activeProcesses = React.useMemo(() => 
-    jobs.filter(
-      (j) =>
-        j.status === 'processing' &&
-        (!jobProgress[j.id as string | number] ||
-          now - jobProgress[j.id as string | number].updated < 20000)
-    ), [jobs, jobProgress, now]
+  const activeProcesses = jobs.filter(
+    (j) =>
+      j.status === 'processing' &&
+      (!jobProgress[j.id as string | number] ||
+        now - jobProgress[j.id as string | number].updated < 20000)
   );
-  const queuedJobs = React.useMemo(() => filterJobsByCategory(jobs, 'queued'), [jobs]);
-  const completedJobs = React.useMemo(() => filterJobsByCategory(jobs, 'completed'), [jobs]);
-  const failedJobs = React.useMemo(() => filterJobsByCategory(jobs, 'failed'), [jobs]);
+  const queuedJobs = filterJobsByCategory(jobs, 'queued');
+  const completedJobs = filterJobsByCategory(jobs, 'completed');
+  const failedJobs = filterJobsByCategory(jobs, 'failed');
 
   // Limit displayed active processes to the number of concurrently running workers
   const episodeQueueStatus = queueStatus.find((q) => q.name === 'episode-processing');
   const activeWorkerLimit = episodeQueueStatus?.active ?? 1; // default to 1 worker if unknown
-  const displayedActiveProcesses = React.useMemo(() => 
-    activeProcesses.slice(0, Math.max(activeWorkerLimit, 1)), 
-    [activeProcesses, activeWorkerLimit]
-  );
+  const displayedActiveProcesses = activeProcesses.slice(0, Math.max(activeWorkerLimit, 1));
 
   // Helper to normalize job IDs (strip 'epjob-' prefix)
   const normalizeId = useCallback((id: string | number | undefined) =>
@@ -149,12 +148,23 @@ export default function Processing() {
 
   // WebSocket event handlers
   useEffect(() => {
+    // Throttle WebSocket updates to prevent excessive re-renders
+    let lastUpdateTime = 0;
+    const UPDATE_THROTTLE_MS = 2000; // Only update once per 2 seconds to reduce re-renders
+    
     // Add a simple message logger to debug all incoming messages
     const handleAllMessages = (_data: unknown) => {
       /* intentionally left blank */
     };
 
     const handleJobUpdate = (data: unknown) => {
+      // Throttle updates to prevent excessive re-renders
+      const now = Date.now();
+      if (now - lastUpdateTime < UPDATE_THROTTLE_MS) {
+        return; // Skip this update if too soon
+      }
+      lastUpdateTime = now;
+      
       // Handle job updates - these come directly without a 'type' field
       if (data && typeof data === 'object' && 'dbJobId' in data && 'status' in data) {
         const jobData = data as {
@@ -191,16 +201,23 @@ export default function Processing() {
           if (jobData.status === 'processing' && jobData.progress !== undefined) {
             setJobProgress((prev) => {
               const jobId = normalizeId(jobData.dbJobId) || '';
-              const newProgress = {
-                ...prev,
-                [jobId]: {
-                  progress: jobData.progress,
-                  fps: jobData.fps,
-                  currentFile: jobData.currentFile,
-                  updated: Date.now(),
-                },
-              };
-              return newProgress;
+              const existingProgress = prev[jobId];
+              
+              // Only update if progress has actually changed to prevent unnecessary re-renders
+              if (!existingProgress || 
+                  existingProgress.progress !== jobData.progress ||
+                  existingProgress.fps !== jobData.fps) {
+                return {
+                  ...prev,
+                  [jobId]: {
+                    progress: jobData.progress,
+                    fps: jobData.fps,
+                    currentFile: jobData.currentFile,
+                    updated: Date.now(),
+                  },
+                };
+              }
+              return prev;
             });
           }
           // Remove progress for jobs that are completed/failed
@@ -282,15 +299,26 @@ export default function Processing() {
 
             // Track real-time progress/fps for processing jobs
             if (legacyJobData.status === 'processing' && legacyJobData.progress !== undefined) {
-              setJobProgress((prev) => ({
-                ...prev,
-                [normalizeId(legacyJobData.dbJobId) || '']: {
-                  progress: legacyJobData.progress,
-                  fps: legacyJobData.fps,
-                  currentFile: legacyJobData.currentFile,
-                  updated: Date.now(),
-                },
-              }));
+              setJobProgress((prev) => {
+                const jobId = normalizeId(legacyJobData.dbJobId) || '';
+                const existingProgress = prev[jobId];
+                
+                // Only update if progress has actually changed to prevent unnecessary re-renders
+                if (!existingProgress || 
+                    existingProgress.progress !== legacyJobData.progress ||
+                    existingProgress.fps !== legacyJobData.fps) {
+                  return {
+                    ...prev,
+                    [jobId]: {
+                      progress: legacyJobData.progress,
+                      fps: legacyJobData.fps,
+                      currentFile: legacyJobData.currentFile,
+                      updated: Date.now(),
+                    },
+                  };
+                }
+                return prev;
+              });
             }
             // Remove progress for jobs that are completed/failed
             if (['completed', 'failed'].includes(legacyJobData.status)) {
@@ -332,6 +360,13 @@ export default function Processing() {
     };
 
     const handleQueueStatus = (data: unknown) => {
+      // Throttle queue status updates
+      const now = Date.now();
+      if (now - lastUpdateTime < UPDATE_THROTTLE_MS) {
+        return; // Skip this update if too soon
+      }
+      lastUpdateTime = now;
+      
       if (data && typeof data === 'object' && 'type' in data && 'queues' in data) {
         const queueData = data as { type: string; queues: QueueStatusType[] };
         if (queueData.type === 'queue_status') {
@@ -341,6 +376,13 @@ export default function Processing() {
     };
 
     const handleProcessingStatus = (data: unknown) => {
+      // Throttle processing status updates
+      const now = Date.now();
+      if (now - lastUpdateTime < UPDATE_THROTTLE_MS) {
+        return; // Skip this update if too soon
+      }
+      lastUpdateTime = now;
+      
       if (data && typeof data === 'object' && 'type' in data && 'processing_status' in data) {
         const processingData = data as { type: string; processing_status: QueueStatusType[] };
         if (processingData.type === 'processing_status') {
@@ -629,7 +671,7 @@ export default function Processing() {
 
               <TabsContent value="queue" className="flex-1 flex flex-col min-h-0 mt-6">
                 <div className="flex-1 flex flex-col min-h-0 overflow-auto">
-                  <MemoizedProcessingQueue
+                  <ProcessingQueue
                     jobs={jobs}
                     mediaFiles={mediaFiles}
                     profiles={[]} // Removed profiles prop
@@ -651,6 +693,8 @@ export default function Processing() {
                     activeProcesses={displayedActiveProcesses}
                     mediaFiles={mediaFiles}
                     jobProgress={jobProgress}
+                    onStopProcessing={stopProcessing}
+                    onDeleteJob={handleDeleteJob}
                   />
                 </div>
               </TabsContent>
