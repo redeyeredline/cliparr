@@ -5,6 +5,7 @@
 import pino from 'pino';
 import fs from 'fs';
 
+
 const isProd = process.env.NODE_ENV === 'production';
 
 // Create logs directory if it doesn't exist
