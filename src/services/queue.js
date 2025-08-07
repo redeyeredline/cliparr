@@ -49,6 +49,12 @@ export const {
   resumeGpuWorkers,
   getQueue,
   debugQueueState,
+  recoverInterruptedJobs,
+  checkAndCleanupStaleJobs,
+  synchronizeJobStates,
+  startPeriodicJobRecovery,
+  stopPeriodicJobRecovery,
+  getJobRecoveryStatus,
 } = QueueManager;
 
 export const {

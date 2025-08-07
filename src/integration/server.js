@@ -7,7 +7,7 @@ import { getDatabaseSingleton } from '../database/Auto_DB_Setup.js';
 import { isPortInUse } from '../utils/isPortFree.js';
 import { ImportTaskManager } from '../tasks/importTask.js';
 import { registerGracefulShutdown } from '../utils/shutdown.js';
-import { initializeQueues, startQueues, stopQueues } from '../services/queue.js';
+import { initializeQueues, startQueues, stopQueues, recoverInterruptedJobs, checkAndCleanupStaleJobs, synchronizeJobStates, startPeriodicJobRecovery, stopPeriodicJobRecovery } from '../services/queue.js';
 
 let serverInstance, dbInstance, importTaskManager;
 
@@ -93,6 +93,20 @@ export async function startServer() {
     appLogger.info('Job queue system initialized and started');
     console.log('✅ Job queues initialized and started');
 
+    // Recover interrupted jobs from previous runs
+    console.log('🔄 Recovering interrupted jobs...');
+    await checkAndCleanupStaleJobs();
+    await synchronizeJobStates();
+    await recoverInterruptedJobs();
+    appLogger.info('Job recovery process completed');
+    console.log('✅ Job recovery process completed');
+
+    // Start periodic job recovery
+    console.log('🔄 Starting periodic job recovery...');
+    await startPeriodicJobRecovery();
+    appLogger.info('Periodic job recovery started');
+    console.log('✅ Periodic job recovery started');
+
     // Start listening
     console.log(`🎧 Starting to listen on ${config.host}:${config.port}...`);
     serverInstance.listen(config.port, config.host, () => {
@@ -109,6 +123,9 @@ export async function startServer() {
         await importTaskManager.stop();
         importTaskManager = null;
       }
+
+      // Stop periodic job recovery
+      await stopPeriodicJobRecovery();
 
       // Stop queues
       await stopQueues();

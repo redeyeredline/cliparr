@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo, useCallback } from 'react';
+import React, { useState, useEffect, memo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -174,7 +174,33 @@ export default function ProcessingQueue({
   const [filter, setFilter] = useState<string>('all');
   const [selectAllLoading, setSelectAllLoading] = useState(false);
   const [allJobIds, setAllJobIds] = useState<(string | number)[]>([]);
+  const [listHeight, setListHeight] = useState(600);
+  const containerRef = useRef<HTMLDivElement>(null);
   const jobsWithId = jobs.filter((job) => job.id !== undefined && job.id !== null);
+  
+  // Calculate dynamic height for the virtual list
+  useEffect(() => {
+    const updateHeight = () => {
+      if (containerRef.current) {
+        const containerHeight = containerRef.current.clientHeight;
+        // Reserve some space for padding and other elements
+        const availableHeight = Math.max(400, containerHeight - 150);
+        setListHeight(availableHeight);
+      }
+    };
+
+    // Initial calculation
+    updateHeight();
+    
+    // Recalculate after a short delay to ensure proper layout
+    const timeoutId = setTimeout(updateHeight, 100);
+    
+    window.addEventListener('resize', updateHeight);
+    return () => {
+      window.removeEventListener('resize', updateHeight);
+      clearTimeout(timeoutId);
+    };
+  }, []);
   
   // Update dropdown filter options and logic
   const filterOptions = [
@@ -313,7 +339,7 @@ export default function ProcessingQueue({
   };
 
   return (
-    <Card className="border-0 rounded-2xl shadow-lg bg-slate-800/90 backdrop-blur-md flex flex-col min-h-0">
+    <Card ref={containerRef} className="border-0 rounded-2xl shadow-lg bg-slate-800/90 backdrop-blur-md flex flex-col min-h-0">
       <CardHeader>
         <div className="relative flex items-center justify-between">
           {/* Left group: title, select all, delete */}
@@ -479,7 +505,7 @@ export default function ProcessingQueue({
           </Select>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 max-h-[60vh] overflow-y-auto flex-1 min-h-0">
+      <CardContent className="space-y-4 flex-1 min-h-0">
         {isLoading && filteredJobs.length === 0 ? (
           <p className="text-slate-400">Loading...</p>
         ) : filteredJobs.length === 0 ? (
@@ -488,7 +514,7 @@ export default function ProcessingQueue({
           </div>
         ) : (
           <VirtualList
-            height={480} // 60vh
+            height={listHeight}
             itemCount={filteredJobs.length}
             itemSize={90}
             width={'100%'}

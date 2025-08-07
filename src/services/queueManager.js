@@ -16,6 +16,7 @@ let QUEUE_CONFIG = {};
 const queues = {};
 const workers = {};
 let episodeProcessingQueueEvents;
+let recoveryInterval = null;
 
 export async function getWorkerLimits() {
   try {
@@ -401,4 +402,461 @@ export function debugQueueState() {
     workers: Object.keys(workers),
     queueConfig: QUEUE_CONFIG,
   };
+}
+
+export async function recoverInterruptedJobs() {
+  workerLogger.info('Starting job recovery process...');
+  console.log('[queueManager] Starting job recovery process...');
+  
+  try {
+    const db = await getDb();
+    
+    // Get all processing jobs that were interrupted
+    const interruptedJobs = db.prepare(`
+      SELECT 
+        pj.id as job_id,
+        pj.media_file_id,
+        pj.status,
+        ef.file_path,
+        e.title as episode_title,
+        e.episode_number,
+        s.season_number,
+        sh.title as show_title
+      FROM processing_jobs pj
+      JOIN episode_files ef ON pj.media_file_id = ef.id
+      JOIN episodes e ON ef.episode_id = e.id
+      JOIN seasons s ON e.season_id = s.id
+      JOIN shows sh ON s.show_id = sh.id
+      WHERE pj.status IN ('scanning', 'processing')
+      ORDER BY pj.created_date ASC
+    `).all();
+    
+    workerLogger.info(`Found ${interruptedJobs.length} interrupted jobs to recover`);
+    console.log(`[queueManager] Found ${interruptedJobs.length} interrupted jobs to recover`);
+    
+    if (interruptedJobs.length === 0) {
+      workerLogger.info('No interrupted jobs found');
+      console.log('[queueManager] No interrupted jobs found');
+      return;
+    }
+    
+    // Group jobs by status
+    const scanningJobs = interruptedJobs.filter(job => job.status === 'scanning');
+    const processingJobs = interruptedJobs.filter(job => job.status === 'processing');
+    
+    workerLogger.info(`Recovering ${scanningJobs.length} scanning jobs and ${processingJobs.length} processing jobs`);
+    console.log(`[queueManager] Recovering ${scanningJobs.length} scanning jobs and ${processingJobs.length} processing jobs`);
+    
+    let recoveredCount = 0;
+    let failedCount = 0;
+    
+    // Re-enqueue scanning jobs (these were never started)
+    if (scanningJobs.length > 0) {
+      const episodeFileAndJobIds = scanningJobs.map(job => ({
+        episodeFileId: job.media_file_id,
+        dbJobId: job.job_id
+      }));
+      
+      try {
+        const { enqueueEpisodeProcessing } = await import('./queueOperations.js');
+        await enqueueEpisodeProcessing(episodeFileAndJobIds);
+        recoveredCount += scanningJobs.length;
+        workerLogger.info(`Successfully re-enqueued ${scanningJobs.length} scanning jobs`);
+        console.log(`[queueManager] Successfully re-enqueued ${scanningJobs.length} scanning jobs`);
+      } catch (error) {
+        failedCount += scanningJobs.length;
+        workerLogger.error('Failed to re-enqueue scanning jobs:', error);
+        console.error('[queueManager] Failed to re-enqueue scanning jobs:', error);
+      }
+    }
+    
+    // Re-enqueue processing jobs (these were interrupted during processing)
+    if (processingJobs.length > 0) {
+      const episodeFileAndJobIds = processingJobs.map(job => ({
+        episodeFileId: job.media_file_id,
+        dbJobId: job.job_id
+      }));
+      
+      try {
+        const { enqueueEpisodeProcessing } = await import('./queueOperations.js');
+        await enqueueEpisodeProcessing(episodeFileAndJobIds);
+        recoveredCount += processingJobs.length;
+        workerLogger.info(`Successfully re-enqueued ${processingJobs.length} processing jobs`);
+        console.log(`[queueManager] Successfully re-enqueued ${processingJobs.length} processing jobs`);
+      } catch (error) {
+        failedCount += processingJobs.length;
+        workerLogger.error('Failed to re-enqueue processing jobs:', error);
+        console.error('[queueManager] Failed to re-enqueue processing jobs:', error);
+      }
+    }
+    
+    workerLogger.info(`Job recovery process completed: ${recoveredCount} recovered, ${failedCount} failed`);
+    console.log(`[queueManager] Job recovery process completed: ${recoveredCount} recovered, ${failedCount} failed`);
+    
+    return { recoveredCount, failedCount, totalJobs: interruptedJobs.length };
+    
+  } catch (error) {
+    workerLogger.error('Failed to recover interrupted jobs:', error);
+    console.error('[queueManager] Failed to recover interrupted jobs:', error);
+    // Don't throw error - job recovery failure shouldn't prevent app startup
+    return { recoveredCount: 0, failedCount: 0, totalJobs: 0, error: error.message };
+  }
+}
+
+export async function synchronizeJobStates() {
+  workerLogger.info('Synchronizing job states between database and Redis...');
+  console.log('[queueManager] Synchronizing job states between database and Redis...');
+  
+  try {
+    const db = await getDb();
+    const episodeProcessingQueue = queues['episode-processing'];
+    
+    if (!episodeProcessingQueue) {
+      workerLogger.warn('Episode processing queue not available for state synchronization');
+      console.log('[queueManager] Episode processing queue not available for state synchronization');
+      return { synchronized: false, reason: 'Queue not available' };
+    }
+    
+    // Get all jobs from Redis
+    const redisJobs = await episodeProcessingQueue.getJobs(['waiting', 'active', 'delayed']);
+    const redisJobIds = new Set(redisJobs.map(job => job.data?.dbJobId).filter(Boolean));
+    
+    // Get all processing jobs from database
+    const dbJobs = db.prepare(`
+      SELECT id, status, media_file_id 
+      FROM processing_jobs 
+      WHERE status IN ('scanning', 'processing')
+    `).all();
+    
+    const dbJobIds = new Set(dbJobs.map(job => job.id.toString()));
+    
+    let missingInRedisCount = 0;
+    let orphanedInRedisCount = 0;
+    
+    // Find jobs that exist in database but not in Redis
+    const missingInRedis = dbJobIds.filter(id => !redisJobIds.has(id));
+    
+    if (missingInRedis.length > 0) {
+      workerLogger.info(`Found ${missingInRedis.length} jobs in database that are missing from Redis`);
+      console.log(`[queueManager] Found ${missingInRedis.length} jobs in database that are missing from Redis`);
+      
+      // Re-enqueue missing jobs
+      const missingJobs = dbJobs.filter(job => missingInRedis.includes(job.id.toString()));
+      const episodeFileAndJobIds = missingJobs.map(job => ({
+        episodeFileId: job.media_file_id,
+        dbJobId: job.id
+      }));
+      
+      try {
+        const { enqueueEpisodeProcessing } = await import('./queueOperations.js');
+        await enqueueEpisodeProcessing(episodeFileAndJobIds);
+        missingInRedisCount = missingJobs.length;
+        workerLogger.info(`Successfully re-enqueued ${missingJobs.length} missing jobs`);
+        console.log(`[queueManager] Successfully re-enqueued ${missingJobs.length} missing jobs`);
+      } catch (error) {
+        workerLogger.error('Failed to re-enqueue missing jobs:', error);
+        console.error('[queueManager] Failed to re-enqueue missing jobs:', error);
+      }
+    }
+    
+    // Find jobs that exist in Redis but not in database (orphaned jobs)
+    const missingInDb = redisJobIds.filter(id => !dbJobIds.has(id));
+    
+    if (missingInDb.length > 0) {
+      workerLogger.warn(`Found ${missingInDb.length} orphaned jobs in Redis that don't exist in database`);
+      console.log(`[queueManager] Found ${missingInDb.length} orphaned jobs in Redis that don't exist in database`);
+      
+      // Remove orphaned jobs from Redis
+      for (const jobId of missingInDb) {
+        try {
+          const job = redisJobs.find(j => j.data?.dbJobId === jobId);
+          if (job) {
+            await job.remove();
+            orphanedInRedisCount++;
+            workerLogger.info(`Removed orphaned job ${jobId} from Redis`);
+            console.log(`[queueManager] Removed orphaned job ${jobId} from Redis`);
+          }
+        } catch (error) {
+          workerLogger.error(`Failed to remove orphaned job ${jobId}:`, error);
+          console.error(`[queueManager] Failed to remove orphaned job ${jobId}:`, error);
+        }
+      }
+    }
+    
+    workerLogger.info('Job state synchronization completed');
+    console.log('[queueManager] Job state synchronization completed');
+    
+    return { 
+      synchronized: true, 
+      missingInRedisCount, 
+      orphanedInRedisCount,
+      totalRedisJobs: redisJobs.length,
+      totalDbJobs: dbJobs.length
+    };
+    
+  } catch (error) {
+    workerLogger.error('Failed to synchronize job states:', error);
+    console.error('[queueManager] Failed to synchronize job states:', error);
+    return { synchronized: false, error: error.message };
+  }
+}
+
+export async function checkAndCleanupStaleJobs() {
+  workerLogger.info('Checking for stale jobs in Redis queues...');
+  console.log('[queueManager] Checking for stale jobs in Redis queues...');
+  
+  try {
+    let totalStaleJobs = 0;
+    let totalJobsChecked = 0;
+    
+    for (const [queueName, queue] of Object.entries(queues)) {
+      try {
+        // Get all jobs in the queue
+        const waiting = await queue.getWaiting();
+        const active = await queue.getActive();
+        const delayed = await queue.getDelayed();
+        
+        totalJobsChecked += waiting.length + active.length + delayed.length;
+        
+        workerLogger.info(`Queue ${queueName}: ${waiting.length} waiting, ${active.length} active, ${delayed.length} delayed`);
+        console.log(`[queueManager] Queue ${queueName}: ${waiting.length} waiting, ${active.length} active, ${delayed.length} delayed`);
+        
+        // Check if any active jobs are stale (running for too long)
+        const now = Date.now();
+        const staleThreshold = 30 * 60 * 1000; // 30 minutes
+        
+        for (const job of active) {
+          const jobAge = now - job.timestamp;
+          if (jobAge > staleThreshold) {
+            workerLogger.warn(`Found stale job ${job.id} in queue ${queueName}, age: ${Math.round(jobAge / 1000)}s`);
+            console.log(`[queueManager] Found stale job ${job.id} in queue ${queueName}, age: ${Math.round(jobAge / 1000)}s`);
+            
+            // Move stale job back to waiting state
+            try {
+              await job.moveToWaiting();
+              totalStaleJobs++;
+              workerLogger.info(`Moved stale job ${job.id} back to waiting state`);
+              console.log(`[queueManager] Moved stale job ${job.id} back to waiting state`);
+            } catch (moveError) {
+              workerLogger.error(`Failed to move stale job ${job.id}:`, moveError);
+              console.error(`[queueManager] Failed to move stale job ${job.id}:`, moveError);
+            }
+          }
+        }
+        
+      } catch (queueError) {
+        workerLogger.error(`Error checking queue ${queueName}:`, queueError);
+        console.error(`[queueManager] Error checking queue ${queueName}:`, queueError);
+      }
+    }
+    
+    workerLogger.info(`Stale job cleanup completed: ${totalStaleJobs} stale jobs moved, ${totalJobsChecked} total jobs checked`);
+    console.log(`[queueManager] Stale job cleanup completed: ${totalStaleJobs} stale jobs moved, ${totalJobsChecked} total jobs checked`);
+    
+    return { totalStaleJobs, totalJobsChecked };
+    
+  } catch (error) {
+    workerLogger.error('Failed to check for stale jobs:', error);
+    console.error('[queueManager] Failed to check for stale jobs:', error);
+    return { totalStaleJobs: 0, totalJobsChecked: 0, error: error.message };
+  }
+}
+
+export async function startPeriodicJobRecovery() {
+  workerLogger.info('Starting periodic job recovery...');
+  console.log('[queueManager] Starting periodic job recovery...');
+  
+  // Clear any existing interval
+  if (recoveryInterval) {
+    clearInterval(recoveryInterval);
+  }
+  
+  // Run recovery every 5 minutes
+  recoveryInterval = setInterval(async () => {
+    try {
+      workerLogger.info('Running periodic job recovery check...');
+      console.log('[queueManager] Running periodic job recovery check...');
+      
+      // Check for stale jobs
+      const staleResult = await checkAndCleanupStaleJobs();
+      
+      // Synchronize job states
+      const syncResult = await synchronizeJobStates();
+      
+      // Only recover jobs if there are issues detected
+      if (staleResult.totalStaleJobs > 0 || 
+          (syncResult.synchronized && (syncResult.missingInRedisCount > 0 || syncResult.orphanedInRedisCount > 0))) {
+        
+        const recoveryResult = await recoverInterruptedJobs();
+        
+        workerLogger.info('Periodic recovery completed:', {
+          staleJobs: staleResult.totalStaleJobs,
+          missingJobs: syncResult.missingInRedisCount || 0,
+          orphanedJobs: syncResult.orphanedInRedisCount || 0,
+          recoveredJobs: recoveryResult.recoveredCount || 0
+        });
+        console.log('[queueManager] Periodic recovery completed:', {
+          staleJobs: staleResult.totalStaleJobs,
+          missingJobs: syncResult.missingInRedisCount || 0,
+          orphanedJobs: syncResult.orphanedInRedisCount || 0,
+          recoveredJobs: recoveryResult.recoveredCount || 0
+        });
+      } else {
+        workerLogger.info('Periodic recovery check: No issues detected');
+        console.log('[queueManager] Periodic recovery check: No issues detected');
+      }
+      
+    } catch (error) {
+      workerLogger.error('Periodic job recovery failed:', error);
+      console.error('[queueManager] Periodic job recovery failed:', error);
+    }
+  }, 5 * 60 * 1000); // 5 minutes
+  
+  workerLogger.info('Periodic job recovery started (runs every 5 minutes)');
+  console.log('[queueManager] Periodic job recovery started (runs every 5 minutes)');
+}
+
+export async function stopPeriodicJobRecovery() {
+  if (recoveryInterval) {
+    clearInterval(recoveryInterval);
+    recoveryInterval = null;
+    workerLogger.info('Periodic job recovery stopped');
+    console.log('[queueManager] Periodic job recovery stopped');
+  }
+}
+
+export async function getJobRecoveryStatus() {
+  try {
+    const db = await getDb();
+    
+    // Get job statistics from database
+    const dbStats = db.prepare(`
+      SELECT 
+        status,
+        COUNT(*) as count
+      FROM processing_jobs
+      GROUP BY status
+    `).all();
+    
+    // Get queue statistics from Redis
+    const queueStats = {};
+    for (const [queueName, queue] of Object.entries(queues)) {
+      try {
+        const waiting = await queue.getWaiting();
+        const active = await queue.getActive();
+        const delayed = await queue.getDelayed();
+        const completed = await queue.getCompleted();
+        const failed = await queue.getFailed();
+        
+        queueStats[queueName] = {
+          waiting: waiting.length,
+          active: active.length,
+          delayed: delayed.length,
+          completed: completed.length,
+          failed: failed.length,
+          total: waiting.length + active.length + delayed.length + completed.length + failed.length
+        };
+      } catch (error) {
+        queueStats[queueName] = { error: error.message };
+      }
+    }
+    
+    // Check for potential issues
+    const issues = [];
+    
+    // Check for stale jobs
+    for (const [queueName, stats] of Object.entries(queueStats)) {
+      if (stats.active > 0) {
+        const now = Date.now();
+        const staleThreshold = 30 * 60 * 1000; // 30 minutes
+        
+        try {
+          const queue = queues[queueName];
+          const activeJobs = await queue.getActive();
+          
+          for (const job of activeJobs) {
+            const jobAge = now - job.timestamp;
+            if (jobAge > staleThreshold) {
+              issues.push({
+                type: 'stale_job',
+                queue: queueName,
+                jobId: job.id,
+                age: Math.round(jobAge / 1000),
+                threshold: Math.round(staleThreshold / 1000)
+              });
+            }
+          }
+        } catch (error) {
+          issues.push({
+            type: 'queue_error',
+            queue: queueName,
+            error: error.message
+          });
+        }
+      }
+    }
+    
+    // Check for database/Redis synchronization issues
+    const episodeProcessingQueue = queues['episode-processing'];
+    if (episodeProcessingQueue) {
+      try {
+        const redisJobs = await episodeProcessingQueue.getJobs(['waiting', 'active', 'delayed']);
+        const redisJobIds = new Set(redisJobs.map(job => job.data?.dbJobId).filter(Boolean));
+        
+        const dbJobs = db.prepare(`
+          SELECT id, status, media_file_id 
+          FROM processing_jobs 
+          WHERE status IN ('scanning', 'processing')
+        `).all();
+        
+        const dbJobIds = new Set(dbJobs.map(job => job.id.toString()));
+        
+        const missingInRedis = dbJobIds.filter(id => !redisJobIds.has(id));
+        const missingInDb = redisJobIds.filter(id => !dbJobIds.has(id));
+        
+        if (missingInRedis.length > 0) {
+          issues.push({
+            type: 'missing_in_redis',
+            count: missingInRedis.length,
+            jobIds: missingInRedis
+          });
+        }
+        
+        if (missingInDb.length > 0) {
+          issues.push({
+            type: 'orphaned_in_redis',
+            count: missingInDb.length,
+            jobIds: missingInDb
+          });
+        }
+      } catch (error) {
+        issues.push({
+          type: 'sync_error',
+          error: error.message
+        });
+      }
+    }
+    
+    return {
+      database: {
+        total: dbStats.reduce((sum, stat) => sum + stat.count, 0),
+        byStatus: dbStats.reduce((acc, stat) => {
+          acc[stat.status] = stat.count;
+          return acc;
+        }, {})
+      },
+      queues: queueStats,
+      issues,
+      recoveryActive: recoveryInterval !== null,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    workerLogger.error('Failed to get job recovery status:', error);
+    console.error('[queueManager] Failed to get job recovery status:', error);
+    return {
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
 }

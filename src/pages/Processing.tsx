@@ -595,7 +595,7 @@ export default function Processing() {
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="flex-1 overflow-auto p-6">
-        <div className="h-full flex flex-col">
+        <div className="min-h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <h1 className="text-3xl font-bold text-white">Processing</h1>
@@ -603,27 +603,27 @@ export default function Processing() {
 
           </div>
           {/* Queue Status Overview */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 flex-shrink-0">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 flex-shrink-0">
             <div className="lg:col-span-2">
               <QueueStatus queueStatus={queueStatus} />
             </div>
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Active Processes Summary */}
               <Card className="border-0 rounded-2xl shadow-lg bg-slate-800/90 backdrop-blur-md">
-                <CardHeader>
-                  <CardTitle className="text-lg font-bold text-white">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-bold text-white">
                     Active Processes ({displayedActiveProcesses.length})
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   {displayedActiveProcesses.length === 0 ? (
                     <p className="text-slate-500 text-center py-4">No active processes</p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {displayedActiveProcesses.map((process) => (
                         <div
                           key={process.id}
-                          className="p-3 bg-slate-900/50 rounded-lg border border-slate-700"
+                          className="p-2 bg-slate-900/50 rounded-lg border border-slate-700"
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-white font-medium">

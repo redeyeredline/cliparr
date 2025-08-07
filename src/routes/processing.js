@@ -30,6 +30,10 @@ import {
   removeJobFromAllQueues,
   queues,
   enqueueCleanupJob,
+  recoverInterruptedJobs,
+  checkAndCleanupStaleJobs,
+  synchronizeJobStates,
+  getJobRecoveryStatus,
 } from '../services/queue.js';
 import { getDatabaseSingleton } from '../database/Auto_DB_Setup.js';
 import path from 'path';
@@ -467,6 +471,54 @@ router.get('/cleanup-job-status/:id', async (req, res) => {
     }
     // Don't log any errors for cleanup job status as they're expected
     return res.status(404).json({ error: 'Cleanup job not found' });
+  }
+});
+
+// Job recovery status endpoint
+router.get('/recovery/status', async (req, res) => {
+  try {
+    const status = await getJobRecoveryStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Failed to get job recovery status:', error);
+    res.status(500).json({ 
+      error: 'Failed to get job recovery status', 
+      details: error.message 
+    });
+  }
+});
+
+// Automatic job recovery endpoint (for system use)
+router.post('/recover', async (req, res) => {
+  try {
+    console.log('🔄 Starting automatic job recovery...');
+    
+    // Step 1: Check and cleanup stale jobs
+    const staleResult = await checkAndCleanupStaleJobs();
+    
+    // Step 2: Synchronize job states between DB and Redis
+    const syncResult = await synchronizeJobStates();
+    
+    // Step 3: Recover interrupted jobs
+    const recoveryResult = await recoverInterruptedJobs();
+    
+    console.log('✅ Automatic job recovery completed');
+    res.json({ 
+      success: true, 
+      message: 'Job recovery completed successfully',
+      results: {
+        stale: staleResult,
+        sync: syncResult,
+        recovery: recoveryResult
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Job recovery failed:', error);
+    res.status(500).json({ 
+      error: 'Job recovery failed', 
+      details: error.message 
+    });
   }
 });
 
