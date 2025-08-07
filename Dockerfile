@@ -25,9 +25,6 @@ RUN npm install && \
 # --------  Runtime layer --------
 FROM lsiobase/ubuntu:jammy
 
-# Build argument to enable NVIDIA support
-ARG NVIDIA_SUPPORT=false
-
 # Install minimal dependencies & Node
 RUN apt-get update && apt-get install -y \
     curl ca-certificates gnupg build-essential \
@@ -42,11 +39,6 @@ RUN apt-get update && apt-get install -y \
     echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb jammy main" | tee /etc/apt/sources.list.d/redis.list && \
     apt-get update && \
     apt-get install -y redis-server && \
-    # Install NVIDIA runtime libraries if NVIDIA support is enabled
-    if [ "$NVIDIA_SUPPORT" = "true" ]; then \
-        apt-get install -y nvidia-cuda-toolkit nvidia-cuda-runtime nvidia-container-runtime && \
-        echo "NVIDIA support enabled"; \
-    fi && \
     apt-get clean && rm -rf /var/lib/apt/lists/* 
 
 # --- Bring in prebuilt FFmpeg ---
@@ -56,13 +48,6 @@ COPY --from=ffmpeg /usr/local /usr/local
 ENV PATH="/usr/local/bin:${PATH}"
 ENV LD_LIBRARY_PATH=/usr/local/lib
 RUN ldconfig
-
-# Set NVIDIA environment variables if NVIDIA support is enabled
-RUN if [ "$NVIDIA_SUPPORT" = "true" ]; then \
-        echo "export NVIDIA_VISIBLE_DEVICES=all" >> /etc/environment && \
-        echo "export NVIDIA_DRIVER_CAPABILITIES=compute,video,utility" >> /etc/environment && \
-        echo "NVIDIA environment variables configured"; \
-    fi
 
 # --- Copy application ---
 COPY --from=app-build /app /app
