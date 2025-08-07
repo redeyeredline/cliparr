@@ -6,6 +6,7 @@ on:
     tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -55,5 +56,7 @@ jobs:
           ghcr.io/redeyeredline/cliparr:nvidia
           ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          FFMPEG_IMAGE=ghcr.io/redeyeredline/ffmpeg-static:7.1.1
         cache-from: type=gha
         cache-to: type=gha,mode=max 

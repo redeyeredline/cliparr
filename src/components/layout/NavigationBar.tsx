@@ -4,7 +4,7 @@ import React, { useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useImportModal } from '../../hooks/useImportModal.tsx';
 import { useKeyboardNavigation, useFocusRestoration } from '../../utils/keyboardNavigation';
-import { Home, Download, Settings, Zap, Cpu, Monitor, Play, Eye } from 'lucide-react';
+import { Home, Download, Settings, Zap, Cpu, Monitor, Play, Eye, Shield } from 'lucide-react';
 
 interface NavigationBarProps {
   children: React.ReactNode;
@@ -26,6 +26,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
     { path: '/hardware', label: 'Hardware', icon: Monitor, shortcut: 'w' },
     { path: '/settings', label: 'Settings', icon: Settings, shortcut: 's' },
     { path: '/system', label: 'System', icon: Cpu, shortcut: 'y' },
+    { path: '/admin', label: 'Admin', icon: Shield, shortcut: 'a' },
   ];
 
   // Keyboard shortcuts for navigation
@@ -37,6 +38,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ children }) => {
     r: () => navigate('/review'),
     y: () => navigate('/system'),
     w: () => navigate('/hardware'),
+    a: () => navigate('/admin'),
     Escape: () => {
       // Close any open modals or return to previous page
       if (location.pathname !== '/') {

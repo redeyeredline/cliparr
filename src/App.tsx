@@ -14,6 +14,7 @@ const ShowDetailsPage = lazy(() => import('./pages/ShowDetailsPage'));
 const HardwarePage = lazy(() => import('./pages/Hardware'));
 const ProcessingPage = lazy(() => import('./pages/Processing'));
 const ReviewPage = lazy(() => import('./pages/Review'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 
 // Loading component for lazy-loaded pages
 const PageLoading = () => (
@@ -37,6 +38,7 @@ function App() {
                 <Route path="/system" element={<SystemPage />} />
                 <Route path="/processing" element={<ProcessingPage />} />
                 <Route path="/review" element={<ReviewPage />} />
+                <Route path="/admin" element={<AdminPage />} />
               </Routes>
             </Suspense>
           </NavigationBar>

@@ -29,8 +29,17 @@ export async function processJob(jobType, jobOrData) {
           workerLogger.error(`Episode file not found for ID: ${episodeFileId}`);
           throw new Error(`Episode file not found for ID: ${episodeFileId}`);
         }
-        // Define a progress callback to emit granular updates via WebSocket
+        // Define a throttled progress callback to prevent excessive WebSocket updates
+        let lastProgressUpdate = 0;
+        const PROGRESS_THROTTLE_MS = 2000; // Only send progress updates every 2 seconds
+        
         const progressCallback = (progress, message) => {
+          const now = Date.now();
+          if (now - lastProgressUpdate < PROGRESS_THROTTLE_MS) {
+            return; // Skip this update if too soon
+          }
+          lastProgressUpdate = now;
+          
           try {
             broadcastJobUpdate({
               type: 'job_update',

@@ -25,7 +25,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ProcessingJob, MediaFile, ProcessingProfile } from '../entities/all';
 import { ProcessingJobEntity } from '../entities/ProcessingJob';
 import { apiClient } from '../../integration/api-client';
-import { FixedSizeList as VirtualList } from 'react-window';
 import { filterJobsByCategory } from '@/utils/jobFilters.tsx';
 
 // Individual episode entity component with isolated updates
@@ -174,33 +173,7 @@ export default function ProcessingQueue({
   const [filter, setFilter] = useState<string>('all');
   const [selectAllLoading, setSelectAllLoading] = useState(false);
   const [allJobIds, setAllJobIds] = useState<(string | number)[]>([]);
-  const [listHeight, setListHeight] = useState(600);
-  const containerRef = useRef<HTMLDivElement>(null);
   const jobsWithId = jobs.filter((job) => job.id !== undefined && job.id !== null);
-  
-  // Calculate dynamic height for the virtual list
-  useEffect(() => {
-    const updateHeight = () => {
-      if (containerRef.current) {
-        const containerHeight = containerRef.current.clientHeight;
-        // Reserve some space for padding and other elements
-        const availableHeight = Math.max(400, containerHeight - 150);
-        setListHeight(availableHeight);
-      }
-    };
-
-    // Initial calculation
-    updateHeight();
-    
-    // Recalculate after a short delay to ensure proper layout
-    const timeoutId = setTimeout(updateHeight, 100);
-    
-    window.addEventListener('resize', updateHeight);
-    return () => {
-      window.removeEventListener('resize', updateHeight);
-      clearTimeout(timeoutId);
-    };
-  }, []);
   
   // Update dropdown filter options and logic
   const filterOptions = [
@@ -339,7 +312,7 @@ export default function ProcessingQueue({
   };
 
   return (
-    <Card ref={containerRef} className="border-0 rounded-2xl shadow-lg bg-slate-800/90 backdrop-blur-md flex flex-col min-h-0">
+    <Card className="border-0 rounded-2xl shadow-lg bg-slate-800/90 backdrop-blur-md flex flex-col min-h-0">
       <CardHeader>
         <div className="relative flex items-center justify-between">
           {/* Left group: title, select all, delete */}
@@ -513,34 +486,26 @@ export default function ProcessingQueue({
             <p>No jobs in this category.</p>
           </div>
         ) : (
-          <VirtualList
-            height={listHeight}
-            itemCount={filteredJobs.length}
-            itemSize={90}
-            width={'100%'}
-          >
-            {({ index, style }) => {
-              const job = filteredJobs[index];
+          <div className="space-y-3 overflow-y-auto flex-1">
+            {filteredJobs.map((job) => {
               const mediaFile = getMediaFile(job.media_file_id);
               return (
-                <div style={style}>
-                  <EpisodeEntity
-                    key={job.id}
-                    job={job}
-                    mediaFile={mediaFile}
-                    profiles={profiles}
-                    selected={selected}
-                    onRowSelect={handleRowSelect}
-                    onStopProcessing={onStopProcessing}
-                    onDeleteJob={onDeleteJob}
-                    statusConfig={statusConfig}
-                    jobProgress={jobProgress}
-                    isProcessing={isProcessing}
-                  />
-                </div>
+                <EpisodeEntity
+                  key={job.id}
+                  job={job}
+                  mediaFile={mediaFile}
+                  profiles={profiles}
+                  selected={selected}
+                  onRowSelect={handleRowSelect}
+                  onStopProcessing={onStopProcessing}
+                  onDeleteJob={onDeleteJob}
+                  statusConfig={statusConfig}
+                  jobProgress={jobProgress}
+                  isProcessing={isProcessing}
+                />
               );
-            }}
-          </VirtualList>
+            })}
+          </div>
         )}
       </CardContent>
     </Card>

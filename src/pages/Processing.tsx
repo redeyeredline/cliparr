@@ -99,7 +99,7 @@ export default function Processing() {
           });
         });
       }
-    }, 1000); // Increased debounce to 1 second to prevent excessive re-renders
+    }, 2000); // Increased debounce to 2 seconds to prevent excessive re-renders
   }, []);
 
   const loadData = useCallback(async () => {
@@ -150,7 +150,7 @@ export default function Processing() {
   useEffect(() => {
     // Throttle WebSocket updates to prevent excessive re-renders
     let lastUpdateTime = 0;
-    const UPDATE_THROTTLE_MS = 2000; // Only update once per 2 seconds to reduce re-renders
+    const UPDATE_THROTTLE_MS = 5000; // Only update once per 5 seconds to reduce re-renders
     
     // Add a simple message logger to debug all incoming messages
     const handleAllMessages = (_data: unknown) => {
