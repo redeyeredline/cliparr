@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Images
 
 on:
   push:
@@ -13,12 +13,74 @@ env:
   IMAGE_NAME: redeyeredline/cliparr
 
 jobs:
-  build:
+  build-ffmpeg-base:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push FFmpeg base image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/ffmpeg.Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: |
+          ghcr.io/redeyeredline/ffmpeg-static:7.1.1-base
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  build-ffmpeg-nvidia:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push FFmpeg NVIDIA image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/ffmpeg-nvidia.Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: |
+          ghcr.io/redeyeredline/ffmpeg-static:7.1.1-nvidia
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  build-cliparr-base:
+    runs-on: ubuntu-latest
+    needs: [build-ffmpeg-base]
+    permissions:
+      contents: read
+      packages: write
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -45,18 +107,66 @@ jobs:
           type=semver,pattern={{major}}.{{minor}}
           type=sha,prefix={{branch}}-
 
-    - name: Build and push Docker image
+    - name: Build and push Cliparr base image
       uses: docker/build-push-action@v5
       with:
         context: .
+        file: ./Dockerfile
         platforms: linux/amd64,linux/arm64
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
           ghcr.io/redeyeredline/cliparr:latest
+          ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          FFMPEG_IMAGE=ghcr.io/redeyeredline/ffmpeg-static:7.1.1-base
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  build-cliparr-nvidia:
+    runs-on: ubuntu-latest
+    needs: [build-ffmpeg-nvidia]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+
+    - name: Build and push Cliparr NVIDIA image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.nvidia
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: |
           ghcr.io/redeyeredline/cliparr:nvidia
           ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         build-args: |
-          FFMPEG_IMAGE=ghcr.io/redeyeredline/ffmpeg-static:7.1.1
+          FFMPEG_IMAGE=ghcr.io/redeyeredline/ffmpeg-static:7.1.1-nvidia
         cache-from: type=gha
         cache-to: type=gha,mode=max 

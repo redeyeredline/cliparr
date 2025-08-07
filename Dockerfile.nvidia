@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 
-# --------  FFmpeg binary layer (prebuilt) --------
-# Provide an FFmpeg image once (built separately with docker/ffmpeg.Dockerfile),
+# --------  FFmpeg binary layer (prebuilt with NVIDIA support) --------
+# Provide an FFmpeg image once (built separately with docker/ffmpeg-nvidia.Dockerfile),
 # push it to your registry, and reference it here so we skip the long compile.
 # Update the tag when you rebuild FFmpeg.
-ARG FFMPEG_IMAGE=ghcr.io/redeyeredline/ffmpeg-static:7.1.1-base
+ARG FFMPEG_IMAGE=ghcr.io/redeyeredline/ffmpeg-static:7.1.1-nvidia
 FROM ${FFMPEG_IMAGE} AS ffmpeg
 
 # --------  Application build layer --------
@@ -25,13 +25,14 @@ RUN npm install && \
 # --------  Runtime layer --------
 FROM lsiobase/ubuntu:jammy
 
-# Install minimal dependencies & Node (CPU + QuickSync only)
+# Install minimal dependencies & Node (CPU + QuickSync + NVIDIA)
 RUN apt-get update && apt-get install -y \
     curl ca-certificates gnupg build-essential \
     libva-drm2 libva-x11-2 \
     libva-glx2 libnuma1 libx264-163 libx265-199 libvpx7 \
     libopus0 libvorbis0a libmp3lame0 libfdk-aac2 libflac8 \
-    libvorbisenc2 libvdpau1 intel-media-va-driver-non-free && \
+    libvorbisenc2 libvdpau1 intel-media-va-driver-non-free \
+    nvidia-cuda-toolkit nvidia-cuda-dev && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && npm install -g npm@11.4.2 && \
     # Install Redis 6.2+ from Redis repository
@@ -41,12 +42,12 @@ RUN apt-get update && apt-get install -y \
     apt-get install -y redis-server && \
     apt-get clean && rm -rf /var/lib/apt/lists/* 
 
-# --- Bring in prebuilt FFmpeg ---
+# --- Bring in prebuilt FFmpeg with NVIDIA support ---
 COPY --from=ffmpeg /usr/local /usr/local
 
 # Ensure ffmpeg binary is in PATH and libs are found
 ENV PATH="/usr/local/bin:${PATH}"
-ENV LD_LIBRARY_PATH=/usr/local/lib
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64
 RUN ldconfig
 
 # --- Copy application ---
@@ -63,4 +64,4 @@ EXPOSE 8484
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 CMD curl -f http://localhost:8484/health/status || exit 1
 
-CMD ["./docker-start.sh"]
+CMD ["./docker-start.sh"] 
